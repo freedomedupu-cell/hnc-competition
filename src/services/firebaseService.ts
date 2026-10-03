@@ -1351,47 +1351,7 @@ export async function seedInitialDataIfEmpty(): Promise<void> {
       await setDoc(saDocRef, saRecord, { merge: true });
     }
 
-    // 2. Ensure initial official Ponder Sip advertisement exists in Firestore if collection is empty
-    try {
-      const adColRef = collection(db, 'advertisements');
-      const adSnap = await getDocs(adColRef);
-      if (adSnap.empty) {
-        const defaultAd: DbAdvertisement = {
-          id: 'ad-ponder-sip-official',
-          brandName: 'Ponder Sip',
-          title: 'Ponder Sip — Fuel Your Mind!',
-          tagline: 'Study Fuel, Artisanal Boba & Brain-Boost Cold Brews',
-          description: 'தேர்வு எழுதும் மாணவர்களுக்கான புத்துணர்ச்சி பானங்கள், ஐஸ் மாச்சா, பிரீமியம் போபா மற்றும் கோல்ட் ப்ரூ காபி. உங்கள் சிந்தனையை வேகப்படுத்துங்கள்!',
-          badgeText: 'SPONSORED',
-          category: 'Cafe & Refreshment',
-          imageUrl: '',
-          promoCode: 'PONDERSIP15',
-          discountPercentage: 15,
-          actionButtonText: 'Explore Menu',
-          actionUrl: '',
-          targetAudience: 'all',
-          status: 'active',
-          priority: 1,
-          createdAt: now,
-          createdBy: {
-            uid: 'sa_freedomedupu',
-            name: 'Chief Academic Registrar (Super Admin)',
-            role: 'super_admin',
-          },
-          menuItems: [
-            { name: '🧠 Mind Spark Matcha', price: 'Rs. 650', description: 'Ceremonial Uji matcha, oat milk & L-theanine for sustained study focus.' },
-            { name: '🧋 Classic Brown Sugar Boba', price: 'Rs. 580', description: 'Warm brown sugar pearls, fresh milk, and rich Ceylon black tea.' },
-            { name: '☕ Brainstorm Cold Brew', price: 'Rs. 620', description: 'Steeped for 18 hours, smooth dark chocolate notes, zero bitterness.' },
-            { name: '🍋 Citrus Logic Quencher', price: 'Rs. 520', description: 'Fresh passion fruit, lime & sparkling soda. Ultimate exam stress relief.' },
-          ],
-        };
-        await setDoc(doc(db, 'advertisements', 'ad-ponder-sip-official'), defaultAd);
-      }
-    } catch (e) {
-      console.warn('Initial ad seed notice:', e);
-    }
-
-    // Purge legacy and sample demo data from Firestore
+    // Purge legacy and sample demo data from Firestore (including demo ads)
     await purgeLegacyDemoFirestoreData();
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('hnc_seed_initialized', 'true');
@@ -1420,6 +1380,22 @@ export async function purgeLegacyDemoFirestoreData(): Promise<{ competitionsDele
     await deleteDoc(adminDoc);
     const adminProf = doc(db, 'admins', 'admin_dr_ananthi');
     await deleteDoc(adminProf);
+  } catch (_) {}
+
+  // Purge demo advertisements from Firestore
+  try {
+    const demoAdIds = [
+      'ad-ponder-sip-official',
+      'ad-pondersip-official',
+      'ad-hnc-scholarship',
+      'ad-demo-1',
+      'ad-demo-2',
+    ];
+    for (const adId of demoAdIds) {
+      try {
+        await deleteDoc(doc(db, 'advertisements', adId));
+      } catch (_) {}
+    }
   } catch (_) {}
 
   let competitionsDeleted = 0;

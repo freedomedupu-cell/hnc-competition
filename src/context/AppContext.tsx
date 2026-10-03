@@ -931,7 +931,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     studentId: currentAuthUser?.studentId || (currentAuthUser?.uid ? `HNC-STD-${currentAuthUser.uid.slice(0, 5).toUpperCase()}` : 'HNC-STD-0000'),
     username: currentAuthUser?.username || '',
     institution: currentAuthUser?.school || 'Participating Institution',
-    gradeLevel: currentAuthUser?.grade || 'Open Grade',
+    gradeLevel: currentAuthUser?.grade || 'Grade 11 (O/L)',
     district: currentAuthUser?.district || '',
     address: currentAuthUser?.address || '',
     dateOfBirth: currentAuthUser?.dateOfBirth || '',

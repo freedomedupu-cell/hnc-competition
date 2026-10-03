@@ -243,12 +243,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
       case 'super_admin':
         return (
           <div className="space-y-1">
-            <div className="px-3 pb-2 pt-1 flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                {t('superAdminPanel')}
-              </span>
-              <Shield className="w-3.5 h-3.5 text-blue-600" />
-            </div>
             {superAdminNavItems.map((item) => {
               const active = superAdminNav === item.id;
               return (
@@ -398,21 +392,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
   const sidebarContent = (
     <div className="flex flex-col h-full justify-between p-4">
       <div className="space-y-4">
-        {/* Portal Context Banner (Admin / Super Admin) */}
-        {!isStudent && (
-          <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-lg">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-              <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wide">
-                {portalDescriptor.tag}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-              {portalDescriptor.desc}
-            </p>
-          </div>
-        )}
-
         {/* Navigation list */}
         <nav className="space-y-1">{renderNavSection()}</nav>
       </div>

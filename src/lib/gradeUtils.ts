@@ -70,35 +70,35 @@ export function isGradeEligible(
   if (!competitionGrade) return true;
   const compNorm = competitionGrade.trim().toLowerCase();
 
-  // Open competitions are accessible to everyone
-  if (
+  // 1. "ஓபன் அண்ட் கொடுத்தா மட்டும் தான் எல்லா மாணவர்களும் டிஸ்ப்ளே ஆகணும்"
+  // ONLY if competition is explicitly Open / All Grades / General -> Eligible for all students
+  const isCompOpen =
     compNorm.includes('open') ||
     compNorm.includes('all') ||
     compNorm.includes('general') ||
     compNorm.includes('அனைத்து') ||
-    compNorm === ''
-  ) {
+    compNorm === 'open (all grades)' ||
+    compNorm === 'all grades' ||
+    compNorm === '';
+
+  if (isCompOpen) {
     return true;
   }
 
-  // If student hasn't specified a grade, don't block
-  if (!studentGrade) return true;
+  // 2. Competition is for a specific grade: Strictly check student's enrolled grade
+  if (!studentGrade) return false;
   const stuNorm = studentGrade.trim().toLowerCase();
-  if (
-    stuNorm.includes('open') ||
-    stuNorm.includes('all') ||
-    stuNorm.includes('general') ||
-    stuNorm === ''
-  ) {
-    return true;
+
+  // If student profile is open/general, they can only see open competitions
+  if (stuNorm.includes('open') && !compNorm.includes('open')) {
+    // If student has no specific grade, fall back to checking if sanitized matches
   }
 
   const compNumbers = extractGradeNumbers(competitionGrade);
   const stuNumbers = extractGradeNumbers(studentGrade);
 
-  // If both have extracted numeric grades:
+  // If numeric grades are present (e.g. Grade 11 vs Grade 6):
   if (compNumbers.length > 0 && stuNumbers.length > 0) {
-    // Student must match at least one of the competition's eligible grades
     return stuNumbers.some((num) => compNumbers.includes(num));
   }
 
@@ -106,8 +106,7 @@ export function isGradeEligible(
   const cleanComp = compNorm.replace(/[^a-z0-9]/g, '');
   const cleanStu = stuNorm.replace(/[^a-z0-9]/g, '');
 
-  if (cleanComp === cleanStu) return true;
-  if (cleanComp.includes(cleanStu) || cleanStu.includes(cleanComp)) return true;
+  if (cleanComp && cleanStu && cleanComp === cleanStu) return true;
 
   return false;
 }

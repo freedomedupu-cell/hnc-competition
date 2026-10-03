@@ -31,6 +31,7 @@ import { GraduationCap, Shield } from 'lucide-react';
 import { APP_LOGO } from '../../assets/logo';
 import { StudentMembershipModal } from './StudentMembershipModal';
 import { DynamicAdBillboard } from '../common/DynamicAdBillboard';
+import { isGradeEligible } from '../../lib/gradeUtils';
 
 export const StudentCompetitionsView: React.FC = () => {
   const {
@@ -70,10 +71,19 @@ export const StudentCompetitionsView: React.FC = () => {
     competition: Competition;
   } | null>(null);
 
+  // Student's academic grade level (e.g. Grade 11 (O/L), Grade 6, etc.)
+  const studentGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 6';
+
   // Visible to students: Published, Registration Open, Ongoing (Real Firestore competitions only)
+  // STRICT GRADE FILTER:
+  // "குறிப்பிட்ட மாணவருடைய தரங்களுக்கு மட்டுமே அவரவர் டாஸ் போர்டுல பரீட்சைகள் டிஸ்ப்ளே ஆக வேண்டும் ஓபன் அண்ட் கொடுத்தா மட்டும் தான் எல்லா மாணவர்களும் டிஸ்ப்ளே ஆகணும்"
   const visibleCompetitions = competitions.filter((comp) => {
     const s = (comp.status || '').toLowerCase();
-    return !s.includes('draft') && !s.includes('closed');
+    const isPublished = !s.includes('draft') && !s.includes('closed');
+    if (!isPublished) return false;
+
+    // Strict: Only matches student's enrolled grade OR competition is Open to all grades
+    return isGradeEligible(comp.grade, studentGrade);
   });
 
   // Dynamic categories extracted from actual competitions

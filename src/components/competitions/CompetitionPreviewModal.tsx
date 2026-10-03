@@ -23,6 +23,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { ShareModal } from '../common/ShareModal';
+import { VoiceTypingInput } from '../common/VoiceTypingInput';
 
 interface CompetitionPreviewModalProps {
   isOpen: boolean;
@@ -377,15 +378,14 @@ export const CompetitionPreviewModal: React.FC<CompetitionPreviewModalProps> = (
                         </div>
                       )}
 
-                      {/* Short Answer */}
+                      {/* Short Answer with Voice Typing */}
                       {q.type === 'short_answer' && (
-                        <div className="space-y-2 max-w-md">
-                          <input
-                            type="text"
-                            placeholder="Candidate short answer input..."
+                        <div className="space-y-2 max-w-lg">
+                          <VoiceTypingInput
+                            id={`preview-short-${q.id}`}
                             value={userAnswers[q.id] || ''}
-                            onChange={(e) => handleSelectAnswer(q.id, e.target.value)}
-                            className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            onChange={(val) => handleSelectAnswer(q.id, val)}
+                            placeholder="Type short answer or click Voice Type..."
                           />
                           {showAnswerKey && q.correctAnswer && (
                             <div className="text-xs bg-emerald-50 text-emerald-900 border border-emerald-200 p-2 rounded-lg flex items-center gap-2">

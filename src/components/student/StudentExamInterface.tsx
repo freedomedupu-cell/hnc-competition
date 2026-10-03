@@ -29,6 +29,8 @@ import { useApp } from '../../context/AppContext';
 import { getCompetitionQuestions } from '../../data/questionPool';
 import { SubmissionConfirmationView } from './SubmissionConfirmationView';
 import { subscribeToSingleProctorSession } from '../../services/firebaseService';
+import { VoiceTypingInput } from '../common/VoiceTypingInput';
+import { ExamCountdownTimer } from './ExamCountdownTimer';
 
 interface StudentExamInterfaceProps {
   competition: Competition;
@@ -344,17 +346,6 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Timer visual styling: changes to amber when < 5 mins, pulse red when < 1 min
-  const timerStyle = useMemo(() => {
-    if (secondsRemaining <= 60) {
-      return 'bg-red-600 text-white animate-pulse ring-4 ring-red-300';
-    }
-    if (secondsRemaining <= 300) {
-      return 'bg-amber-500 text-white ring-2 ring-amber-300';
-    }
-    return 'bg-slate-900 text-emerald-400 border border-slate-700';
-  }, [secondsRemaining]);
-
   // Handle answer selection
   const handleSelectAnswer = (qId: string, answerValue: string) => {
     if (isLocked) return;
@@ -460,16 +451,16 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
           </div>
         </div>
 
-        {/* Center: Admin-Configured Countdown Timer */}
-        <div className="flex items-center gap-3">
-          <div
-            id="exam-countdown-timer"
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-base sm:text-lg font-bold shadow-inner transition-colors duration-300 ${timerStyle}`}
-            title={`Configured duration: ${durationMinutes} minutes`}
-          >
-            <Clock className="h-4 w-4 shrink-0" />
-            <span>{formatTime(secondsRemaining)}</span>
-          </div>
+        {/* Center: Interactive Visual Countdown Timer with Auto-Submit */}
+        <div className="flex items-center gap-2">
+          <ExamCountdownTimer
+            totalSeconds={totalDurationSeconds}
+            remainingSeconds={secondsRemaining}
+            isLocked={isLocked}
+            onTimeUp={() => handleFinalSubmit(true)}
+            language={language}
+            isSubmitting={isSubmitting}
+          />
         </div>
 
         {/* Right: Answered Progress & Finish Button */}
@@ -495,6 +486,22 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
           </button>
         </div>
       </header>
+
+      {/* Visual Time Progress Indicator Bar */}
+      <div className="sticky top-[61px] z-30 w-full bg-slate-800/90 backdrop-blur-xs h-1.5 overflow-hidden">
+        <div
+          className={`h-full transition-all duration-1000 ease-linear ${
+            secondsRemaining <= 60
+              ? 'bg-red-500 animate-pulse'
+              : secondsRemaining <= 300
+              ? 'bg-amber-400'
+              : 'bg-emerald-400'
+          }`}
+          style={{
+            width: `${Math.max(0, Math.min(100, (secondsRemaining / totalDurationSeconds) * 100))}%`,
+          }}
+        />
+      </div>
 
       {/* Main Exam Canvas */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -634,26 +641,46 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
                 </div>
               )}
 
-              {/* Type 3: Short Answer */}
+              {/* Type 3: Short Answer with Voice Typing */}
               {currentQuestion.type === 'short_answer' && (
                 <div className="space-y-3">
-                  <label
-                    htmlFor={`short-answer-${currentQuestion.id}`}
-                    className="block text-xs font-semibold uppercase tracking-wider text-slate-500"
-                  >
-                    Your Answer
-                  </label>
-                  <input
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor={`short-answer-${currentQuestion.id}`}
+                      className="block text-xs font-semibold uppercase tracking-wider text-slate-500"
+                    >
+                      {language === 'ta'
+                        ? 'உங்கள் விடை (Your Answer)'
+                        : language === 'si'
+                        ? 'ඔබේ පිළිතුර (Your Answer)'
+                        : 'Your Answer'}
+                    </label>
+                    <span className="text-[11px] text-blue-600 font-semibold flex items-center gap-1">
+                      <span>🎙️ Voice Typing Supported</span>
+                    </span>
+                  </div>
+
+                  <VoiceTypingInput
                     id={`short-answer-${currentQuestion.id}`}
-                    type="text"
                     value={currentAnswer}
-                    onChange={(e) => handleSelectAnswer(currentQuestion.id, e.target.value)}
+                    onChange={(val) => handleSelectAnswer(currentQuestion.id, val)}
                     disabled={isLocked}
-                    placeholder="Enter your exact solution or answer..."
-                    className="w-full rounded-2xl border border-slate-300 px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 outline-none transition"
+                    portalLanguage={language}
+                    placeholder={
+                      language === 'ta'
+                        ? 'உங்கள் விடையைத் தட்டச்சு செய்யவும் அல்லது மைக்ரோஃபோனை அழுத்திப் பேசவும்...'
+                        : language === 'si'
+                        ? 'ඔබේ පිළිතුර ටයිප් කරන්න හෝ මයික්‍රෆෝනය ඔබා කතා කරන්න...'
+                        : 'Enter your answer or use voice typing...'
+                    }
                   />
+
                   <p className="text-xs text-slate-500">
-                    Your answer will be evaluated with standard case-insensitive trimmed comparison.
+                    {language === 'ta'
+                      ? 'உங்கள் விடை தானாக மதிப்பீடு செய்யப்படும். எழுத்துப்பிழையின்றி தட்டச்சு செய்யவோ அல்லது குரல் வழியாகக் கூறவோ முடியும்.'
+                      : language === 'si'
+                      ? 'ඔබගේ පිළිතුර ස්වයංක්‍රීයව ඇගයීමට ලක් කෙරේ. ටයිප් කිරීමට හෝ හඬින් ප්‍රකාශ කිරීමට හැක.'
+                      : 'Your answer will be evaluated with standard case-insensitive trimmed comparison. You can type or speak.'}
                   </p>
                 </div>
               )}
@@ -662,20 +689,35 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
               {currentQuestion.type === 'picture_question' &&
                 (!currentQuestion.options || currentQuestion.options.length === 0) && (
                   <div className="space-y-3">
-                    <label
-                      htmlFor={`picture-answer-${currentQuestion.id}`}
-                      className="block text-xs font-semibold uppercase tracking-wider text-slate-500"
-                    >
-                      Your Analysis / Identification
-                    </label>
-                    <input
+                    <div className="flex items-center justify-between">
+                      <label
+                        htmlFor={`picture-answer-${currentQuestion.id}`}
+                        className="block text-xs font-semibold uppercase tracking-wider text-slate-500"
+                      >
+                        {language === 'ta'
+                          ? 'உங்கள் விளக்கம் / விடை (Your Analysis)'
+                          : language === 'si'
+                          ? 'ඔබේ පිළිතුර (Your Analysis)'
+                          : 'Your Analysis / Identification'}
+                      </label>
+                      <span className="text-[11px] text-blue-600 font-semibold flex items-center gap-1">
+                        <span>🎙️ Voice Typing Supported</span>
+                      </span>
+                    </div>
+
+                    <VoiceTypingInput
                       id={`picture-answer-${currentQuestion.id}`}
-                      type="text"
                       value={currentAnswer}
-                      onChange={(e) => handleSelectAnswer(currentQuestion.id, e.target.value)}
+                      onChange={(val) => handleSelectAnswer(currentQuestion.id, val)}
                       disabled={isLocked}
-                      placeholder="Type your answer based on the image..."
-                      className="w-full rounded-2xl border border-slate-300 px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 outline-none transition"
+                      portalLanguage={language}
+                      placeholder={
+                        language === 'ta'
+                          ? 'படத்தின் அடிப்படையில் விடையைத் தட்டச்சு செய்யவும் அல்லது பேசவும்...'
+                          : language === 'si'
+                          ? 'පින්තූරය අනුව පිළිතුර ටයිප් කරන්න හෝ කතා කරන්න...'
+                          : 'Type or speak your answer based on the image...'
+                      }
                     />
                   </div>
                 )}
@@ -782,6 +824,31 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
                   </button>
                 );
               })}
+            </div>
+
+            {/* Visual Time Status Inside Palette */}
+            <div className={`p-3 rounded-2xl border transition-all flex items-center justify-between ${
+              secondsRemaining <= 60
+                ? 'bg-red-50 border-red-300 text-red-900 animate-pulse'
+                : secondsRemaining <= 300
+                ? 'bg-amber-50 border-amber-300 text-amber-900'
+                : 'bg-slate-50 border-slate-200 text-slate-800'
+            }`}>
+              <div className="flex items-center gap-2">
+                <Clock className={`w-4 h-4 ${
+                  secondsRemaining <= 60
+                    ? 'text-red-600'
+                    : secondsRemaining <= 300
+                    ? 'text-amber-600'
+                    : 'text-blue-600'
+                }`} />
+                <span className="text-xs font-bold">
+                  {language === 'ta' ? 'மீதமுள்ள நேரம்' : language === 'si' ? 'ඉතිරි කාලය' : 'Time Left'}
+                </span>
+              </div>
+              <span className="font-mono font-black text-sm">
+                {formatTime(secondsRemaining)}
+              </span>
             </div>
 
             {/* Legend & Stats */}

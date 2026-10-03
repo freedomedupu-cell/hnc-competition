@@ -19,50 +19,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
-const DEFAULT_FALLBACK_ADS: DbAdvertisement[] = [
-  {
-    id: 'ad-pondersip-official',
-    brandName: 'Ponder Sip',
-    title: 'Ponder Sip — Premium Organic Ceylon Tea & Handcrafted Beverages',
-    tagline: 'Sip Pure Ceylon Excellence • 20% Special Student Discount',
-    description: 'Fuel your exam preparation with 100% natural Ceylon herbal teas, organic artisan brews, and healthy refreshers. Special 20% discount for all registered HNC Olympiad candidates!',
-    badgeText: 'Featured Sponsor',
-    category: 'Food & Beverage',
-    imageUrl: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=1200&q=80',
-    promoCode: 'HNCSTUDENT20',
-    discountPercentage: 20,
-    actionButtonText: 'Explore Ponder Sip',
-    actionUrl: 'https://pondersip.com',
-    targetAudience: 'all',
-    status: 'active',
-    priority: 1,
-    createdAt: new Date().toISOString(),
-    clicksCount: 42,
-    menuItems: [
-      { name: '🧠 Mind Spark Matcha', description: 'Ceremonial Uji matcha, oat milk & L-theanine for sustained study focus.', price: 'Rs. 650' },
-      { name: '🧋 Classic Brown Sugar Boba', description: 'Warm brown sugar pearls, fresh milk, and rich Ceylon black tea.', price: 'Rs. 580' },
-      { name: '☕ Brainstorm Cold Brew', description: 'Steeped for 18 hours, smooth dark chocolate notes, zero bitterness.', price: 'Rs. 620' },
-      { name: '🍋 Citrus Logic Quencher', description: 'Fresh passion fruit, lime & sparkling soda. Ultimate exam stress relief.', price: 'Rs. 520' },
-    ],
-  },
-  {
-    id: 'ad-hnc-scholarship',
-    brandName: 'HNC Olympiad Foundation',
-    title: 'HNC STEM National Merit Scholarship & International Grants',
-    tagline: 'Fully Funded Opportunities for Top Olympiad Performers',
-    description: 'Top rankers in Mathematics, Science, and IT competitions qualify for international study grants, laptop awards, and institutional merit certificates.',
-    badgeText: 'Official Grant',
-    category: 'Education & Grants',
-    imageUrl: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1200&q=80',
-    actionButtonText: 'View Scholarship Criteria',
-    actionUrl: 'https://hncedu.lk/scholarships',
-    targetAudience: 'students',
-    status: 'active',
-    priority: 2,
-    createdAt: new Date().toISOString(),
-    clicksCount: 28,
-  },
-];
+const DEFAULT_FALLBACK_ADS: DbAdvertisement[] = [];
 
 export const DynamicAdBillboard: React.FC = () => {
   const {
@@ -83,19 +40,20 @@ export const DynamicAdBillboard: React.FC = () => {
   const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(null);
   const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(null);
 
+  // Filter ONLY real active ads from Firestore
   const activeAds = (advertisements || []).filter(
     (a) => a && a.status === 'active' && (a.targetAudience === 'all' || a.targetAudience === 'students')
   );
 
-  // Robust display ads determination: If any active ads exist, show them; else if any ads exist, show them; else use fallbacks
-  const displayAds =
-    activeAds.length > 0
-      ? activeAds
-      : (advertisements || []).length > 0
-      ? advertisements
-      : DEFAULT_FALLBACK_ADS;
+  const isSuperAdminOrAdmin =
+    currentAuthUser?.role === 'super_admin' || currentAuthUser?.role === 'admin';
 
-  const currentAd = (displayAds && displayAds[activeIndex % displayAds.length]) || DEFAULT_FALLBACK_ADS[0];
+  // For Admin preview: show all real ads in database; for students: only active real ads
+  const displayAds = isSuperAdminOrAdmin
+    ? (advertisements || []).filter(Boolean)
+    : activeAds;
+
+  const currentAd = displayAds.length > 0 ? displayAds[activeIndex % displayAds.length] : null;
 
   // 2. ALL useEffect hooks declared after all useState hooks
   useEffect(() => {
@@ -107,7 +65,7 @@ export const DynamicAdBillboard: React.FC = () => {
       component: 'DynamicAdBillboard (Student Dashboard)',
       firestoreDb: 'ai-studio-hnceduhub-87cf124f-0cc7-41e5-bd50-84681e12383b',
       collection: 'advertisements',
-      syncStatus: (advertisements || []).length > 0 ? 'REALTIME_FIRESTORE_SYNCED' : 'FALLBACK_PREVIEW_ACTIVE',
+      syncStatus: (advertisements || []).length > 0 ? 'REALTIME_FIRESTORE_SYNCED' : 'NO_ADS_IN_DATABASE',
       totalLoadedInState: (advertisements || []).length,
       activeFilteredForStudent: activeAds.length,
       renderingCount: displayAds.length,
@@ -160,13 +118,7 @@ export const DynamicAdBillboard: React.FC = () => {
           const localImg = await getMediaFromIndexedDB(`ad_image_${currentAd.id}`);
           if (isMounted) setResolvedImageUrl(localImg || null);
         } else {
-          // If ad doesn't have an image, provide default Ponder Sip or fallback image
-          const fallbackImg =
-            currentAd.imageUrl ||
-            (currentAd.brandName?.toLowerCase().includes('ponder')
-              ? 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=1200&q=80'
-              : 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1200&q=80');
-          if (isMounted) setResolvedImageUrl(fallbackImg);
+          if (isMounted) setResolvedImageUrl(currentAd.imageUrl || null);
         }
       } catch {
         if (isMounted) {
@@ -201,9 +153,6 @@ export const DynamicAdBillboard: React.FC = () => {
     }
   };
 
-  const isSuperAdminOrAdmin =
-    currentAuthUser?.role === 'super_admin' || currentAuthUser?.role === 'admin';
-
   const handleManageAds = () => {
     if (currentAuthUser?.role === 'super_admin') {
       setSuperAdminNav('Sponsors & Ads');
@@ -211,6 +160,10 @@ export const DynamicAdBillboard: React.FC = () => {
       setAdminNav('Sponsors & Ads');
     }
   };
+
+  if (displayAds.length === 0 || !currentAd) {
+    return null;
+  }
 
   const mediaSource = resolvedVideoUrl || currentAd.videoUrl;
   const imageSource = resolvedImageUrl || currentAd.imageUrl;

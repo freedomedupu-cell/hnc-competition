@@ -49,6 +49,7 @@ interface StudentDashboardViewProps {
 export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNavigate }) => {
   const {
     currentStudent,
+    currentAuthUser,
     competitions,
     results,
     isStudentRegistered,
@@ -88,21 +89,19 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
   const [copiedRef, setCopiedRef] = useState(false);
   const [refToast, setRefToast] = useState<string | null>(null);
 
-  // Grade filter state: defaults to student's own grade so Grade 6 only sees Grade 6
-  const [dashboardGradeFilter, setDashboardGradeFilter] = useState<'my_grade' | 'all'>('my_grade');
-  const studentGrade = currentStudent?.gradeLevel || 'Grade 6';
+  // Student's academic grade level (e.g. Grade 11 (O/L), Grade 6, etc.)
+  const studentGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 6';
 
   // Filter only real active/published competitions from Firestore
-  // Filter by student's grade so Grade 6 competitions are not shown to Grade 7 students
+  // STRICT GRADE FILTER:
+  // "குறிப்பிட்ட மாணவருடைய தரங்களுக்கு மட்டுமே அவரவர் டாஸ் போர்டுல பரீட்சைகள் டிஸ்ப்ளே ஆக வேண்டும் ஓபன் அண்ட் கொடுத்தா மட்டும் தான் எல்லா மாணவர்களும் டிஸ்ப்ளே ஆகணும்"
   const visibleCompetitions = competitions.filter((comp) => {
     const s = (comp.status || '').toLowerCase();
     const isPublished = !s.includes('draft') && !s.includes('closed');
     if (!isPublished) return false;
 
-    if (dashboardGradeFilter === 'my_grade') {
-      return isGradeEligible(comp.grade, studentGrade);
-    }
-    return true;
+    // Matches student's enrolled grade OR competition is marked as Open (All Grades)
+    return isGradeEligible(comp.grade, studentGrade);
   });
 
   const combinedCompetitions = visibleCompetitions.map((c) => {
@@ -510,9 +509,11 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
             </h2>
             <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-blue-700 text-white shadow-2xs">
               <GraduationCap className="w-3 h-3" />
-              {dashboardGradeFilter === 'my_grade'
-                ? (language === 'ta' ? `வகுப்பு: ${studentGrade}` : language === 'si' ? `ශ්‍රේණිය: ${studentGrade}` : `Grade: ${studentGrade}`)
-                : (language === 'ta' ? 'அனைத்து வகுப்புகளும்' : language === 'si' ? 'සියලු ශ්‍රේණි' : 'All Grades')}
+              {language === 'ta'
+                ? `தரம்: ${studentGrade} & பொதுவானவை (Open)`
+                : language === 'si'
+                ? `ශ්‍රේණිය: ${studentGrade} සහ විවෘත (Open)`
+                : `Grade: ${studentGrade} & Open`}
             </span>
             {selectedFormat !== 'all' && (
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
@@ -522,19 +523,6 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setDashboardGradeFilter(dashboardGradeFilter === 'my_grade' ? 'all' : 'my_grade')}
-              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition border ${
-                dashboardGradeFilter === 'my_grade'
-                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              {dashboardGradeFilter === 'my_grade'
-                ? (language === 'ta' ? '🎯 எனது வகுப்பு மட்டும்' : language === 'si' ? '🎯 මගේ ශ්‍රේණිය පමණි' : '🎯 My Grade Only')
-                : (language === 'ta' ? 'அனைத்து வகுப்புகளும்' : language === 'si' ? 'සියලු ශ්‍රේණි' : 'All Grades')}
-            </button>
             {selectedFormat !== 'all' && (
               <button
                 onClick={() => setSelectedFormat('all')}

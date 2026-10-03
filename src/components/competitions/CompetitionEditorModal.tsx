@@ -1285,17 +1285,37 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
               {/* Grid 2: Grade, Language, Duration */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block font-semibold text-slate-800 mb-1">
-                    Grade / Level (வகுப்பு / நிலை) <span className="text-red-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-800">
+                      Grade / Level (வகுப்பு / நிலை) <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-blue-700 font-bold">
+                      {grade.toLowerCase().includes('open') ? '🌐 Open to All' : `🎯 Only ${grade}`}
+                    </span>
+                  </div>
                   <input
                     type="text"
+                    list="grade-presets-list"
                     required
-                    placeholder="e.g. Grade 10, Grade 6, Level 1, Primary, Grade 11 (O/L)..."
+                    placeholder="e.g. Grade 11 (O/L), Grade 6, Open (All Grades)..."
                     value={grade}
                     onChange={(e) => setGrade(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-semibold text-slate-900"
                   />
+                  <datalist id="grade-presets-list">
+                    <option value="Grade 6" />
+                    <option value="Grade 7" />
+                    <option value="Grade 8" />
+                    <option value="Grade 9" />
+                    <option value="Grade 10" />
+                    <option value="Grade 11 (O/L)" />
+                    <option value="Grade 12 (A/L)" />
+                    <option value="Grade 13 (A/L)" />
+                    <option value="Open (All Grades)" />
+                  </datalist>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    குறிப்பிட்ட வகுப்புக்கு மட்டும் தெரிய வேண்டுமெனில் (எ.கா: Grade 11 (O/L)) தெரிவு செய்யவும். அனைத்து மாணவர்களுக்கும் தெரிய வேண்டுமெனில் <strong>Open (All Grades)</strong> என வைக்கவும்.
+                  </p>
                 </div>
 
                 <div>

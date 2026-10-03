@@ -290,7 +290,7 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
         <div className="p-3.5 rounded-xl bg-white border border-blue-200 bg-blue-50/30 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-blue-700 uppercase tracking-wide">
-              {language === 'ta' ? 'Quiz எண்ணிக்கை' : language === 'si' ? 'Quiz සංඛ්‍යාව' : 'Active Quizzes'}
+              {language === 'ta' ? 'வினாடி வினாக்கள் (Quizzes)' : language === 'si' ? 'Quiz තරඟ' : 'Quiz Challenges'}
             </span>
             <FileQuestion className="w-4 h-4 text-blue-600" />
           </div>
@@ -478,9 +478,11 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
                     <span>{comp.duration || 60} mins</span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-blue-900 bg-blue-50/80 px-2 py-1 rounded border border-blue-200/60 font-semibold">
+                  <div className="flex items-center gap-1.5 text-blue-900 bg-blue-50/80 px-2 py-1 rounded border border-blue-200/60 font-semibold truncate">
                     <FileQuestion className="w-3.5 h-3.5 text-blue-700 shrink-0" />
-                    <span>Quiz: {questionCount} வினாக்கள் ({totalMarks} pts)</span>
+                    <span className="truncate">
+                      {comp.competitionType || 'Quiz'}: {questionCount} {language === 'ta' ? 'வினாக்கள்' : language === 'si' ? 'ප්‍රශ්න' : 'Questions'} ({totalMarks} pts)
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 text-slate-700">
