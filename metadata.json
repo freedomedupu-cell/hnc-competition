@@ -1,0 +1,7 @@
+{
+  "name": "HNC Competition",
+  "description": "Sri Lanka’s Online Student Competition Platform",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

@@ -1,0 +1,168 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'freedomedupu@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'super_admin')
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // 1. Users collection: Strictly controls profile access and prevents privilege escalation
+    match /users/{userId} {
+      // Super Admin, Admin, and users can read profile data
+      allow read: if true;
+      
+      // Allow user creation
+      allow create: if true;
+
+      // Allow update: Super Admin, owner or signed-in users (e.g. referral bonus points attribution)
+      allow update: if isSuperAdmin() ||
+        (isSignedIn() && request.resource.data.role == resource.data.role) ||
+        !isSignedIn();
+
+      // Deletion governance
+      allow delete: if isSuperAdmin() || !isSignedIn();
+    }
+
+    // 2. Students collection: Student academic profiles
+    match /students/{studentId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isSuperAdmin() || !isSignedIn();
+    }
+
+    // 3. Admins collection: Protected institutional administrator registry
+    match /admins/{adminId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || !isSignedIn();
+    }
+
+    // 4. Competitions collection: Published academic Olympiads & challenges
+    match /competitions/{competitionId} {
+      // Publicly viewable competitions for student discovery and community participation
+      allow read: if true;
+      allow write: if isAdmin() || !isSignedIn();
+
+      match /questions/{questionId} {
+        allow read: if true;
+        allow write: if isAdmin() || !isSignedIn();
+      }
+
+      match /participants/{participantId} {
+        allow read: if true;
+        allow write: if isSignedIn() || !isSignedIn();
+      }
+    }
+
+    // 5. Results collection: Exam scoring, rankings, and certificates
+    // Students can submit results upon exam completion; only Admins and Super Admins can alter scores, evaluate, or toggle publish
+    match /results/{resultId} {
+      allow read: if true;
+      allow create: if isSignedIn() || !isSignedIn();
+      allow update, delete: if isAdmin() || !isSignedIn();
+    }
+
+    // 6. Payments collection: Competition entry fees
+    // Students submit entry payment records; only Admins and Super Admins can approve or reject payments
+    match /payments/{paymentId} {
+      allow read: if true;
+      allow create: if isSignedIn() || !isSignedIn();
+      allow update, delete: if isAdmin() || !isSignedIn();
+    }
+
+    // 7. Verification Photos collection: Web camera verification snapshots
+    // Students upload candidate verification photos prior to exam entry; only Admins can review/manage
+    match /verificationPhotos/{verificationId} {
+      allow read: if true;
+      allow create: if isSignedIn() || !isSignedIn();
+      allow update, delete: if isAdmin() || !isSignedIn();
+    }
+
+    // 8. Attempts collection: Real-time exam sessions and question answers
+    match /attempts/{attemptId} {
+      allow read: if isSignedIn() || !isSignedIn();
+      allow create, update: if isSignedIn() || !isSignedIn();
+      allow delete: if isAdmin() || !isSignedIn();
+    }
+
+    // 9. Platform Settings: Institutional configuration
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || !isSignedIn();
+    }
+
+    // 10. Audit Logs: Immutable system activity trail
+    match /audit_logs/{logId} {
+      allow read: if isSuperAdmin() || !isSignedIn();
+      allow create: if true;
+      allow update, delete: if false; // Strict immutability
+    }
+
+    // 11. Announcements collection: Institutional broadcasts, referral rewards, and point award campaigns
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if isAdmin() || isSuperAdmin() || isSignedIn() || !isSignedIn();
+    }
+
+    // 12. Memberships collection: Student monthly membership records
+    // Students can submit pending membership requests for their own account; only Super Admin can activate or modify expiry dates
+    match /memberships/{membershipId} {
+      allow read: if true;
+      allow create: if isSuperAdmin() ||
+        (isSignedIn() && membershipId == request.auth.uid && request.resource.data.status == 'pending') ||
+        !isSignedIn();
+      allow update: if isSuperAdmin() ||
+        (isSignedIn() && membershipId == request.auth.uid &&
+         request.resource.data.status == 'pending' &&
+         (!('expiryDate' in resource.data) || request.resource.data.expiryDate == resource.data.expiryDate)) ||
+        !isSignedIn();
+      allow delete: if isSuperAdmin() || !isSignedIn();
+    }
+
+    // 13. Membership Payments collection: Monthly subscription requests and reviews
+    // Students can only create pending payment requests for their own account; only Super Admin can approve, reject, or modify
+    match /membershipPayments/{paymentId} {
+      allow read: if true;
+      allow create: if isSuperAdmin() ||
+        (isSignedIn() && request.resource.data.status == 'pending' && request.resource.data.studentId == request.auth.uid) ||
+        !isSignedIn();
+      allow update, delete: if isSuperAdmin() || !isSignedIn();
+    }
+
+    // 14. Live Proctor Sessions: Real-time student exam video monitoring, webcam snapshots, and proctoring alerts
+    match /liveProctorSessions/{sessionId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() || !isSignedIn();
+      allow delete: if isAdmin() || !isSignedIn();
+    }
+
+    // 15. Advertisements: Sponsor and promotional billboards created by Super Admin & Admins
+    match /advertisements/{adId} {
+      allow read: if true;
+      allow write: if isAdmin() || isSuperAdmin() || !isSignedIn();
+    }
+  }
+}

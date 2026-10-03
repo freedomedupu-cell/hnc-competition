@@ -1,0 +1,198 @@
+{
+  "entities": {
+    "users": {
+      "title": "Users",
+      "description": "System accounts for Super Admins, Admins, and Students",
+      "fields": {
+        "uid": { "type": "string", "description": "Firebase Auth user ID" },
+        "fullName": { "type": "string", "description": "Full name of the user" },
+        "email": { "type": "string", "description": "User email address" },
+        "authEmail": { "type": "string", "description": "Internal unique authentication email (for students with shared parent email)" },
+        "phone": { "type": "string", "description": "Contact telephone number" },
+        "role": { "type": "string", "enum": ["super_admin", "admin", "student"], "description": "Role determining system access" },
+        "status": { "type": "string", "enum": ["active", "inactive"], "description": "Account status" },
+        "studentId": { "type": "string", "description": "Institutional Student ID (for candidates)" },
+        "username": { "type": "string", "description": "Unique username used for candidate authentication" },
+        "district": { "type": "string", "description": "Geographical district (e.g. Jaffna, Colombo)" },
+        "address": { "type": "string", "description": "Residential or mailing address" },
+        "avatarUrl": { "type": "string", "description": "Profile picture URL or avatar emoji" },
+        "dateOfBirth": { "type": "string", "description": "Date of birth (YYYY-MM-DD)" },
+        "referralCode": { "type": "string", "description": "Unique referral code for sharing with peers" },
+        "referredBy": { "type": "string", "description": "Referral code of peer who invited this student" },
+        "referralPoints": { "type": "number", "description": "Accumulated share and referral points" },
+        "totalReferrals": { "type": "number", "description": "Count of successfully referred candidates" },
+        "sharesCount": { "type": "number", "description": "Count of social/messaging platform shares" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of account creation" }
+      }
+    },
+    "students": {
+      "title": "Students",
+      "description": "Student candidate profiles and academic details",
+      "fields": {
+        "uid": { "type": "string", "description": "Associated user UID" },
+        "studentId": { "type": "string", "description": "Institutional Student ID" },
+        "username": { "type": "string", "description": "Unique username" },
+        "fullName": { "type": "string", "description": "Full name" },
+        "email": { "type": "string", "description": "Email address" },
+        "authEmail": { "type": "string", "description": "Internal unique authentication email" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "grade": { "type": "string", "description": "Grade or academic level" },
+        "school": { "type": "string", "description": "School or educational institution" },
+        "district": { "type": "string", "description": "District" },
+        "address": { "type": "string", "description": "Full residential address" },
+        "avatarUrl": { "type": "string", "description": "Profile picture URL or avatar emoji" },
+        "dateOfBirth": { "type": "string", "description": "Date of birth (YYYY-MM-DD)" },
+        "referralCode": { "type": "string", "description": "Unique referral code for sharing with peers" },
+        "referredBy": { "type": "string", "description": "Referral code of peer who invited this student" },
+        "referralPoints": { "type": "number", "description": "Accumulated share and referral points" },
+        "totalReferrals": { "type": "number", "description": "Count of successfully referred candidates" },
+        "sharesCount": { "type": "number", "description": "Count of social/messaging platform shares" },
+        "status": { "type": "string", "enum": ["active", "inactive"], "description": "Profile status" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of creation" }
+      }
+    },
+    "admins": {
+      "title": "Admins",
+      "description": "Academic administrator profiles managed by Super Admin",
+      "fields": {
+        "uid": { "type": "string", "description": "Associated user UID" },
+        "fullName": { "type": "string", "description": "Full name" },
+        "email": { "type": "string", "description": "Email address" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "status": { "type": "string", "enum": ["active", "inactive"], "description": "Account status" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of creation" }
+      }
+    },
+    "competitions": {
+      "title": "Competitions",
+      "description": "Academic contests, Quizzes, and Exams managed by Super Admin and Admin",
+      "fields": {
+        "competitionId": { "type": "string", "description": "Unique competition identifier" },
+        "title": { "type": "string", "description": "Competition title" },
+        "description": { "type": "string", "description": "Full description" },
+        "competitionType": { "type": "string", "enum": ["Quiz", "Exam"], "description": "Type of competition" },
+        "category": { "type": "string", "enum": ["Mathematics", "Science", "English", "Tamil", "General Knowledge", "IQ & Logic"], "description": "Subject category" },
+        "grade": { "type": "string", "description": "Target grade level (e.g. Grade 10, Grade 11 (O/L), Grade 12-13 (A/L), Open)" },
+        "language": { "type": "string", "enum": ["English", "Tamil", "Sinhala"], "description": "Competition language medium" },
+        "duration": { "type": "number", "description": "Duration in minutes" },
+        "entryType": { "type": "string", "enum": ["Free", "Paid"], "description": "Entry fee type" },
+        "entryFee": { "type": "number", "description": "Entry fee in LKR when paid" },
+        "prizesEnabled": { "type": "boolean", "description": "Whether prizes are awarded" },
+        "prizeDetails": { "type": "object", "description": "Prizes for 1st, 2nd, 3rd, and certificates" },
+        "registrationStart": { "type": "string", "description": "Registration opening timestamp" },
+        "registrationEnd": { "type": "string", "description": "Registration closing timestamp" },
+        "competitionStart": { "type": "string", "description": "Competition start timestamp" },
+        "competitionEnd": { "type": "string", "description": "Competition end timestamp" },
+        "status": { "type": "string", "enum": ["Draft", "Published", "Registration Open", "Ongoing", "Completed", "Closed"], "description": "Current lifecycle status" },
+        "questions": { "type": "array", "description": "List of questions (Multiple Choice, True/False, Short Answer, Picture Question)" },
+        "questionsCount": { "type": "number", "description": "Total count of questions" },
+        "totalMarks": { "type": "number", "description": "Sum of all question marks" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of creation" }
+      }
+    },
+    "results": {
+      "title": "Results",
+      "description": "Student competition scores, percentages, and rankings",
+      "fields": {
+        "resultId": { "type": "string", "description": "Unique result identifier" },
+        "competitionId": { "type": "string", "description": "Associated competition ID" },
+        "studentId": { "type": "string", "description": "Associated student UID" },
+        "score": { "type": "number", "description": "Score achieved" },
+        "totalMarks": { "type": "number", "description": "Maximum marks possible" },
+        "percentage": { "type": "number", "description": "Calculated percentage" },
+        "rank": { "type": "number", "description": "Achieved rank or position" },
+        "submittedAt": { "type": "string", "description": "ISO timestamp of submission or evaluation" },
+        "prizeStatus": { "type": "string", "description": "Assigned prize status (e.g. 1st Prize, 2nd Prize, 3rd Prize, Participation Certificate)" }
+      }
+    },
+    "payments": {
+      "title": "Competition Payments",
+      "description": "Student entry fee payment transactions for paid competitions",
+      "fields": {
+        "paymentId": { "type": "string", "description": "Unique transaction identifier" },
+        "studentId": { "type": "string", "description": "Associated student UID" },
+        "competitionId": { "type": "string", "description": "Associated competition ID" },
+        "amount": { "type": "number", "description": "Transaction amount in LKR" },
+        "status": { "type": "string", "enum": ["completed", "pending", "failed"], "description": "Payment settlement status" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of payment" }
+      }
+    },
+    "verificationPhotos": {
+      "title": "Exam Verification Photos",
+      "description": "Student webcam verification snapshots taken before exam commencement",
+      "fields": {
+        "verificationId": { "type": "string", "description": "Unique verification record ID" },
+        "studentId": { "type": "string", "description": "Associated student UID" },
+        "competitionId": { "type": "string", "description": "Associated competition ID" },
+        "photoUrl": { "type": "string", "description": "Secure base64 data URL of candidate verification photo" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of photo capture" }
+      }
+    },
+    "attempts": {
+      "title": "Student Attempts",
+      "description": "Student exam attempts, selected answers, timer tracking, and evaluation status",
+      "fields": {
+        "attemptId": { "type": "string", "description": "Unique attempt identifier" },
+        "competitionId": { "type": "string", "description": "Associated competition ID" },
+        "studentId": { "type": "string", "description": "Associated student UID" },
+        "answers": { "type": "object", "description": "Map of question IDs to student submitted answers" },
+        "startedAt": { "type": "string", "description": "ISO timestamp of attempt commencement" },
+        "submittedAt": { "type": "string", "description": "ISO timestamp of final submission" },
+        "status": { "type": "string", "enum": ["in-progress", "submitted", "completed", "timeout"], "description": "Current lifecycle status of attempt" },
+        "score": { "type": "number", "description": "Marks awarded" },
+        "totalMarks": { "type": "number", "description": "Total marks possible" }
+      }
+    },
+    "announcements": {
+      "title": "Announcements",
+      "description": "Institutional broadcast announcements, points incentives, and referral awards campaigns",
+      "fields": {
+        "id": { "type": "string", "description": "Unique announcement ID" },
+        "title": { "type": "string", "description": "Announcement title in English" },
+        "titleTa": { "type": "string", "description": "Announcement title in Tamil" },
+        "titleSi": { "type": "string", "description": "Announcement title in Sinhala" },
+        "content": { "type": "string", "description": "Detailed body content in English" },
+        "contentTa": { "type": "string", "description": "Detailed body content in Tamil" },
+        "contentSi": { "type": "string", "description": "Detailed body content in Sinhala" },
+        "category": { "type": "string", "enum": ["points_referral", "awards", "competition", "general", "urgent"], "description": "Category of announcement" },
+        "targetAudience": { "type": "string", "enum": ["all", "students", "admins"], "description": "Target audience" },
+        "pointsReward": { "type": "number", "description": "Reward points associated with campaign" },
+        "badgeText": { "type": "string", "description": "Badge text in English" },
+        "badgeTextTa": { "type": "string", "description": "Badge text in Tamil" },
+        "actionUrl": { "type": "string", "description": "Action route or navigation URL" },
+        "actionLabel": { "type": "string", "description": "Action button label in English" },
+        "actionLabelTa": { "type": "string", "description": "Action button label in Tamil" },
+        "isPinned": { "type": "boolean", "description": "Whether announcement is pinned to top" },
+        "priority": { "type": "string", "enum": ["normal", "high", "urgent"], "description": "Priority level" },
+        "publishedAt": { "type": "string", "description": "ISO timestamp of publication" },
+        "authorName": { "type": "string", "description": "Author or publisher name" }
+      }
+    },
+    "advertisements": {
+      "title": "Advertisements",
+      "description": "Super Admin promotional billboard banners and sponsor advertisements for student portal",
+      "fields": {
+        "id": { "type": "string", "description": "Unique advertisement ID" },
+        "brandName": { "type": "string", "description": "Sponsor or brand name" },
+        "title": { "type": "string", "description": "Headline title of the advertisement" },
+        "tagline": { "type": "string", "description": "Short promo tagline" },
+        "description": { "type": "string", "description": "Detailed promotion description" },
+        "badgeText": { "type": "string", "description": "Badge label tag" },
+        "category": { "type": "string", "description": "Industry or sponsor category" },
+        "mediaType": { "type": "string", "enum": ["image", "video"], "description": "Media presentation type" },
+        "imageUrl": { "type": "string", "description": "Banner photo image URL or compressed data URL" },
+        "videoUrl": { "type": "string", "description": "Promo video URL or local media reference" },
+        "promoCode": { "type": "string", "description": "Promotional coupon code" },
+        "discountPercentage": { "type": "number", "description": "Discount percentage" },
+        "actionButtonText": { "type": "string", "description": "CTA button label" },
+        "actionUrl": { "type": "string", "description": "Destination link" },
+        "targetAudience": { "type": "string", "enum": ["all", "students", "admins"], "description": "Audience target" },
+        "status": { "type": "string", "enum": ["active", "inactive"], "description": "Publication status" },
+        "priority": { "type": "number", "description": "Display order priority" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of creation" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" },
+        "clicksCount": { "type": "number", "description": "Student interaction count" }
+      }
+    }
+  }
+}
