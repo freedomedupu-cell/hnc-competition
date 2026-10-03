@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Competition, CompetitionCategory, DbAttempt } from '../../types';
 import {
@@ -73,6 +73,24 @@ export const StudentCompetitionsView: React.FC = () => {
 
   // Student's academic grade level (e.g. Grade 11 (O/L), Grade 6, etc.)
   const studentGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 6';
+
+  // Auto-open target competition if user arrived via deep link (?comp=ID) or sessionStorage
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const params = new URLSearchParams(window.location.search);
+      const urlCompId = params.get('comp') || sessionStorage.getItem('hnc_target_competition');
+      if (urlCompId && competitions.length > 0) {
+        const target = competitions.find(
+          (c) => c.id === urlCompId || c.code.toLowerCase() === urlCompId.toLowerCase()
+        );
+        if (target) {
+          setDetailsComp(target);
+          sessionStorage.removeItem('hnc_target_competition');
+        }
+      }
+    } catch {}
+  }, [competitions]);
 
   // Visible to students: Published, Registration Open, Ongoing (Real Firestore competitions only)
   // STRICT GRADE FILTER:

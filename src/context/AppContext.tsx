@@ -320,16 +320,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   
   // Real Firebase Auth user & loading status
-  const [currentAuthUser, setCurrentAuthUser] = useState<DbUser | null>(() => getSavedActiveUser());
+  const [currentAuthUser, setCurrentAuthUserState] = useState<DbUser | null>(() => getSavedActiveUser());
   const [authLoading, setAuthLoading] = useState<boolean>(() => !getSavedActiveUser());
 
-  // Portal role (strictly synchronized with currentAuthUser.role)
-  const [currentPortal, setInternalPortal] = useState<PortalRole>(() => getSavedActiveUser()?.role || 'super_admin');
+  // Portal role (strictly synchronized with currentAuthUser.role, default 'student' for safety)
+  const [currentPortal, setInternalPortal] = useState<PortalRole>(() => getSavedActiveUser()?.role || 'student');
 
   // Navigation tab states
   const [superAdminNav, setSuperAdminNav] = useState<SuperAdminNav>('Dashboard');
   const [adminNav, setAdminNav] = useState<AdminNav>('Dashboard');
   const [studentNav, setStudentNav] = useState<StudentNav>('Dashboard');
+
+  // Synchronized setter for authenticated user that immediately updates the active portal
+  const setCurrentAuthUser = useCallback(
+    (userOrUpdater: DbUser | null | ((prev: DbUser | null) => DbUser | null)) => {
+      setCurrentAuthUserState((prev) => {
+        const nextUser = typeof userOrUpdater === 'function' ? userOrUpdater(prev) : userOrUpdater;
+        if (nextUser) {
+          saveActiveUser(nextUser);
+          setInternalPortal(nextUser.role);
+          if (nextUser.role === 'student') {
+            setStudentNav('Dashboard');
+          } else if (nextUser.role === 'admin') {
+            setAdminNav('Dashboard');
+          } else if (nextUser.role === 'super_admin') {
+            setSuperAdminNav('Dashboard');
+          }
+        } else {
+          logoutUserSession();
+          setInternalPortal('student');
+        }
+        return nextUser;
+      });
+    },
+    []
+  );
+
+  // Automatically enforce portal to match authenticated user role whenever auth changes
+  useEffect(() => {
+    if (currentAuthUser?.role) {
+      if (currentAuthUser.role === 'student' && currentPortal !== 'student') {
+        setInternalPortal('student');
+        setStudentNav('Dashboard');
+      } else if (currentAuthUser.role === 'admin' && currentPortal !== 'admin' && currentPortal !== 'student') {
+        setInternalPortal('admin');
+        setAdminNav('Dashboard');
+      }
+    }
+  }, [currentAuthUser?.uid, currentAuthUser?.role, currentPortal]);
 
   const t = (key: keyof typeof translations['en']): string => {
     return translations[language][key] || translations['en'][key] || key;

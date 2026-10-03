@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/common/Header';
 import { Sidebar } from './components/common/Sidebar';
@@ -64,6 +64,18 @@ const MainPortalArea: React.FC = () => {
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
+  // Handle deep-linking URL parameters (?comp=ID) for logged-in students
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined' || !currentAuthUser) return;
+      const params = new URLSearchParams(window.location.search);
+      const compId = params.get('comp') || sessionStorage.getItem('hnc_target_competition');
+      if (compId && currentAuthUser.role === 'student') {
+        setStudentNav('Competitions');
+      }
+    } catch {}
+  }, [currentAuthUser?.uid]);
+
   // 1. Loading State
   if (authLoading) {
     return (
@@ -87,8 +99,16 @@ const MainPortalArea: React.FC = () => {
     return <AuthView />;
   }
 
+  // Strict role enforcement: If authenticated as student, NEVER show admin or super admin
+  const effectivePortal =
+    currentAuthUser.role === 'student'
+      ? 'student'
+      : currentAuthUser.role === 'admin'
+      ? currentPortal === 'student' ? 'student' : 'admin'
+      : currentPortal;
+
   // 3. Phase 4: Distraction-Free Student Exam Engine
-  if (currentPortal === 'student' && activeExamComp && examSessionStage === 'taking') {
+  if (effectivePortal === 'student' && activeExamComp && examSessionStage === 'taking') {
     return (
       <StudentExamInterface
         competition={activeExamComp}
@@ -103,7 +123,7 @@ const MainPortalArea: React.FC = () => {
 
   // 4. Authenticated State -> Route by enforced role
   const renderActiveView = () => {
-    switch (currentPortal) {
+    switch (effectivePortal) {
       case 'super_admin':
         switch (superAdminNav) {
           case 'Dashboard':

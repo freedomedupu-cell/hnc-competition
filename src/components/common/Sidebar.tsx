@@ -54,7 +54,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
     language,
   } = useApp();
 
-  const isStudent = currentPortal === 'student';
+  // Strict role enforcement: If user is a student, portal MUST be student
+  const effectivePortal =
+    currentAuthUser?.role === 'student'
+      ? 'student'
+      : currentAuthUser?.role === 'admin'
+      ? currentPortal === 'student' ? 'student' : 'admin'
+      : currentPortal;
+
+  const isStudent = effectivePortal === 'student';
   const activeProctorCount = liveProctorSessions.filter((s) => s.status === 'active').length;
 
   // Navigation configurations matching strict requirements
@@ -239,7 +247,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
   ];
 
   const renderNavSection = () => {
-    switch (currentPortal) {
+    switch (effectivePortal) {
       case 'super_admin':
         return (
           <div className="space-y-1">
@@ -387,7 +395,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
       tag: t('studentLevel'),
       desc: t('studentDesc'),
     },
-  }[currentPortal];
+  }[effectivePortal];
 
   const sidebarContent = (
     <div className="flex flex-col h-full justify-between p-4">

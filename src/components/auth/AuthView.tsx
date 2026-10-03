@@ -69,7 +69,16 @@ const generateSuggestedStudentId = () => {
 };
 
 export const AuthView: React.FC = () => {
-  const { language, setLanguage, t, setCurrentAuthUser } = useApp();
+  const {
+    language,
+    setLanguage,
+    t,
+    setCurrentAuthUser,
+    setCurrentPortal,
+    setStudentNav,
+    setAdminNav,
+    setSuperAdminNav,
+  } = useApp();
 
   const [mode, setMode] = useState<'login' | 'register_student'>('login');
   const [loading, setLoading] = useState(false);
@@ -173,6 +182,14 @@ export const AuthView: React.FC = () => {
     try {
       const { userProfile } = await loginWithEmailPassword(identifier, loginPassword);
       setCurrentAuthUser(userProfile);
+      setCurrentPortal(userProfile.role);
+      if (userProfile.role === 'student') {
+        setStudentNav('Dashboard');
+      } else if (userProfile.role === 'admin') {
+        setAdminNav('Dashboard');
+      } else if (userProfile.role === 'super_admin') {
+        setSuperAdminNav('Dashboard');
+      }
     } catch (err: any) {
       console.warn('Login attempt notification:', err?.message || err);
       let msg = err.message || 'Authentication failed. Please verify credentials.';
@@ -325,6 +342,8 @@ export const AuthView: React.FC = () => {
       );
 
       setCurrentAuthUser(userProfile);
+      setCurrentPortal('student');
+      setStudentNav('Dashboard');
     } catch (err: any) {
       console.error('Registration error:', err);
       let msg = err.message || 'Registration failed.';

@@ -13,7 +13,6 @@ import {
   ChevronDown,
   Share2,
   Eye,
-  RefreshCw,
 } from 'lucide-react';
 import { ShareModal } from './ShareModal';
 
@@ -40,8 +39,16 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
+  // Strict role enforcement: If authenticated as student, NEVER show admin or super admin header
+  const effectivePortal =
+    currentAuthUser?.role === 'student'
+      ? 'student'
+      : currentAuthUser?.role === 'admin'
+      ? currentPortal === 'student' ? 'student' : 'admin'
+      : currentPortal;
+
   const getPortalUser = () => {
-    switch (currentPortal) {
+    switch (effectivePortal) {
       case 'super_admin':
         return {
           name: currentAuthUser?.fullName || superAdminUser.name,
@@ -203,20 +210,6 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
               </button>
             </div>
 
-            {/* Quick Refresh Button for Instant Mobile Updates */}
-            <button
-              id="btn-header-refresh"
-              type="button"
-              onClick={() => {
-                window.location.reload();
-              }}
-              className="p-1.5 sm:px-2 sm:py-1.5 rounded-lg text-slate-600 hover:text-blue-700 bg-slate-50 hover:bg-blue-50 border border-slate-200 text-xs font-semibold flex items-center gap-1 transition-colors shrink-0 cursor-pointer"
-              title={language === 'ta' ? 'பக்கத்தைப் புதுப்பி (Refresh)' : 'Refresh App'}
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Refresh</span>
-            </button>
-
             {/* Quick Platform Share Button */}
             <button
               id="btn-header-share-platform"
@@ -296,7 +289,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
             </div>
 
             {/* Profile Pill */}
-            {currentPortal === 'student' ? (
+            {effectivePortal === 'student' ? (
               <div className="hidden sm:flex items-center gap-2.5 pl-2 border-l border-slate-200 select-none">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-200 via-amber-100 to-yellow-300 border-2 border-amber-300 flex items-center justify-center text-sm shadow-2xs overflow-hidden shrink-0">
                   {currentStudent.avatarUrl && (currentStudent.avatarUrl.startsWith('data:') || currentStudent.avatarUrl.startsWith('http')) ? (
