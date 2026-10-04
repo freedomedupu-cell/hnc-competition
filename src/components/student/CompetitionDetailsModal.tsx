@@ -17,6 +17,7 @@ import {
 import { Competition } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { getCompetitionQuestions } from '../../data/questionPool';
+import { getCompetitionScheduleStatus } from '../../utils/competitionTimeUtils';
 import { APP_LOGO } from '../../assets/logo';
 
 interface CompetitionDetailsModalProps {
@@ -43,8 +44,21 @@ export const CompetitionDetailsModal: React.FC<CompetitionDetailsModalProps> = (
   const questionCount = questions.length || competition.questionsCount || 10;
   const totalMarks = competition.totalMarks || questions.reduce((sum, q) => sum + (q.marks || 0), 0) || 100;
 
+  const schedule = getCompetitionScheduleStatus(competition);
+
   const handleAction = () => {
     if (isSubmitted) return;
+
+    if (schedule.isUpcoming) {
+      alert(
+        language === 'ta'
+          ? `⚠️ இந்த பரீட்சை இன்னும் தொடங்கவில்லை! ${schedule.formattedStart} அன்று தான் தானாகவே திறக்கப்படும்.`
+          : language === 'si'
+          ? `⚠️ මෙම විභාගය තවම ආරම්භ වී නැත! ${schedule.formattedStart} දින විවෘත වේ.`
+          : `⚠️ Exam has not started yet! Opens automatically on ${schedule.formattedStart}.`
+      );
+      return;
+    }
 
     if (!isRegistered) {
       registerStudentForCompetition(competition.id);
@@ -364,6 +378,22 @@ export const CompetitionDetailsModal: React.FC<CompetitionDetailsModalProps> = (
             >
               <Lock className="h-4 w-4" />
               {language === 'ta' ? 'முடிவடைந்தது' : language === 'si' ? 'සම්පූර්ණයි' : 'Completed'}
+            </button>
+          ) : schedule.isUpcoming ? (
+            <button
+              id="upcoming-competition-btn"
+              type="button"
+              onClick={handleAction}
+              className="inline-flex items-center gap-2 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 px-5 py-2.5 text-xs font-bold shadow-xs hover:bg-amber-200 transition cursor-pointer"
+            >
+              <Lock className="h-4 w-4 text-amber-700" />
+              <span>
+                {language === 'ta'
+                  ? `பரீட்சை தொடங்கவில்லை (${schedule.formattedStart})`
+                  : language === 'si'
+                  ? `විභාගය ආරම්භ වී නැත (${schedule.formattedStart})`
+                  : `Opens On ${schedule.formattedStart}`}
+              </span>
             </button>
           ) : (
             <button

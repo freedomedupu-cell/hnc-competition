@@ -6,10 +6,14 @@ export interface CompetitionScheduleStatus {
   isLive: boolean;
   isEnded: boolean;
   canTakeExam: boolean;
+  isRegistrationOpen: boolean;
+  isRegistrationClosed: boolean;
+  regEndDateTime: Date | null;
   startDateTime: Date | null;
   endDateTime: Date | null;
   formattedStart: string;
   formattedEnd: string;
+  formattedRegEnd: string;
   statusBadgeTa: string;
   statusBadgeEn: string;
   statusBadgeSi: string;
@@ -162,8 +166,14 @@ export function getCompetitionScheduleStatus(comp: Competition): CompetitionSche
     timeRemainingTextEn = 'Competition examination window has closed';
   }
 
+  const regEndDateStr = comp.registrationEnd || comp.registrationDeadline;
+  const regEndDateTime = parseDateTime(regEndDateStr, '23:59', 'end');
+  const isRegistrationClosed = regEndDateTime ? nowMs > regEndDateTime.getTime() : false;
+  const isRegistrationOpen = !isRegistrationClosed;
+
   const formattedStart = startDateTime ? formatDateTimeReadable(startDateTime) : 'இப்போது திறக்கப்பட்டுள்ளது (Open Now)';
   const formattedEnd = endDateTime ? formatDateTimeReadable(endDateTime) : 'வரையறுக்கப்படவில்லை (No limit)';
+  const formattedRegEnd = regEndDateTime ? formatDateTimeReadable(regEndDateTime) : 'முடிவடையவில்லை (No deadline)';
 
   return {
     phase,
@@ -171,10 +181,14 @@ export function getCompetitionScheduleStatus(comp: Competition): CompetitionSche
     isLive: phase === 'live',
     isEnded: phase === 'ended',
     canTakeExam: phase === 'live',
+    isRegistrationOpen,
+    isRegistrationClosed,
+    regEndDateTime,
     startDateTime,
     endDateTime,
     formattedStart,
     formattedEnd,
+    formattedRegEnd,
     statusBadgeTa:
       phase === 'upcoming'
         ? `⏰ வரவிருக்கும் போட்டி (ஆரம்பம்: ${formatTime12h(startTimeStr) || formattedStart})`

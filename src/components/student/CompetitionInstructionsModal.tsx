@@ -10,9 +10,11 @@ import {
   X,
   ShieldAlert,
   Camera,
+  Lock,
 } from 'lucide-react';
 import { Competition } from '../../types';
 import { getCompetitionQuestions } from '../../data/questionPool';
+import { getCompetitionScheduleStatus } from '../../utils/competitionTimeUtils';
 import { useApp } from '../../context/AppContext';
 import { APP_LOGO } from '../../assets/logo';
 
@@ -276,26 +278,49 @@ export const CompetitionInstructionsModal: React.FC<CompetitionInstructionsModal
         </div>
 
         {/* Footer */}
-        <div className="border-t border-slate-200 bg-slate-50 p-4 px-6 flex items-center justify-between">
-          <button
-            id="cancel-instruction-btn"
-            type="button"
-            onClick={onClose}
-            className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
-          >
-            {language === 'ta' ? 'பின்செல்ல' : language === 'si' ? 'ආපසු යන්න' : 'Cancel & Go Back'}
-          </button>
+        {(() => {
+          const schedule = getCompetitionScheduleStatus(competition);
+          return (
+            <div className="border-t border-slate-200 bg-slate-50 p-4 px-6 flex items-center justify-between">
+              <button
+                id="cancel-instruction-btn"
+                type="button"
+                onClick={onClose}
+                className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
+              >
+                {language === 'ta' ? 'பின்செல்ல' : language === 'si' ? 'ආපසු යන්න' : 'Cancel & Go Back'}
+              </button>
 
-          <button
-            id="start-now-btn"
-            type="button"
-            onClick={onStartNow}
-            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-7 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 hover:bg-blue-700 transition active:scale-95"
-          >
-            <Play className="h-4 w-4 fill-white" />
-            {language === 'ta' ? 'இப்போது தொடங்குக' : language === 'si' ? 'දැන් ආරම්භ කරන්න' : 'Start Now'}
-          </button>
-        </div>
+              {schedule.isUpcoming ? (
+                <button
+                  id="upcoming-start-btn"
+                  type="button"
+                  disabled
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 px-5 py-2.5 text-xs font-bold shadow-xs cursor-not-allowed"
+                >
+                  <Lock className="h-4 w-4 text-amber-700" />
+                  <span>
+                    {language === 'ta'
+                      ? `பரீட்சை தொடங்கவில்லை (${schedule.formattedStart})`
+                      : language === 'si'
+                      ? `විභාගය ආරම්භ වී නැත (${schedule.formattedStart})`
+                      : `Opens On ${schedule.formattedStart}`}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  id="start-now-btn"
+                  type="button"
+                  onClick={onStartNow}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-7 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 hover:bg-blue-700 transition active:scale-95"
+                >
+                  <Play className="h-4 w-4 fill-white" />
+                  {language === 'ta' ? 'இப்போது தொடங்குக' : language === 'si' ? 'දැන් ආරම්භ කරන්න' : 'Start Now'}
+                </button>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

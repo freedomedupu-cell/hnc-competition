@@ -10,6 +10,7 @@ import {
   query,
   where,
   orderBy,
+  increment,
   Unsubscribe,
 } from 'firebase/firestore';
 import {
@@ -540,30 +541,36 @@ export async function registerStudentAccount(data: {
       }
 
       if (referrerDocSnap) {
-        const refId = referrerDocSnap.id;
         const refData = referrerDocSnap.data() as any;
+        const targetUid = refData.uid || refData.studentId || referrerDocSnap.id;
         const currentPoints = typeof refData.referralPoints === 'number' ? refData.referralPoints : 0;
         const currentTotal = typeof refData.totalReferrals === 'number' ? refData.totalReferrals : 0;
-        const updatedRefPoints = currentPoints + 25;
-        const updatedRefTotal = currentTotal + 1;
 
-        // Reward referrer with +25 points and increment total referrals
+        // Reward referrer with +25 points and increment total referrals atomically
+        const rewardData = {
+          referralPoints: increment(25),
+          totalReferrals: increment(1),
+        };
+
         try {
-          await updateDoc(doc(db, 'students', refId), {
-            referralPoints: updatedRefPoints,
-            totalReferrals: updatedRefTotal,
-          });
+          await setDoc(doc(db, 'students', targetUid), rewardData, { merge: true });
         } catch (e) {
-          console.warn('Could not update referrer in students collection:', e);
+          console.warn('Could not set referrer in students collection:', e);
         }
 
         try {
-          await updateDoc(doc(db, 'users', refId), {
-            referralPoints: updatedRefPoints,
-            totalReferrals: updatedRefTotal,
-          });
+          await setDoc(doc(db, 'users', targetUid), rewardData, { merge: true });
         } catch (e) {
-          console.warn('Could not update referrer in users collection:', e);
+          console.warn('Could not set referrer in users collection:', e);
+        }
+
+        if (referrerDocSnap.id !== targetUid) {
+          try {
+            await setDoc(doc(db, 'students', referrerDocSnap.id), rewardData, { merge: true });
+          } catch (_) {}
+          try {
+            await setDoc(doc(db, 'users', referrerDocSnap.id), rewardData, { merge: true });
+          } catch (_) {}
         }
 
         // New student gets +25 Referral Bonus Points for using their friend's referral link!

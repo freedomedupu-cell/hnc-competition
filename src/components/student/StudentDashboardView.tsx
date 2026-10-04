@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Competition, DbAttempt } from '../../types';
+import { getCompetitionScheduleStatus } from '../../utils/competitionTimeUtils';
 import {
   Trophy,
   Calendar,
@@ -96,9 +97,11 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
   // STRICT GRADE FILTER:
   // "குறிப்பிட்ட மாணவருடைய தரங்களுக்கு மட்டுமே அவரவர் டாஸ் போர்டுல பரீட்சைகள் டிஸ்ப்ளே ஆக வேண்டும் ஓபன் அண்ட் கொடுத்தா மட்டும் தான் எல்லா மாணவர்களும் டிஸ்ப்ளே ஆகணும்"
   const visibleCompetitions = competitions.filter((comp) => {
-    const s = (comp.status || '').toLowerCase();
-    const isPublished = !s.includes('draft') && !s.includes('closed');
-    if (!isPublished) return false;
+    if (!comp) return false;
+    const s = (comp.status || '').toLowerCase().trim();
+    if (s.includes('draft') || s === 'closed' || s === 'inactive' || s === 'unpublished') {
+      return false;
+    }
 
     // Matches student's enrolled grade OR competition is marked as Open (All Grades)
     return isGradeEligible(comp.grade, studentGrade);
@@ -185,6 +188,20 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
         setViewingReceipt({ attempt: prevAttempt, competition: comp });
         return;
       }
+    }
+
+    // Check if competition start date/time is in the future
+    const sched = getCompetitionScheduleStatus(comp);
+    if (sched.isUpcoming) {
+      setRefToast(
+        language === 'ta'
+          ? `⚠️ இந்த பரீட்சை இன்னும் தொடங்கவில்லை! ${sched.formattedStart} அன்று தான் தானாகவே திறக்கப்படும்.`
+          : language === 'si'
+          ? `⚠️ මෙම විභාගය තවම ආරම්භ වී නැත! ${sched.formattedStart} දින විවෘත වේ.`
+          : `⚠️ Exam has not started yet! Opens automatically on ${sched.formattedStart}.`
+      );
+      setTimeout(() => setRefToast(null), 5000);
+      return;
     }
 
     // Check membership eligibility if membership is required
@@ -665,22 +682,44 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
                           : 'View Receipt'}
                       </span>
                     </button>
-                  ) : (
-                    <button
-                      id={`join-btn-${item.id}`}
-                      onClick={() => handleJoinCompetition(item.fullCompetition)}
-                      className="bg-[#1877F2] hover:bg-[#166FE5] active:scale-95 text-white font-bold text-xs sm:text-sm px-5 py-2 sm:py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 shrink-0"
-                    >
-                      <span>
-                        {language === 'ta'
-                          ? 'இப்போதே சேரவும்'
-                          : language === 'si'
-                          ? 'දැන් එකතු වන්න'
-                          : 'Join Now'}
-                      </span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  )}
+                  ) : (() => {
+                    const sched = getCompetitionScheduleStatus(item.fullCompetition);
+                    if (sched.isUpcoming) {
+                      return (
+                        <button
+                          id={`join-btn-${item.id}`}
+                          onClick={() => handleJoinCompetition(item.fullCompetition)}
+                          className="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-xs sm:text-sm px-4 py-2 sm:py-2.5 rounded-xl transition-all flex items-center gap-1.5 shrink-0"
+                        >
+                          <Lock className="w-4 h-4 text-amber-700" />
+                          <span>
+                            {language === 'ta'
+                              ? `தொடங்கும் நேரம்: ${sched.formattedStart}`
+                              : language === 'si'
+                              ? `ආරම්භක දිනය: ${sched.formattedStart}`
+                              : `Opens: ${sched.formattedStart}`}
+                          </span>
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <button
+                        id={`join-btn-${item.id}`}
+                        onClick={() => handleJoinCompetition(item.fullCompetition)}
+                        className="bg-[#1877F2] hover:bg-[#166FE5] active:scale-95 text-white font-bold text-xs sm:text-sm px-5 py-2 sm:py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 shrink-0"
+                      >
+                        <span>
+                          {language === 'ta'
+                            ? 'இப்போதே சேரவும்'
+                            : language === 'si'
+                            ? 'දැන් එකතු වන්න'
+                            : 'Join Now'}
+                        </span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             );

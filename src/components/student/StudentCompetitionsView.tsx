@@ -27,6 +27,7 @@ import { ExamCameraVerificationModal } from './ExamCameraVerificationModal';
 import { CompetitionLeaderboardModal } from '../common/CompetitionLeaderboardModal';
 import { ShareModal } from '../common/ShareModal';
 import { getCompetitionQuestions } from '../../data/questionPool';
+import { getCompetitionScheduleStatus } from '../../utils/competitionTimeUtils';
 import { GraduationCap, Shield } from 'lucide-react';
 import { APP_LOGO } from '../../assets/logo';
 import { StudentMembershipModal } from './StudentMembershipModal';
@@ -96,9 +97,11 @@ export const StudentCompetitionsView: React.FC = () => {
   // STRICT GRADE FILTER:
   // "குறிப்பிட்ட மாணவருடைய தரங்களுக்கு மட்டுமே அவரவர் டாஸ் போர்டுல பரீட்சைகள் டிஸ்ப்ளே ஆக வேண்டும் ஓபன் அண்ட் கொடுத்தா மட்டும் தான் எல்லா மாணவர்களும் டிஸ்ப்ளே ஆகணும்"
   const visibleCompetitions = competitions.filter((comp) => {
-    const s = (comp.status || '').toLowerCase();
-    const isPublished = !s.includes('draft') && !s.includes('closed');
-    if (!isPublished) return false;
+    if (!comp) return false;
+    const s = (comp.status || '').toLowerCase().trim();
+    if (s.includes('draft') || s === 'closed' || s === 'inactive' || s === 'unpublished') {
+      return false;
+    }
 
     // Strict: Only matches student's enrolled grade OR competition is Open to all grades
     return isGradeEligible(comp.grade, studentGrade);
@@ -156,6 +159,20 @@ export const StudentCompetitionsView: React.FC = () => {
 
   const handleStartFlow = (comp: Competition) => {
     if (hasStudentSubmitted(comp.id)) return;
+
+    // Check if competition start date/time is in the future
+    const sched = getCompetitionScheduleStatus(comp);
+    if (sched.isUpcoming) {
+      setRegToast(
+        language === 'ta'
+          ? `⚠️ இந்த பரீட்சை இன்னும் தொடங்கவில்லை! ${sched.formattedStart} அன்று தான் தானாகவே திறக்கப்படும்.`
+          : language === 'si'
+          ? `⚠️ මෙම විභාගය තවම ආරම්භ වී නැත! ${sched.formattedStart} දින විවෘත වේ.`
+          : `⚠️ Exam has not started yet! Opens automatically on ${sched.formattedStart}.`
+      );
+      setTimeout(() => setRegToast(null), 5000);
+      return;
+    }
 
     // Check membership eligibility if membership is required
     if (comp.membershipRequired && !isMembershipActiveForStudent()) {
@@ -725,43 +742,89 @@ export const StudentCompetitionsView: React.FC = () => {
                       </span>
                     </button>
                   ) : isRegistered ? (
-                    // Registered (or Paid & Confirmed): Show "Start Competition"
-                    <button
-                      id={`btn-start-${comp.id}`}
-                      type="button"
-                      onClick={() => handleStartFlow(comp)}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-sm transition"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-white" />
-                      <span>
-                        {comp.competitionType === 'Exam'
-                          ? (language === 'ta'
-                              ? 'பரீட்சையைத் தொடங்கு'
+                    (() => {
+                      const sched = getCompetitionScheduleStatus(comp);
+                      if (sched.isUpcoming) {
+                        return (
+                          <button
+                            id={`btn-upcoming-${comp.id}`}
+                            type="button"
+                            onClick={() => handleStartFlow(comp)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs hover:bg-amber-200 transition"
+                          >
+                            <Lock className="w-3.5 h-3.5 text-amber-700" />
+                            <span>
+                              {language === 'ta'
+                                ? `தொடங்கும் நேரம்: ${sched.formattedStart}`
+                                : language === 'si'
+                                ? `ආරම්භක දිනය: ${sched.formattedStart}`
+                                : `Opens: ${sched.formattedStart}`}
+                            </span>
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <button
+                          id={`btn-start-${comp.id}`}
+                          type="button"
+                          onClick={() => handleStartFlow(comp)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-sm transition"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-white" />
+                          <span>
+                            {comp.competitionType === 'Exam'
+                              ? (language === 'ta'
+                                  ? 'பரீட்சையைத் தொடங்கு'
+                                  : language === 'si'
+                                  ? 'විභාගය ආරම්භ කරන්න'
+                                  : 'Start Exam')
+                              : (language === 'ta'
+                                  ? 'போட்டியைத் தொடங்கு'
+                                  : language === 'si'
+                                  ? 'තරඟය ආරම්භ කරන්න'
+                                  : 'Start Competition')}
+                          </span>
+                        </button>
+                      );
+                    })()
+                  ) : (() => {
+                    const sched = getCompetitionScheduleStatus(comp);
+                    if (sched.isRegistrationClosed) {
+                      return (
+                        <button
+                          id={`btn-reg-closed-${comp.id}`}
+                          type="button"
+                          disabled
+                          className="px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed flex items-center gap-1"
+                        >
+                          <Lock className="w-3 h-3 text-slate-400" />
+                          <span>
+                            {language === 'ta'
+                              ? 'பதிவு காலம் முடிவடைந்தது'
                               : language === 'si'
-                              ? 'විභාගය ආරම්භ කරන්න'
-                              : 'Start Exam')
-                          : (language === 'ta'
-                              ? 'போட்டியைத் தொடங்கு'
-                              : language === 'si'
-                              ? 'තරඟය ආරම්භ කරන්න'
-                              : 'Start Competition')}
-                      </span>
-                    </button>
-                  ) : (
-                    // Free competition not yet registered: Show "Register"
-                    <button
-                      id={`btn-register-${comp.id}`}
-                      type="button"
-                      onClick={() => handleRegister(comp)}
-                      className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-sm transition"
-                    >
-                      {language === 'ta'
-                        ? 'பதிவு செய்க'
-                        : language === 'si'
-                        ? 'ලියාපදිංචි වන්න'
-                        : 'Register'}
-                    </button>
-                  )}
+                              ? 'ලියාපදිංචිය අවසන්'
+                              : 'Registration Closed'}
+                          </span>
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <button
+                        id={`btn-register-${comp.id}`}
+                        type="button"
+                        onClick={() => handleRegister(comp)}
+                        className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-sm transition cursor-pointer"
+                      >
+                        {language === 'ta'
+                          ? 'பதிவு செய்க'
+                          : language === 'si'
+                          ? 'ලියාපදිංචි වන්න'
+                          : 'Register'}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             );

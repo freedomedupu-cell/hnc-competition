@@ -36,6 +36,7 @@ import {
   initialSettings,
 } from '../data/mockData';
 import { getCompetitionQuestions } from '../data/questionPool';
+import { getCompetitionScheduleStatus } from '../utils/competitionTimeUtils';
 import { Language, translations } from '../i18n/translations';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -1323,6 +1324,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (studentRegistrations.includes(competitionId)) {
       return false;
     }
+
+    const comp = competitions.find((c) => c.id === competitionId);
+    if (comp) {
+      const sched = getCompetitionScheduleStatus(comp);
+      if (sched.isRegistrationClosed) {
+        alert(`⚠️ Registration deadline (${sched.formattedRegEnd}) for this competition has passed.`);
+        return false;
+      }
+    }
+
     setStudentRegistrations((prev) => [...prev, competitionId]);
 
     const studentRecord = {
@@ -1583,6 +1594,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Student has already submitted this competition. Multiple attempts prohibited.');
       return;
     }
+
+    // Strict Schedule & Time Window Access Control:
+    const sched = getCompetitionScheduleStatus(comp);
+    if (sched.isUpcoming) {
+      alert(`⚠️ This exam has not started yet! Opens automatically on ${sched.formattedStart}.`);
+      return;
+    }
+    if (sched.isEnded) {
+      alert('⚠️ This competition examination window has ended.');
+      return;
+    }
+
+    // Registration Deadline Enforcement:
+    const isRegistered = isStudentRegistered(comp.id);
+    if (!isRegistered && sched.isRegistrationClosed) {
+      alert(`⚠️ Registration closed on ${sched.formattedRegEnd}. You cannot join this exam now.`);
+      return;
+    }
+
     // Defense-in-depth: Block unauthorized exam access if membership is required and inactive
     if (comp.membershipRequired && !isMembershipActiveForStudent(currentAuthUser?.uid || currentStudent.id)) {
       console.warn('Membership is required and not active for this student.');

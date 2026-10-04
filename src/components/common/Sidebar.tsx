@@ -203,7 +203,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
       id: 'Competitions',
       label: t('navCompetitions'),
       icon: <Trophy className="w-5 h-5" />,
-      badge: competitions.filter((c) => c.status === 'ongoing' || c.status === 'upcoming').length,
+      badge: competitions.filter((c) => {
+        if (!c) return false;
+        const s = (c.status || '').toLowerCase().trim();
+        return !s.includes('draft') && !s.includes('closed') && !s.includes('inactive');
+      }).length,
     },
     {
       id: 'My Results',
@@ -216,11 +220,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
             r.studentName === (currentAuthUser?.fullName || currentStudent.name)) &&
           r.publishStatus === 'published'
       ).length || undefined,
-    },
-    {
-      id: 'My Profile',
-      label: t('navMyProfile'),
-      icon: <User className="w-5 h-5" />,
     },
     {
       id: 'Referral & Points',
@@ -243,6 +242,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
           : 'Announcements',
       icon: <Bell className="w-5 h-5 text-indigo-500" />,
       badge: announcements.filter(a => a.targetAudience === 'all' || a.targetAudience === 'students').length || undefined,
+    },
+    {
+      id: 'My Profile',
+      label: t('navMyProfile'),
+      icon: <User className="w-5 h-5" />,
     },
   ];
 
