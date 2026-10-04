@@ -129,6 +129,7 @@ export type AdminNav =
 export type StudentNav = 
   | 'Dashboard' 
   | 'Competitions' 
+  | 'Edu-Arena Quest'
   | 'My Results' 
   | 'My Profile'
   | 'Referral & Points'

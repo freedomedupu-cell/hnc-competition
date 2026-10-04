@@ -28,6 +28,7 @@ import {
   Mail,
   Share2,
   ExternalLink,
+  Gamepad2,
 } from 'lucide-react';
 import { SuperAdminNav, AdminNav, StudentNav } from '../../context/AppContext';
 
@@ -213,6 +214,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
         const s = (c.status || '').toLowerCase().trim();
         return !s.includes('draft') && !s.includes('closed') && !s.includes('inactive');
       }).length,
+    },
+    {
+      id: 'Edu-Arena Quest',
+      label:
+        language === 'ta'
+          ? '🎯 தீவுப் பயணம் (Quest)'
+          : language === 'si'
+          ? '🎯 දුපත් චාරිකාව (Quest)'
+          : '🎯 Island Quest (Arena)',
+      icon: <Gamepad2 className="w-5 h-5 text-emerald-500" />,
+      badge: '⚡ New',
     },
     {
       id: 'My Results',

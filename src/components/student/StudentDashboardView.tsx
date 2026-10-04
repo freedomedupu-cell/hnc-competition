@@ -28,6 +28,7 @@ import {
   Phone,
   Mail,
   ExternalLink,
+  Gamepad2,
 } from 'lucide-react';
 import {
   Math3DIcon,
@@ -512,6 +513,40 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
             <span>{language === 'ta' ? 'வெகுமதிகள்' : 'Rewards Hub'}</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
+        </div>
+      </div>
+
+      {/* 2.5 HNC EDU-ARENA: ISLAND QUEST HERO PROMO CARD */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 via-slate-900 to-blue-900 p-6 sm:p-7 text-white shadow-md border border-indigo-700/50">
+        <div className="absolute -right-8 -top-8 w-48 h-48 rounded-full bg-blue-500/10 blur-2xl pointer-events-none" />
+        <div className="absolute right-1/3 -bottom-8 w-40 h-40 rounded-full bg-amber-500/10 blur-xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="space-y-2 max-w-xl">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{language === 'ta' ? 'புதிய கேமிஃபிகேஷன் அரங்கம்' : 'Interactive Gamified Quest'}</span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
+              <span>🎯 HNC Edu-Arena: தீவுப் பயணம்</span>
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              {language === 'ta'
+                ? 'இலங்கையின் மாவட்டங்களைக் கடந்து உங்கள் கல்விச் சிகரத்தை அடையுங்கள்! 50-50, டைமர் மற்றும் Kahoot பாணி போர்க்களத்தில் பங்கேற்று XP புள்ளிகளை வெல்லுங்கள்!'
+                : 'Conquer the academic challenges across Sri Lankan districts! Compete in rapid Kahoot-style arena battles with 50-50 power-ups and earn XP!'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setStudentNav('Edu-Arena Quest')}
+              className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black rounded-2xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 transition active:scale-95 cursor-pointer"
+            >
+              <Gamepad2 className="w-5 h-5 text-slate-950" />
+              <span>{language === 'ta' ? 'விளையாடத் தொடங்கு ⚔️' : 'Play Quest Now ⚔️'}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 

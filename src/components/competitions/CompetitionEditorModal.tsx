@@ -11,6 +11,7 @@ import {
   QuestionType,
   SupportedLanguage,
 } from '../../types';
+import { SRI_LANKA_25_DISTRICTS, PROVINCES_OF_SRI_LANKA } from '../../data/sriLankaDistricts';
 import {
   Trophy,
   Plus,
@@ -349,6 +350,8 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
   const [requireCameraVerification, setRequireCameraVerification] = useState<boolean>(false);
   const [requireVideoVerification, setRequireVideoVerification] = useState<boolean>(false);
   const [membershipRequired, setMembershipRequired] = useState<boolean>(false);
+  const [district, setDistrict] = useState<string>('All Island');
+  const [scope, setScope] = useState<'all_island' | 'district' | 'province'>('all_island');
 
   // Schedule & Entry
   const [entryType, setEntryType] = useState<'Free' | 'Paid'>('Free');
@@ -499,6 +502,8 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
           : false
       );
       setMembershipRequired(Boolean(initialCompetition.membershipRequired));
+      setDistrict(initialCompetition.district || 'All Island');
+      setScope(initialCompetition.scope || (initialCompetition.district ? 'district' : 'all_island'));
       const rawQs = initialCompetition.questions ? [...initialCompetition.questions] : [];
       const cleanQs = rawQs.filter((q) => {
         const text = (q.questionText || '').toLowerCase();
@@ -528,6 +533,8 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
       setCategory('Mathematics');
       setGrade('Grade 10');
       setLanguage('English');
+      setDistrict('All Island');
+      setScope('all_island');
 
       setEntryType('Free');
       setEntryFee(0);
@@ -953,6 +960,8 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
         requireCameraVerification,
         requireVideoVerification,
         membershipRequired,
+        district: district === 'All Island' ? undefined : district,
+        scope: district === 'All Island' ? 'all_island' : 'district',
       };
 
       await onSave(compPayload);
@@ -1345,6 +1354,44 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                     onChange={(e) => setDuration(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                </div>
+
+                {/* District Scope: All Island or 25 Sri Lankan Districts */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-800">
+                      இலக்கு மாவட்டம் (District Scope)
+                    </label>
+                    <span className="text-[10px] text-emerald-700 font-bold">
+                      {district === 'All Island' ? '🌐 அனைத்திலங்கை' : `📍 ${district}`}
+                    </span>
+                  </div>
+                  <select
+                    value={district}
+                    onChange={(e) => {
+                      setDistrict(e.target.value);
+                      setScope(e.target.value === 'All Island' ? 'all_island' : 'district');
+                    }}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-semibold text-slate-900"
+                  >
+                    <option value="All Island">🌐 அனைத்திலங்கை (All Island / National)</option>
+                    {PROVINCES_OF_SRI_LANKA.map((prov) => (
+                      <optgroup key={prov.id} label={`${prov.nameTa} (${prov.nameEn})`}>
+                        {prov.districts.map((dId) => {
+                          const distInfo = SRI_LANKA_25_DISTRICTS.find((d) => d.id === dId);
+                          if (!distInfo) return null;
+                          return (
+                            <option key={dId} value={distInfo.nameTa}>
+                              {distInfo.icon} {distInfo.nameTa} ({distInfo.nameEn})
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    குறிப்பிட்ட ஒரு மாவட்டத்திற்கு மட்டும் அல்லது <strong>அனைத்திலங்கை</strong> மாணவர்களுக்கும் பிரசுரிக்கலாம்.
+                  </p>
                 </div>
               </div>
 

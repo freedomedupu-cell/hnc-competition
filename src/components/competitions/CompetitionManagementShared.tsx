@@ -27,11 +27,15 @@ import {
   FileText,
   Sparkles,
   Share2,
+  MapPin,
+  Globe,
 } from 'lucide-react';
 import { CompetitionEditorModal } from './CompetitionEditorModal';
 import { CompetitionPreviewModal } from './CompetitionPreviewModal';
 import { CompetitionParticipantsModal } from './CompetitionParticipantsModal';
 import { ShareModal } from '../common/ShareModal';
+import { DistrictsCompetitionStudioModal } from '../admin/DistrictsCompetitionStudioModal';
+import { SRI_LANKA_25_DISTRICTS } from '../../data/sriLankaDistricts';
 
 interface CompetitionManagementSharedProps {
   role: 'super_admin' | 'admin';
@@ -52,9 +56,11 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
   const [gradeFilter, setGradeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [districtFilter, setDistrictFilter] = useState('all');
 
   // Modals state
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isDistrictsStudioOpen, setIsDistrictsStudioOpen] = useState(false);
   const [editingComp, setEditingComp] = useState<Competition | null>(null);
   const [editorInitialType, setEditorInitialType] = useState<CompetitionType>('Competition');
   const [editorInitialTab, setEditorInitialTab] = useState<'details' | 'schedule' | 'prizes' | 'questions'>('details');
@@ -99,7 +105,14 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
         ? true
         : comp.competitionType?.toLowerCase() === typeFilter.toLowerCase();
 
-    return matchesSearch && matchesCategory && matchesGrade && matchesStatus && matchesType;
+    const matchesDistrict =
+      districtFilter === 'all'
+        ? true
+        : districtFilter === 'All Island'
+        ? !comp.district || comp.district === 'All Island'
+        : comp.district === districtFilter;
+
+    return matchesSearch && matchesCategory && matchesGrade && matchesStatus && matchesType && matchesDistrict;
   });
 
   // KPI calculations
@@ -274,6 +287,18 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
             <Sparkles className="w-3.5 h-3.5" />
             <span>Question Paper Studio</span>
           </button>
+
+          {/* 25 Districts Studio & Quest Manager */}
+          <button
+            type="button"
+            id="btn-open-districts-studio"
+            onClick={() => setIsDistrictsStudioOpen(true)}
+            className="px-3.5 py-2 bg-gradient-to-r from-indigo-700 to-blue-700 text-white rounded-lg text-xs font-bold hover:from-indigo-800 hover:to-blue-800 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+            title="இலங்கையின் 25 மாவட்டப் போட்டிகள் மற்றும் பிரசுரிக்கும் அரங்கம் (25 Districts Studio)"
+          >
+            <MapPin className="w-3.5 h-3.5 text-amber-300" />
+            <span>🎯 25 மாவட்டங்கள் அரங்கம்</span>
+          </button>
         </div>
       </div>
 
@@ -326,7 +351,7 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
 
       {/* Search & Filter Controls */}
       <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5 text-xs">
           {/* Search */}
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -401,6 +426,23 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
               <option value="closed">Closed</option>
             </select>
           </div>
+
+          {/* District Scope Filter (25 Districts) */}
+          <div>
+            <select
+              value={districtFilter}
+              onChange={(e) => setDistrictFilter(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">அனைத்து மாவட்டங்களும் (All)</option>
+              <option value="All Island">🌐 அனைத்திலங்கை (National)</option>
+              {SRI_LANKA_25_DISTRICTS.map((d) => (
+                <option key={d.id} value={d.nameTa}>
+                  {d.icon} {d.nameTa} ({d.nameEn})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -462,6 +504,10 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
                       <span>{comp.grade || 'Open'}</span>
                       <span>•</span>
                       <span>Medium: {comp.language || 'English'}</span>
+                      <span>•</span>
+                      <span className="inline-flex items-center gap-1 font-bold text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                        {comp.district ? `📍 ${comp.district}` : '🌐 அனைத்திலங்கை'}
+                      </span>
                     </div>
                   </div>
 
@@ -509,40 +555,38 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
 
                 {/* Bottom Action Strip */}
                 <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                  {/* Quick Status actions */}
-                  <div className="flex items-center gap-1.5">
+                  {/* Quick Status actions: Publish / Unpublish */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     {comp.status === 'Draft' ? (
                       <button
                         type="button"
                         onClick={() => handleQuickStatusChange(comp.id, 'Published')}
-                        className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-800 hover:bg-blue-100 text-[11px] font-bold transition-colors border border-blue-200 flex items-center gap-1"
+                        className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
+                        title="போட்டியை உடனடியாக பிரசுரி (Publish Now)"
                       >
-                        <CheckCircle2 className="w-3 h-3" /> Publish
-                      </button>
-                    ) : comp.status === 'Published' ? (
-                      <button
-                        type="button"
-                        onClick={() => handleQuickStatusChange(comp.id, 'Registration Open')}
-                        className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-[11px] font-bold transition-colors border border-emerald-200"
-                      >
-                        Open Registration
-                      </button>
-                    ) : comp.status === 'Registration Open' || comp.status === 'Ongoing' ? (
-                      <button
-                        type="button"
-                        onClick={() => handleQuickStatusChange(comp.id, 'Closed')}
-                        className="px-2.5 py-1 rounded-md bg-rose-50 text-rose-800 hover:bg-rose-100 text-[11px] font-bold transition-colors border border-rose-200"
-                      >
-                        Close
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Publish (பிரசுரி)</span>
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleQuickStatusChange(comp.id, 'Draft')}
-                        className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 text-[11px] font-medium transition-colors"
-                      >
-                        Set to Draft
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {comp.status === 'Published' && (
+                          <button
+                            type="button"
+                            onClick={() => handleQuickStatusChange(comp.id, 'Registration Open')}
+                            className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-[11px] font-bold transition-colors border border-emerald-200 cursor-pointer"
+                          >
+                            Open Registration
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleQuickStatusChange(comp.id, 'Draft')}
+                          className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 text-[11px] font-medium transition-colors border border-slate-200 cursor-pointer"
+                          title="பிரசுரத்தை நிறுத்தி வரைவாக்கு (Unpublish / Draft)"
+                        >
+                          Unpublish (மறை)
+                        </button>
+                      </div>
                     )}
 
                     {/* View Participants */}
@@ -708,6 +752,70 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
           isOpen={!!shareComp}
           onClose={() => setShareComp(null)}
           competition={shareComp}
+        />
+      )}
+
+      {/* 25 Districts Studio & Quest Publishing Management Modal */}
+      {isDistrictsStudioOpen && (
+        <DistrictsCompetitionStudioModal
+          isOpen={isDistrictsStudioOpen}
+          onClose={() => setIsDistrictsStudioOpen(false)}
+          role={role}
+          onCreateFormalCompetition={(district) => {
+            const newCode = `HNC-${district.nameEn.slice(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
+            const today = new Date();
+            const inTwoWeeks = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
+            const inThreeWeeks = new Date(today.getTime() + 21 * 24 * 60 * 60 * 1000);
+            const inFourWeeks = new Date(today.getTime() + 28 * 24 * 60 * 60 * 1000);
+            const fmt = (d: Date) => d.toISOString().split('T')[0];
+
+            setEditingComp({
+              id: `comp-${district.id}-${Date.now().toString(36)}`,
+              code: newCode,
+              title: `${district.nameTa} மாவட்டப் போட்டி (${district.gradeSubject})`,
+              category: district.gradeSubject.includes('கணிதம்')
+                ? 'Mathematics'
+                : district.gradeSubject.includes('விஞ்ஞானம்')
+                ? 'Science'
+                : district.gradeSubject.includes('தமிழ்')
+                ? 'Tamil'
+                : 'General Knowledge',
+              description: district.descriptionTa,
+              competitionType: 'Competition',
+              grade: district.gradeSubject.split('•')[0]?.trim() || 'Open (All Grades)',
+              language: 'Tamil',
+              duration: 45,
+              entryType: 'Free',
+              entryFee: 0,
+              status: 'Published',
+              enrolledCount: 0,
+              district: district.nameTa,
+              province: district.provinceTa,
+              scope: 'district',
+              registrationStart: fmt(today),
+              registrationEnd: fmt(inTwoWeeks),
+              competitionStart: fmt(inThreeWeeks),
+              competitionEnd: fmt(inFourWeeks),
+              competitionStartTime: '09:00',
+              competitionEndTime: '23:59',
+              questions: district.initialQuestions.map((q, idx) => ({
+                id: q.id || `q-${idx + 1}`,
+                type: 'multiple_choice' as const,
+                questionText: q.questionText,
+                options: q.options.map((o) => o.text),
+                correctAnswer: q.options[q.correctIndex]?.text || '',
+                marks: 5,
+                order: idx + 1,
+                explanation: q.explanation,
+              })),
+              questionsCount: district.initialQuestions.length,
+              totalMarks: district.initialQuestions.length * 5,
+            } as any);
+            setEditorInitialType('Competition');
+            setEditorInitialTab('details');
+            setIsEditorOpen(true);
+            showNotification(`🎯 ${district.nameTa} போட்டிக்கான வினாத்தாள் எடிட்டரில் தயார்!`);
+          }}
         />
       )}
     </div>

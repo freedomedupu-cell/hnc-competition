@@ -20,6 +20,7 @@ import {
   Video,
   Download,
   Eye,
+  MapPin,
 } from 'lucide-react';
 import { CompetitionEditorModal } from '../competitions/CompetitionEditorModal';
 import { Competition, CompetitionType } from '../../types';
@@ -138,6 +139,16 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
           >
             <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
             <span>Paper Studio</span>
+          </button>
+
+          <button
+            id="sa-quick-districts-studio"
+            onClick={() => onNavigate('Competition Management')}
+            className="px-3.5 py-2 text-xs font-bold rounded-lg bg-gradient-to-r from-indigo-700 to-blue-700 text-white hover:from-indigo-800 hover:to-blue-800 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+            title="இலங்கையின் 25 மாவட்டப் போட்டிகள் & பிரசுரிக்கும் மையம்"
+          >
+            <MapPin className="w-3.5 h-3.5 text-amber-300" />
+            <span>🎯 25 மாவட்டங்கள்</span>
           </button>
         </div>
       </div>

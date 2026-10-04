@@ -150,6 +150,9 @@ export interface DbCompetition {
   requireCameraVerification?: boolean;
   requireVideoVerification?: boolean;
   membershipRequired?: boolean;
+  district?: string;
+  province?: string;
+  scope?: 'all_island' | 'district' | 'province';
 }
 
 export interface DbResult {
@@ -437,6 +440,9 @@ export interface Competition {
   membershipRequired?: boolean;
   roundsCount?: number;
   createdAt?: string;
+  district?: string;
+  province?: string;
+  scope?: 'all_island' | 'district' | 'province';
 }
 
 export interface CompetitionResult {

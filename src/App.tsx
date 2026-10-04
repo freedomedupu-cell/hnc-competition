@@ -34,6 +34,7 @@ import { StudentProfileView } from './components/student/StudentProfileView';
 import { StudentExamInterface } from './components/student/StudentExamInterface';
 import { StudentReferralView } from './components/student/StudentReferralView';
 import { StudentAnnouncementsView } from './components/student/StudentAnnouncementsView';
+import { GameQuest } from './components/student/GameQuest';
 
 // Common Announcements Management (Admin / Super Admin)
 import { AnnouncementsManagementView } from './components/common/AnnouncementsManagementView';
@@ -172,6 +173,8 @@ const MainPortalArea: React.FC = () => {
             return <StudentDashboardView onNavigate={setStudentNav} />;
           case 'Competitions':
             return <StudentCompetitionsView />;
+          case 'Edu-Arena Quest':
+            return <GameQuest />;
           case 'My Results':
             return <StudentResultsView />;
           case 'My Profile':
