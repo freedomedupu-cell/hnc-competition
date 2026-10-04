@@ -28,6 +28,9 @@ import {
   X,
   Trash2,
   Image as ImageIcon,
+  MessageCircle,
+  Share2,
+  ExternalLink,
 } from 'lucide-react';
 import { StudentMembershipModal } from './StudentMembershipModal';
 
@@ -617,6 +620,101 @@ export const StudentProfileView: React.FC = () => {
                 <p className="text-slate-700 italic">"{currentStudent.bio}"</p>
               </div>
             )}
+          </div>
+
+          {/* Official Higher Novas College Support & Social Channels Card */}
+          <div className="p-4 sm:p-5 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-slate-50 text-xs space-y-3">
+            <div className="flex items-center justify-between border-b border-blue-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
+                  HNC
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm">
+                    {language === 'ta' ? 'அதிகாரப்பூர்வ தொடர்புகள் & சமூக ஊடகங்கள்' : language === 'si' ? 'නිල සේවාවන් සහ සමාජ මාධ්‍ය' : 'Higher Novas College Official Support'}
+                  </h4>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    {language === 'ta' ? 'சந்தேகங்கள் மற்றும் உதவிக்கு எம்மை அணுகவும்' : language === 'si' ? 'ඕනෑම විමසීමක් සඳහා අප හා සම්බන්ධ වන්න' : 'Get direct institutional support & stay updated'}
+                  </p>
+                </div>
+              </div>
+              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100/80 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                {language === 'ta' ? 'நேரலை உதவி' : 'Active Support'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              <a
+                href="https://whatsapp.com/channel/0029VaEAS90Gk1FwJW7arA23"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-3 rounded-xl bg-white border border-emerald-200 hover:border-emerald-400 hover:shadow-md transition-all flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <MessageCircle className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <span className="font-extrabold text-slate-800 text-xs block group-hover:text-emerald-700">WhatsApp Channel</span>
+                    <span className="text-[10px] text-slate-500 font-medium">Official Community Updates</span>
+                  </div>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600" />
+              </a>
+
+              <a
+                href="https://www.facebook.com/share/18cWgwEKmy/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-3 rounded-xl bg-white border border-blue-200 hover:border-blue-400 hover:shadow-md transition-all flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Share2 className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <span className="font-extrabold text-slate-800 text-xs block group-hover:text-blue-700">Facebook Page</span>
+                    <span className="text-[10px] text-slate-500 font-medium">Official Announcements & News</span>
+                  </div>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600" />
+              </a>
+
+              <a
+                href="https://wa.me/94741760710"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-3 rounded-xl bg-white border border-slate-200 hover:border-emerald-400 hover:shadow-md transition-all flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 text-emerald-600 flex items-center justify-center shrink-0">
+                    <Phone className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <span className="font-extrabold text-slate-800 text-xs block group-hover:text-emerald-700">Phone & WhatsApp Support</span>
+                    <span className="text-[11px] font-mono font-bold text-emerald-800">+94 74 176 0710</span>
+                  </div>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600" />
+              </a>
+
+              <a
+                href="mailto:highernovascollege01@gmail.com"
+                className="p-3 rounded-xl bg-white border border-slate-200 hover:border-blue-400 hover:shadow-md transition-all flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 text-blue-600 flex items-center justify-center shrink-0">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <div className="text-left min-w-0">
+                    <span className="font-extrabold text-slate-800 text-xs block group-hover:text-blue-700">Official Help Email</span>
+                    <span className="text-[10.5px] font-mono font-bold text-blue-800 truncate block">highernovascollege01@gmail.com</span>
+                  </div>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 shrink-0" />
+              </a>
+            </div>
           </div>
         </div>
       </div>

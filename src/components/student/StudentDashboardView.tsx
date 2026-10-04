@@ -25,6 +25,9 @@ import {
   Copy,
   Check,
   Shield,
+  Phone,
+  Mail,
+  ExternalLink,
 } from 'lucide-react';
 import {
   Math3DIcon,
@@ -608,6 +611,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
             displayedCompetitions.map((item) => {
             const hasSubmitted = hasStudentSubmitted(item.fullCompetition.id);
             const isRegistered = isStudentRegistered(item.fullCompetition.id);
+            const sched = getCompetitionScheduleStatus(item.fullCompetition);
 
             return (
               <div
@@ -682,44 +686,37 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
                           : 'View Receipt'}
                       </span>
                     </button>
-                  ) : (() => {
-                    const sched = getCompetitionScheduleStatus(item.fullCompetition);
-                    if (sched.isUpcoming) {
-                      return (
-                        <button
-                          id={`join-btn-${item.id}`}
-                          onClick={() => handleJoinCompetition(item.fullCompetition)}
-                          className="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-xs sm:text-sm px-4 py-2 sm:py-2.5 rounded-xl transition-all flex items-center gap-1.5 shrink-0"
-                        >
-                          <Lock className="w-4 h-4 text-amber-700" />
-                          <span>
-                            {language === 'ta'
-                              ? `தொடங்கும் நேரம்: ${sched.formattedStart}`
-                              : language === 'si'
-                              ? `ආරම්භක දිනය: ${sched.formattedStart}`
-                              : `Opens: ${sched.formattedStart}`}
-                          </span>
-                        </button>
-                      );
-                    }
-
-                    return (
-                      <button
-                        id={`join-btn-${item.id}`}
-                        onClick={() => handleJoinCompetition(item.fullCompetition)}
-                        className="bg-[#1877F2] hover:bg-[#166FE5] active:scale-95 text-white font-bold text-xs sm:text-sm px-5 py-2 sm:py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 shrink-0"
-                      >
-                        <span>
-                          {language === 'ta'
-                            ? 'இப்போதே சேரவும்'
-                            : language === 'si'
-                            ? 'දැන් එකතු වන්න'
-                            : 'Join Now'}
-                        </span>
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
-                    );
-                  })()}
+                  ) : sched.isUpcoming ? (
+                    <button
+                      id={`join-btn-${item.id}`}
+                      onClick={() => handleJoinCompetition(item.fullCompetition)}
+                      className="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-xs sm:text-sm px-4 py-2 sm:py-2.5 rounded-xl transition-all flex items-center gap-1.5 shrink-0"
+                    >
+                      <Lock className="w-4 h-4 text-amber-700" />
+                      <span>
+                        {language === 'ta'
+                          ? `தொடங்கும் நேரம்: ${sched.formattedStart}`
+                          : language === 'si'
+                          ? `ආරම්භක දිනය: ${sched.formattedStart}`
+                          : `Opens: ${sched.formattedStart}`}
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      id={`join-btn-${item.id}`}
+                      onClick={() => handleJoinCompetition(item.fullCompetition)}
+                      className="bg-[#1877F2] hover:bg-[#166FE5] active:scale-95 text-white font-bold text-xs sm:text-sm px-5 py-2 sm:py-2.5 rounded-xl shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 shrink-0"
+                    >
+                      <span>
+                        {language === 'ta'
+                          ? 'இப்போதே சேரவும்'
+                          : language === 'si'
+                          ? 'දැන් එකතු වන්න'
+                          : 'Join Now'}
+                      </span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -755,6 +752,101 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
 
         {/* Right: Vector Celebration Graphic */}
         <CelebratingStudentGraphic />
+      </div>
+
+      {/* 4.5 OFFICIAL COMMUNITY & SUPPORT BANNER */}
+      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-md space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-white/10 p-1.5 backdrop-blur-md border border-white/20 flex items-center justify-center font-black text-amber-400 text-sm shrink-0">
+              HNC
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-extrabold text-white">
+                {language === 'ta' ? 'அதிகாரப்பூர்வ சமூக ஊடகங்கள் & உதவி மையம்' : language === 'si' ? 'නිල සමාජ මාධ්‍ය සහ උපකාරක සේවාව' : 'Higher Novas College Official Community & Support'}
+              </h3>
+              <p className="text-xs text-blue-200/80 font-medium">
+                {language === 'ta' ? 'புதிய தகவல்கள் பெற இணைந்து கொள்ளுங்கள் • உடனடி உதவி பெற தொடர்புகொள்ளுங்கள்' : language === 'si' ? 'නව තොරතුරු සඳහා එකතු වන්න • ක්ෂණික සහාය ලබා ගන්න' : 'Join our official channels for real-time announcements & instant help'}
+              </p>
+            </div>
+          </div>
+          <span className="self-start sm:self-auto inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-3 py-1 rounded-full">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            24/7 Helpline Active
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          <a
+            href="https://whatsapp.com/channel/0029VaEAS90Gk1FwJW7arA23"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-sm transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0">
+                <MessageCircle className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <span className="font-bold text-white text-xs block group-hover:text-amber-300 transition-colors">WhatsApp Channel</span>
+                <span className="text-[10px] text-blue-200/70">Official News & Links</span>
+              </div>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-blue-300 group-hover:text-white" />
+          </a>
+
+          <a
+            href="https://www.facebook.com/share/18cWgwEKmy/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-sm transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-300 flex items-center justify-center shrink-0">
+                <Share2 className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <span className="font-bold text-white text-xs block group-hover:text-amber-300 transition-colors">Facebook Page</span>
+                <span className="text-[10px] text-blue-200/70">College Posts & Photos</span>
+              </div>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-blue-300 group-hover:text-white" />
+          </a>
+
+          <a
+            href="https://wa.me/94741760710"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-sm transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0">
+                <Phone className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <span className="font-bold text-white text-xs block group-hover:text-amber-300 transition-colors">WhatsApp / Call</span>
+                <span className="text-[11px] font-mono font-bold text-emerald-300">+94 74 176 0710</span>
+              </div>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-blue-300 group-hover:text-white" />
+          </a>
+
+          <a
+            href="mailto:highernovascollege01@gmail.com"
+            className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-sm transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-300 flex items-center justify-center shrink-0">
+                <Mail className="w-4 h-4" />
+              </div>
+              <div className="text-left min-w-0">
+                <span className="font-bold text-white text-xs block group-hover:text-amber-300 transition-colors">Official Email</span>
+                <span className="text-[10px] font-mono text-blue-200 truncate block">highernovascollege01@gmail.com</span>
+              </div>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-blue-300 group-hover:text-white shrink-0" />
+          </a>
+        </div>
       </div>
 
       {/* 5. Modals for seamless competition interaction */}

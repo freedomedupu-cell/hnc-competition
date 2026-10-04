@@ -31,6 +31,8 @@ export interface DbUser {
   totalReferrals?: number;
   sharesCount?: number;
   redeemedPerks?: string[];
+  guardianName?: string;
+  bio?: string;
 }
 
 export interface DbStudent {
@@ -480,6 +482,10 @@ export interface PlatformSettings {
   academicYear: string;
   platformName: string;
   supportEmail: string;
+  supportPhone?: string;
+  whatsappPhone?: string;
+  whatsappChannelUrl?: string;
+  facebookPageUrl?: string;
   allowStudentRegistration: boolean;
   competitionApprovalWorkflow: 'strict' | 'relaxed';
   maintenanceMode: boolean;

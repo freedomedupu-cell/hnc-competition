@@ -23,6 +23,11 @@ import {
   Bell,
   Video,
   Activity,
+  MessageCircle,
+  Phone,
+  Mail,
+  Share2,
+  ExternalLink,
 } from 'lucide-react';
 import { SuperAdminNav, AdminNav, StudentNav } from '../../context/AppContext';
 
@@ -408,38 +413,80 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
         <nav className="space-y-1">{renderNavSection()}</nav>
       </div>
 
-      {/* Footer Card */}
-      {isStudent ? (
-        /* Student Inspiring Watermark Motivation Card */
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0F2252] to-[#0A1633] border border-blue-900/60 p-4 text-center select-none shadow-inner">
-          {/* Subtle line-art graduation cap watermark */}
-          <div className="absolute -top-3 -right-3 text-blue-400/10 pointer-events-none">
-            <GraduationCap className="w-24 h-24 stroke-[1.2]" />
+      {/* Official Higher Novas College Support & Channels Card */}
+      <div className="pt-3 border-t border-slate-800/80 space-y-2">
+        <div className="bg-[#08122B] border border-blue-900/50 rounded-xl p-3 space-y-2">
+          <div className="flex items-center justify-between text-[11px] font-bold text-blue-300">
+            <span>{language === 'ta' ? 'அதிகாரப்பூர்வ தொடர்புகள்' : language === 'si' ? 'නිල සේවාවන්' : 'Official Support & Channels'}</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           </div>
 
-          <p className="font-serif italic text-base text-blue-200 font-medium">
-            {language === 'ta' ? 'சிறு படிகள்' : language === 'si' ? 'කුඩා පියවර' : 'Small Steps'}
-          </p>
-          {/* Hand-drawn yellow wave stroke */}
-          <div className="w-20 h-1 bg-[#F59E0B] rounded-full mx-auto my-1.5 transform -rotate-1 shadow-xs" />
-          <p className="font-sans text-xs font-black uppercase tracking-wider text-white">
-            {language === 'ta' ? 'பெரிய சாதனைகள்!' : language === 'si' ? 'විශිෂ්ට ජයග්‍රහණ!' : 'Big Achievements!'}
-          </p>
-        </div>
-      ) : (
-        /* Institutional footer indicator for Admins */
-        <div className="pt-4 border-t border-slate-200">
-          <div className="p-3 bg-blue-900 text-white rounded-lg">
-            <div className="flex items-center justify-between text-xs font-semibold">
-              <span>{t('activeAcademicCycle')}</span>
-              <span className="text-[10px] px-1.5 py-0.5 bg-blue-800 rounded text-blue-200">2026</span>
-            </div>
-            <p className="text-[11px] text-blue-200/80 mt-1">
-              {t('officialOlympiadsEngine')}
-            </p>
+          <div className="grid grid-cols-2 gap-1.5 pt-1">
+            <a
+              href="https://whatsapp.com/channel/0029VaEAS90Gk1FwJW7arA23"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 p-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-800/50 text-[10px] font-bold text-emerald-300 transition shrink-0"
+              title="Join WhatsApp Channel"
+            >
+              <MessageCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate">WhatsApp</span>
+            </a>
+
+            <a
+              href="https://www.facebook.com/share/18cWgwEKmy/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 p-1.5 rounded-lg bg-blue-950/60 hover:bg-blue-900/80 border border-blue-800/50 text-[10px] font-bold text-blue-300 transition shrink-0"
+              title="Follow Facebook Page"
+            >
+              <Share2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <span className="truncate">Facebook</span>
+            </a>
+          </div>
+
+          <div className="pt-1.5 border-t border-blue-900/40 space-y-1 text-[10px]">
+            <a
+              href="https://wa.me/94741760710"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-slate-300 hover:text-emerald-400 transition"
+            >
+              <Phone className="w-3 h-3 text-emerald-400 shrink-0" />
+              <span className="font-mono font-medium">+94 74 176 0710</span>
+            </a>
+
+            <a
+              href="mailto:highernovascollege01@gmail.com"
+              className="flex items-center gap-1.5 text-slate-300 hover:text-blue-300 transition"
+            >
+              <Mail className="w-3 h-3 text-blue-400 shrink-0" />
+              <span className="truncate font-mono text-[9.5px]">highernovascollege01@gmail.com</span>
+            </a>
           </div>
         </div>
-      )}
+
+        {isStudent ? (
+          /* Student Inspiring Watermark Motivation Card */
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#0F2252] to-[#0A1633] border border-blue-900/60 p-2.5 text-center select-none shadow-inner">
+            <p className="font-serif italic text-xs text-blue-200 font-medium">
+              {language === 'ta' ? 'சிறு படிகள்' : language === 'si' ? 'කුඩා පියවර' : 'Small Steps'}
+            </p>
+            <div className="w-16 h-0.5 bg-[#F59E0B] rounded-full mx-auto my-1 shadow-xs" />
+            <p className="font-sans text-[10px] font-black uppercase tracking-wider text-white">
+              {language === 'ta' ? 'பெரிய சாதனைகள்!' : language === 'si' ? 'විශිෂ්ට ජයග්‍රහණ!' : 'Big Achievements!'}
+            </p>
+          </div>
+        ) : (
+          /* Institutional footer indicator for Admins */
+          <div className="p-2.5 bg-blue-900/80 text-white rounded-xl border border-blue-800/60">
+            <div className="flex items-center justify-between text-[11px] font-semibold">
+              <span>{t('activeAcademicCycle')}</span>
+              <span className="text-[9px] px-1.5 py-0.5 bg-blue-800 rounded text-blue-200">2026</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 

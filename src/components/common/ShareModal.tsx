@@ -258,7 +258,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           <button
             type="button"
             onClick={handleWhatsAppShare}
-            className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-xs"
+            className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
           >
             <MessageCircle className="w-4 h-4 fill-white" />
             <span>
@@ -273,7 +273,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           <button
             type="button"
             onClick={handleCopyText}
-            className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-2xs"
+            className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-2xs cursor-pointer"
           >
             <Copy className="w-4 h-4 text-slate-600" />
             <span>
@@ -282,6 +282,32 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 : (language === 'ta' ? 'முழு அழைப்பை நகலெடு (Copy Text)' : 'Copy Invitation Text')}
             </span>
           </button>
+        </div>
+
+        {/* Official Channels Quick Links */}
+        <div className="flex items-center justify-between p-2.5 bg-blue-50/80 border border-blue-200/80 rounded-xl text-xs">
+          <span className="font-extrabold text-slate-800 text-[11px]">
+            {language === 'ta' ? 'அதிகாரப்பூர்வ சமூக ஊடகங்கள்:' : 'Official Community Channels:'}
+          </span>
+          <div className="flex items-center gap-2.5 text-[11px] font-extrabold">
+            <a
+              href="https://whatsapp.com/channel/0029VaEAS90Gk1FwJW7arA23"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-700 hover:text-emerald-800 underline flex items-center gap-1"
+            >
+              WhatsApp Channel
+            </a>
+            <span className="text-slate-300">•</span>
+            <a
+              href="https://www.facebook.com/share/18cWgwEKmy/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-700 hover:text-blue-800 underline flex items-center gap-1"
+            >
+              Facebook Page
+            </a>
+          </div>
         </div>
 
         {/* Invitation Preview Message Accordion / Box */}

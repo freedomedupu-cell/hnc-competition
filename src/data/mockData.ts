@@ -43,8 +43,12 @@ export const initialAuditLogs: SystemAuditLog[] = [];
 
 export const initialSettings: PlatformSettings = {
   academicYear: '2025-2026 Academic Term',
-  platformName: 'HNC Competition Central Governance',
-  supportEmail: 'freedomedupu@gmail.com',
+  platformName: 'Higher Novas College (HNC) Competition Platform',
+  supportEmail: 'highernovascollege01@gmail.com',
+  supportPhone: '+94741760710',
+  whatsappPhone: '+94741760710',
+  whatsappChannelUrl: 'https://whatsapp.com/channel/0029VaEAS90Gk1FwJW7arA23',
+  facebookPageUrl: 'https://www.facebook.com/share/18cWgwEKmy/',
   allowStudentRegistration: true,
   competitionApprovalWorkflow: 'strict',
   maintenanceMode: false,

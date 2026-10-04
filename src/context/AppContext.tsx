@@ -1688,6 +1688,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const current = studentAttempts.find((a) => a.attemptId === attemptId) || activeExamAttempt;
     const updatedAttempt: DbAttempt = {
+      startedAt: current?.startedAt || new Date().toISOString(),
       ...(current || {
         attemptId,
         competitionId,
