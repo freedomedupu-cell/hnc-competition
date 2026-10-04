@@ -1352,6 +1352,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const nextCount = (c.enrolledCount || 0) + 1;
           saveCompetitionToFirestore({
             competitionId: c.id,
+            status: c.status,
+            registrationStart: c.registrationStart,
+            registrationEnd: c.registrationEnd,
+            competitionStart: c.competitionStart,
+            competitionEnd: c.competitionEnd,
+            competitionStartTime: c.competitionStartTime,
+            competitionEndTime: c.competitionEndTime,
             participants: nextParticipants,
             enrolledCount: nextCount,
           }).catch((err) => console.warn('Sync participant note:', err));

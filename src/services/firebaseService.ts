@@ -836,10 +836,12 @@ export async function saveCompetitionToFirestore(
   }
   const compRef = doc(db, 'competitions', targetId);
   const existingSnap = await getDoc(compRef);
+  const existingData = existingSnap.exists() ? (existingSnap.data() as DbCompetition) : null;
   const now = new Date().toISOString();
 
   // Clean and sanitize all questions to ensure Firestore compatibility (no undefined values)
-  const sanitizedQuestions = (competition.questions || []).map((q, idx) => ({
+  const rawQuestions = competition.questions || existingData?.questions || [];
+  const sanitizedQuestions = rawQuestions.map((q, idx) => ({
     id: q.id || `q-${idx + 1}`,
     type: q.type || 'multiple_choice',
     questionText: (q.questionText || '').trim(),
@@ -854,47 +856,45 @@ export async function saveCompetitionToFirestore(
   const calculatedTotalMarks =
     typeof competition.totalMarks === 'number' && !isNaN(competition.totalMarks)
       ? competition.totalMarks
-      : sanitizedQuestions.reduce((acc, q) => acc + (q.marks || 0), 0);
+      : (existingData?.totalMarks ?? sanitizedQuestions.reduce((acc, q) => acc + (q.marks || 0), 0));
 
   const record: DbCompetition = {
     competitionId: targetId,
-    title: (competition.title || 'Untitled Competition').trim(),
-    description: (competition.description || '').trim(),
-    competitionType: competition.competitionType || 'Quiz',
-    category: competition.category || 'General Knowledge',
-    grade: competition.grade || 'Open',
-    language: competition.language || 'English',
-    duration: typeof competition.duration === 'number' ? competition.duration : 60,
-    entryType: competition.entryType || 'Free',
-    entryFee: typeof competition.entryFee === 'number' ? competition.entryFee : 0,
-    prizesEnabled: competition.prizesEnabled ?? true,
-    prizeDetails: competition.prizeDetails || {
+    title: (competition.title ?? existingData?.title ?? 'Untitled Competition').trim(),
+    description: (competition.description ?? existingData?.description ?? '').trim(),
+    competitionType: competition.competitionType ?? existingData?.competitionType ?? 'Quiz',
+    category: competition.category ?? existingData?.category ?? 'General Knowledge',
+    grade: competition.grade ?? existingData?.grade ?? 'Open',
+    language: competition.language ?? existingData?.language ?? 'English',
+    duration: typeof competition.duration === 'number' ? competition.duration : (existingData?.duration ?? 60),
+    entryType: competition.entryType ?? existingData?.entryType ?? 'Free',
+    entryFee: typeof competition.entryFee === 'number' ? competition.entryFee : (existingData?.entryFee ?? 0),
+    prizesEnabled: competition.prizesEnabled ?? existingData?.prizesEnabled ?? true,
+    prizeDetails: competition.prizeDetails ?? existingData?.prizeDetails ?? {
       firstPrize: 'Gold Medal & Trophy',
       secondPrize: 'Silver Medal',
       thirdPrize: 'Bronze Medal',
       participationCertificate: 'E-Certificate of Participation',
     },
-    registrationStart: competition.registrationStart || now,
-    registrationEnd: competition.registrationEnd || now,
-    competitionStart: competition.competitionStart || now,
-    competitionEnd: competition.competitionEnd || now,
-    competitionStartTime: competition.competitionStartTime || '09:00',
-    competitionEndTime: competition.competitionEndTime || '18:00',
-    status: competition.status || 'Draft',
+    registrationStart: competition.registrationStart ?? existingData?.registrationStart ?? now,
+    registrationEnd: competition.registrationEnd ?? existingData?.registrationEnd ?? now,
+    competitionStart: competition.competitionStart ?? existingData?.competitionStart ?? now,
+    competitionEnd: competition.competitionEnd ?? existingData?.competitionEnd ?? now,
+    competitionStartTime: competition.competitionStartTime ?? existingData?.competitionStartTime ?? '09:00',
+    competitionEndTime: competition.competitionEndTime ?? existingData?.competitionEndTime ?? '18:00',
+    status: competition.status ?? existingData?.status ?? 'Draft',
     questions: sanitizedQuestions,
     questionsCount: sanitizedQuestions.length,
     totalMarks: calculatedTotalMarks,
-    participants: competition.participants || [],
-    enrolledCount: competition.enrolledCount || competition.participants?.length || 0,
-    createdAt: existingSnap.exists()
-      ? (existingSnap.data().createdAt || now)
-      : now,
-    code: competition.code || `HNC-${targetId.slice(0, 6).toUpperCase()}`,
-    leadAdminId: competition.leadAdminId || 'adm-system',
-    leadAdminName: competition.leadAdminName || 'Academic Staff',
-    requireCameraVerification: Boolean(competition.requireCameraVerification),
-    evaluationMode: competition.evaluationMode || 'Automated',
-    membershipRequired: Boolean(competition.membershipRequired),
+    participants: competition.participants ?? existingData?.participants ?? [],
+    enrolledCount: competition.enrolledCount ?? competition.participants?.length ?? existingData?.enrolledCount ?? 0,
+    createdAt: existingData?.createdAt || now,
+    code: competition.code ?? existingData?.code ?? `HNC-${targetId.slice(0, 6).toUpperCase()}`,
+    leadAdminId: competition.leadAdminId ?? existingData?.leadAdminId ?? 'adm-system',
+    leadAdminName: competition.leadAdminName ?? existingData?.leadAdminName ?? 'Academic Staff',
+    requireCameraVerification: competition.requireCameraVerification ?? existingData?.requireCameraVerification ?? false,
+    evaluationMode: competition.evaluationMode ?? existingData?.evaluationMode ?? 'Automated',
+    membershipRequired: competition.membershipRequired ?? existingData?.membershipRequired ?? false,
   };
 
   await setDoc(compRef, record, { merge: true });
