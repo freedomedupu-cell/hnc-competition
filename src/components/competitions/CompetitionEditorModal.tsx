@@ -11,7 +11,7 @@ import {
   QuestionType,
   SupportedLanguage,
 } from '../../types';
-import { SRI_LANKA_25_DISTRICTS, PROVINCES_OF_SRI_LANKA } from '../../data/sriLankaDistricts';
+import { SRI_LANKA_25_DISTRICTS, PROVINCES_OF_SRI_LANKA, StudyGamingMode } from '../../data/sriLankaDistricts';
 import {
   Trophy,
   Plus,
@@ -352,6 +352,7 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
   const [membershipRequired, setMembershipRequired] = useState<boolean>(false);
   const [district, setDistrict] = useState<string>('All Island');
   const [scope, setScope] = useState<'all_island' | 'district' | 'province'>('all_island');
+  const [gamingMode, setGamingMode] = useState<StudyGamingMode | 'standard'>('standard');
 
   // Schedule & Entry
   const [entryType, setEntryType] = useState<'Free' | 'Paid'>('Free');
@@ -504,6 +505,7 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
       setMembershipRequired(Boolean(initialCompetition.membershipRequired));
       setDistrict(initialCompetition.district || 'All Island');
       setScope(initialCompetition.scope || (initialCompetition.district ? 'district' : 'all_island'));
+      setGamingMode(initialCompetition.gamingMode || 'standard');
       const rawQs = initialCompetition.questions ? [...initialCompetition.questions] : [];
       const cleanQs = rawQs.filter((q) => {
         const text = (q.questionText || '').toLowerCase();
@@ -962,6 +964,7 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
         membershipRequired,
         district: district === 'All Island' ? undefined : district,
         scope: district === 'All Island' ? 'all_island' : 'district',
+        gamingMode: gamingMode === 'standard' ? undefined : gamingMode,
       };
 
       await onSave(compPayload);
@@ -1391,6 +1394,32 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                   </select>
                   <p className="text-[10px] text-slate-500 mt-1">
                     குறிப்பிட்ட ஒரு மாவட்டத்திற்கு மட்டும் அல்லது <strong>அனைத்திலங்கை</strong> மாணவர்களுக்கும் பிரசுரிக்கலாம்.
+                  </p>
+                </div>
+
+                {/* Study Gaming Mode (HNC Arena Modes & Standard) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-800">
+                      Study Gaming Mode / HNC Arena Gaming Method
+                    </label>
+                    <span className="text-[10px] text-indigo-700 font-bold">
+                      {gamingMode === 'standard' ? 'Standard Academic' : gamingMode.toUpperCase()}
+                    </span>
+                  </div>
+                  <select
+                    value={gamingMode}
+                    onChange={(e) => setGamingMode(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-semibold text-slate-900"
+                  >
+                    <option value="standard">🏛️ Standard Academic Assessment (வழக்கமான தேர்வு முறை)</option>
+                    <option value="kahoot">▲ HNC Speed Rush (மின்னல் வேகப்பந்தயம் & வடிவியல் பட்டன்கள்)</option>
+                    <option value="quizizz">⚡ HNC Power Battle (50-50, Time Freeze, Shields)</option>
+                    <option value="trivia_crack">🎡 HNC Wheel Duel (பாட சுழல் சக்கரம் & மகுடங்கள்)</option>
+                    <option value="brain_out">🧠 HNC Brain Logic (தர்க்க புதிர்கள் & IQ டெஸ்ட்)</option>
+                  </select>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    மாணவர்களுக்கு விளையாட்டு முறையில் ஈடுபாட்டை அதிகரிக்க HNC Speed Rush, Power Battle, Wheel Duel அல்லது Brain Logic முறையைத் தேர்வு செய்யலாம்.
                   </p>
                 </div>
               </div>

@@ -1,3 +1,94 @@
+export type StudyGamingMode = 'kahoot' | 'quizizz' | 'trivia_crack' | 'brain_out';
+
+export interface GamingMethodDef {
+  id: StudyGamingMode;
+  nameEn: string;
+  nameTa: string;
+  nameSi: string;
+  taglineEn: string;
+  taglineTa: string;
+  taglineSi: string;
+  icon: string;
+  accent: string;
+  descriptionEn: string;
+  descriptionTa: string;
+  descriptionSi: string;
+  featuresEn: string[];
+  featuresTa: string[];
+  featuresSi: string[];
+}
+
+export const STUDY_GAMING_METHODS: GamingMethodDef[] = [
+  {
+    id: 'kahoot',
+    nameEn: 'HNC Speed Rush',
+    nameTa: 'HNC மின்னல் வேகப்பந்தயம்',
+    nameSi: 'HNC අධිවේගී සටන',
+    taglineEn: 'Rapid-fire color geometry with combo streaks & speed multipliers',
+    taglineTa: 'வடிவியல் குறிகாட்டிகள், மின்னல் டைமர் மற்றும் தொடர் போனஸ் புள்ளிகள்',
+    taglineSi: 'ජ්‍යාමිතික හැඩතල, ටයිමරය සහ ස්පීඩ් ලකුණු සහිත විනෝදජනක ක්‍රීඩාව',
+    icon: '▲',
+    accent: 'from-rose-500 via-purple-600 to-indigo-600',
+    descriptionEn: 'Answer quickly with iconic geometric shapes (Triangle, Square, Circle, Diamond). Faster answers earn higher multiplier XP!',
+    descriptionTa: 'வண்ண வடிவங்கள் (▲, ■, ●, ♦) மூலம் மின்னல் வேகத்தில் விடையளித்து 2x, 3x ஸ்ட்ரீக் போனஸ் ஈட்டுங்கள்!',
+    descriptionSi: 'හැඩතල (▲, ■, ●, ♦) භාවිතයෙන් හැකි ඉක්මණින් පිළිතුරු දී වැඩි ලකුණු ලබා ගන්න!',
+    featuresEn: ['20s Speed Countdown', '▲ ■ ● ♦ Geometric Pads', 'Streak Fire Multiplier (1.5x - 3x)', 'Podium Finish'],
+    featuresTa: ['20 விநாடி மின்னல் கவுண்ட்டவுன்', '▲ ■ ● ♦ வடிவியல் பொத்தான்கள்', 'ஸ்ட்ரீக் போனஸ் பெருக்கல் (1.5x - 3x)', 'போடியம் பதக்கங்கள்'],
+    featuresSi: ['තත්පර 20 වේගවත් ටයිමරය', '▲ ■ ● ♦ ජ්‍යාමිතික බොත්තම්', 'ස්ට්‍රීක් බෝනස් (1.5x - 3x)', 'විජයග්‍රාහී පදක්කම්'],
+  },
+  {
+    id: 'quizizz',
+    nameEn: 'HNC Power Battle',
+    nameTa: 'HNC பவர்-அப் போர்க்களம்',
+    nameSi: 'HNC බල සටන',
+    taglineEn: 'Supercharge your brain with 50-50, Time Freeze, Shields & Double Chance',
+    taglineTa: '50-50, நேர முடக்கம், கவசம் மற்றும் இருமடி வாய்ப்பு பவர்-அப்கள்',
+    taglineSi: '50-50, කාලය නැවතීම, ආරක්ෂක පලිහ සහ ද්විත්ව අවස්ථා බලගැන්වීම්',
+    icon: '⚡',
+    accent: 'from-amber-500 via-orange-600 to-red-600',
+    descriptionEn: 'Equip tactical power-ups during the quiz to eliminate wrong choices, freeze time, shield mistakes, and unleash double points!',
+    descriptionTa: 'தவறான விடைகளை நீக்க 50-50, நேரத்தை நிறுத்த Time Freeze, மற்றும் 2x போனஸ் பவர்-அப்களைப் பயன்படுத்தி போரிடுங்கள்!',
+    descriptionSi: 'වරදින පිළිතුරු ඉවත් කිරීමට 50-50, කාලය නැවැත්වීම සහ 2x බෝනස් බලයන් යොදාගන්න!',
+    featuresEn: ['⚡ 50-50 Eliminator', '⏱️ Time Freeze (+15s)', '🛡️ Streak Shield', '💡 Smart Academic Hint'],
+    featuresTa: ['⚡ 50-50 நீக்கி', '⏱️ நேர முடக்கம் (+15வி)', '🛡️ பாதுகாப்பு கவசம்', '💡 பாடக் குறிப்பு'],
+    featuresSi: ['⚡ 50-50 බලය', '⏱️ කාලය නැවතීම (+15ත)', '🛡️ ආරක්ෂක පලිහ', '💡 ඉඟි පුවරුව'],
+  },
+  {
+    id: 'trivia_crack',
+    nameEn: 'HNC Wheel Duel',
+    nameTa: 'HNC பாட சுழல் சக்கரம்',
+    nameSi: 'HNC කැරකෙන රෝද අභියෝගය',
+    taglineEn: 'Spin the academic wheel across 6 curriculum disciplines & claim crowns',
+    taglineTa: '6 பாடப்பிரிவு சுழல் சக்கரத்தைச் சுழற்றி மாவட்ட மகுடங்களை வெல்லுங்கள்',
+    taglineSi: 'විෂය 6කින් යුත් රෝදය කරකවා දිස්ත්‍රික් කිරුළු දිනා ගන්න',
+    icon: '🎡',
+    accent: 'from-emerald-500 via-teal-600 to-cyan-600',
+    descriptionEn: 'Spin the multi-discipline wheel to land on History, Geography, Science, Literature, Maths, or General Knowledge. Collect all 6 crowns to dominate the district!',
+    descriptionTa: 'வரலாறு, புவியியல், விஞ்ஞானம், இலக்கியம், கணிதம், பொது அறிவு ஆகிய 6 பிரிவுகளின் சுழல் சக்கரத்தைச் சுழற்றி மகுடங்களை வெல்லுங்கள்!',
+    descriptionSi: 'ඉතිහාසය, භූගෝලය, විද්‍යාව, සාහිත්‍යය, ගණිතය සහ සාමාන්‍ය දැනීම විෂයයන්ගෙන් කිරුළු 6ම දිනාගන්න!',
+    featuresEn: ['🎡 6-Category Spinning Wheel', '👑 District Crown Collection', '⚔️ 1v1 Academic Duel', '6 Core Subjects'],
+    featuresTa: ['🎡 6 பாட சுழல் சக்கரம்', '👑 மாவட்ட மகுட சேகரிப்பு', '⚔️ 1v1 நேரடி சவால்', '6 பிரதான பாடங்கள்'],
+    featuresSi: ['🎡 විෂය 6 කැරකෙන රෝදය', '👑 දිස්ත්‍රික් කිරුළු', '⚔️ 1v1 සෘජු තරඟය', 'ප්‍රධාන විෂයයන් 6'],
+  },
+  {
+    id: 'brain_out',
+    nameEn: 'HNC Brain Logic',
+    nameTa: 'HNC புத்திசாலித்தனப் புதிர் களம்',
+    nameSi: 'HNC බුද්ධි ප්‍රහේලිකා සටන',
+    taglineEn: 'Lateral thinking educational puzzles, trick questions & interactive brain IQ tests',
+    taglineTa: 'பகுத்தறியும் தர்க்க புதிர்கள், புத்திசாலித்தனமான வினாக்கள் & IQ சோதனை',
+    taglineSi: 'තර්කානුකූල අධ්‍යාපනික ප්‍රහේලිකා, උපක්‍රමශීලී ගැටළු සහ IQ පරීක්ෂණය',
+    icon: '🧠',
+    accent: 'from-pink-500 via-rose-600 to-purple-700',
+    descriptionEn: 'Think outside the textbook! Solve tricky curricular riddles, interactive visual clues, and unlock your true intellectual potential.',
+    descriptionTa: 'புத்தக வரிகளுக்கு அப்பால் சிந்தித்து, தந்திரமான புதிர்களையும் மறைக்கப்பட்ட தடயங்களையும் விடுவியுங்கள்!',
+    descriptionSi: 'සාම්ප්‍රදායික රාමුවෙන් මිදී සිතන්න! සැඟවුණු ඉඟි සොයා බුද්ධිමත් විසඳුම් ලබා දෙන්න!',
+    featuresEn: ['🧠 IQ Brain Index Rating', '🔍 Interactive Clue Scanner', '💡 Lateral Thinking Riddles', 'Eureka Triumph Chimes'],
+    featuresTa: ['🧠 IQ மூளை திறன் குறியீடு', '🔍 மறைந்த தடய ஸ்கேனர்', '💡 சிந்தனைத் தூண்டும் புதிர்கள்', 'யுரேகா வெற்றி மணி'],
+    featuresSi: ['🧠 IQ බුද්ධි දර්ශකය', '🔍 ඉඟි ස්කෑනරය', '💡 තර්ක ප්‍රහේලිකා', 'ජයග්‍රාහී නාදය'],
+  },
+];
+
 export interface SriLankaDistrictInfo {
   id: string; // e.g., 'colombo', 'jaffna', 'anuradhapura'
   nameEn: string;
@@ -5,40 +96,53 @@ export interface SriLankaDistrictInfo {
   nameSi: string;
   provinceEn: string;
   provinceTa: string;
+  provinceSi?: string;
   icon: string;
   levelNumber: number;
   gradeSubject: string;
   gradeSubjectEn: string;
+  gradeSubjectSi?: string;
   descriptionTa: string;
   descriptionEn: string;
+  descriptionSi?: string;
   defaultPoints: number;
+  defaultGamingMode?: StudyGamingMode;
   initialQuestions: {
     id: string;
     questionText: string;
+    questionTextEn?: string;
+    questionTextSi?: string;
+    category?: string; // For Trivia Crack wheel
     options: {
       shape: 'triangle' | 'square' | 'circle' | 'diamond';
       symbol: string;
       text: string;
+      textEn?: string;
+      textSi?: string;
       color: string;
       hoverColor: string;
       borderColor: string;
     }[];
     correctIndex: number;
     hint: string;
+    hintEn?: string;
+    hintSi?: string;
     explanation: string;
+    explanationEn?: string;
+    explanationSi?: string;
   }[];
 }
 
 export const PROVINCES_OF_SRI_LANKA = [
-  { id: 'western', nameEn: 'Western Province', nameTa: 'மேல் மாகாணம்', districts: ['colombo', 'gampaha', 'kalutara'] },
-  { id: 'central', nameEn: 'Central Province', nameTa: 'மத்திய மாகாணம்', districts: ['kandy', 'matale', 'nuwara_eliya'] },
-  { id: 'southern', nameEn: 'Southern Province', nameTa: 'தென் மாகாணம்', districts: ['galle', 'matara', 'hambantota'] },
-  { id: 'northern', nameEn: 'Northern Province', nameTa: 'வட மாகாணம்', districts: ['jaffna', 'kilinochchi', 'mannar', 'vavuniya', 'mullaitivu'] },
-  { id: 'eastern', nameEn: 'Eastern Province', nameTa: 'கிழக்கு மாகாணம்', districts: ['batticaloa', 'ampara', 'trincomalee'] },
-  { id: 'north_western', nameEn: 'North Western Province', nameTa: 'வடமேல் மாகாணம்', districts: ['kurunegala', 'puttalam'] },
-  { id: 'north_central', nameEn: 'North Central Province', nameTa: 'வடமத்திய மாகாணம்', districts: ['anuradhapura', 'polonnaruwa'] },
-  { id: 'uva', nameEn: 'Uva Province', nameTa: 'ஊவா மாகாணம்', districts: ['badulla', 'monaragala'] },
-  { id: 'sabaragamuwa', nameEn: 'Sabaragamuwa Province', nameTa: 'சப்ரகமுவ மாகாணம்', districts: ['ratnapura', 'kegalle'] },
+  { id: 'western', nameEn: 'Western Province', nameTa: 'மேல் மாகாணம்', nameSi: 'බස්නාහිර පළාත', districts: ['colombo', 'gampaha', 'kalutara'] },
+  { id: 'central', nameEn: 'Central Province', nameTa: 'மத்திய மாகாணம்', nameSi: 'මධ්‍යම පළාත', districts: ['kandy', 'matale', 'nuwara_eliya'] },
+  { id: 'southern', nameEn: 'Southern Province', nameTa: 'தென் மாகாணம்', nameSi: 'දකුණු පළාත', districts: ['galle', 'matara', 'hambantota'] },
+  { id: 'northern', nameEn: 'Northern Province', nameTa: 'வட மாகாணம்', nameSi: 'උතුරු පළාත', districts: ['jaffna', 'kilinochchi', 'mannar', 'vavuniya', 'mullaitivu'] },
+  { id: 'eastern', nameEn: 'Eastern Province', nameTa: 'கிழக்கு மாகாணம்', nameSi: 'නැගෙනහිර පළාත', districts: ['batticaloa', 'ampara', 'trincomalee'] },
+  { id: 'north_western', nameEn: 'North Western Province', nameTa: 'வடமேல் மாகாணம்', nameSi: 'වයඹ පළාත', districts: ['kurunegala', 'puttalam'] },
+  { id: 'north_central', nameEn: 'North Central Province', nameTa: 'வடமத்திய மாகாணம்', nameSi: 'උතුරු මැද පළාත', districts: ['anuradhapura', 'polonnaruwa'] },
+  { id: 'uva', nameEn: 'Uva Province', nameTa: 'ஊவா மாகாணம்', nameSi: 'ඌව පළාත', districts: ['badulla', 'monaragala'] },
+  { id: 'sabaragamuwa', nameEn: 'Sabaragamuwa Province', nameTa: 'சப்ரகமுவ மாகாணம்', nameSi: 'සබරගමුව පළාත', districts: ['ratnapura', 'kegalle'] },
 ];
 
 export const SRI_LANKA_25_DISTRICTS: SriLankaDistrictInfo[] = [
@@ -838,11 +942,28 @@ export function getDistrictById(districtId: string): SriLankaDistrictInfo | unde
   return SRI_LANKA_25_DISTRICTS.find((d) => d.id === districtId);
 }
 
-export function getAllDistrictsList(): { id: string; nameEn: string; nameTa: string; provinceTa: string }[] {
+export function getAllDistrictsList(): { id: string; nameEn: string; nameTa: string; nameSi: string; provinceTa: string; provinceEn: string; provinceSi: string }[] {
   return SRI_LANKA_25_DISTRICTS.map((d) => ({
     id: d.id,
     nameEn: d.nameEn,
     nameTa: d.nameTa,
+    nameSi: d.nameSi,
     provinceTa: d.provinceTa,
+    provinceEn: d.provinceEn,
+    provinceSi: d.provinceSi || d.provinceEn,
   }));
+}
+
+export function getGamingMethodById(id: StudyGamingMode): GamingMethodDef {
+  const found = STUDY_GAMING_METHODS.find((m) => m.id === id);
+  return found || STUDY_GAMING_METHODS[0];
+}
+
+export function getLocalizedDistrict(district: SriLankaDistrictInfo, lang: 'ta' | 'en' | 'si') {
+  return {
+    name: lang === 'ta' ? district.nameTa : lang === 'si' ? district.nameSi : district.nameEn,
+    province: lang === 'ta' ? district.provinceTa : lang === 'si' ? (district.provinceSi || district.provinceEn) : district.provinceEn,
+    gradeSubject: lang === 'ta' ? district.gradeSubject : lang === 'si' ? (district.gradeSubjectSi || district.gradeSubjectEn) : district.gradeSubjectEn,
+    description: lang === 'ta' ? district.descriptionTa : lang === 'si' ? (district.descriptionSi || district.descriptionEn) : district.descriptionEn,
+  };
 }

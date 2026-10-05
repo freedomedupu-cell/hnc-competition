@@ -27,7 +27,7 @@ interface AdminDashboardViewProps {
 }
 
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNavigate }) => {
-  const { currentAdmin, competitions, students, results, saveCompetition, liveProctorSessions, language, t } = useApp();
+  const { currentAdmin, competitions, students, results, saveCompetition, liveProctorSessions, language, t, openDistrictsStudio } = useApp();
 
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingComp, setEditingComp] = useState<Competition | null>(null);
@@ -100,8 +100,40 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           </p>
         </div>
 
-        {/* Quick Action Buttons: Create Quiz, Create Exam, Create Competition, Paper Studio, Score Submissions */}
+        {/* Quick Action Buttons: Create Quiz, Create Exam, Create Competition, Paper Studio, Score Submissions, Island Quest */}
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <button
+            id="adm-quick-create-island-quest"
+            onClick={() => openDistrictsStudio('create')}
+            className="px-3 py-2 text-xs font-bold rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700 transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
+            title="Create Gamified HNC Arena Island Quest (தீவுப் போட்டி உருவாக்கு)"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+            <span>
+              {language === 'ta'
+                ? '+ தீவுப் போட்டி'
+                : language === 'si'
+                ? '+ දූපත් තරඟය'
+                : '+ Island Quest'}
+            </span>
+          </button>
+
+          <button
+            id="adm-quick-edu-arena-studio"
+            onClick={() => openDistrictsStudio('list')}
+            className="px-3 py-2 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-300 hover:bg-indigo-100 transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
+            title="HNC Edu-Arena Study Gaming Studio (25 மாவட்டங்கள்)"
+          >
+            <MapPin className="w-3.5 h-3.5 text-indigo-700" />
+            <span>
+              {language === 'ta'
+                ? '🎯 Edu-Arena (25 மாவட்டங்கள்)'
+                : language === 'si'
+                ? '🎯 Edu-Arena (දිස්ත්‍රික්ක 25)'
+                : '🎯 Edu-Arena Studio'}
+            </span>
+          </button>
+
           <button
             id="adm-quick-add-quiz"
             onClick={() => openEditor('Quiz', 'details')}

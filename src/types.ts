@@ -109,6 +109,8 @@ export interface CompetitionParticipant {
   registeredAt: string;
 }
 
+export type StudyGamingMode = 'kahoot' | 'quizizz' | 'trivia_crack' | 'brain_out' | 'standard';
+
 export interface DbCompetition {
   competitionId: string;
   title: string;
@@ -153,6 +155,7 @@ export interface DbCompetition {
   district?: string;
   province?: string;
   scope?: 'all_island' | 'district' | 'province';
+  gamingMode?: StudyGamingMode;
 }
 
 export interface DbResult {
@@ -443,6 +446,7 @@ export interface Competition {
   district?: string;
   province?: string;
   scope?: 'all_island' | 'district' | 'province';
+  gamingMode?: StudyGamingMode;
 }
 
 export interface CompetitionResult {

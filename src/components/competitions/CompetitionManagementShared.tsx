@@ -48,6 +48,10 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
     deleteCompetition,
     updateCompetitionStatus,
     language,
+    isDistrictsStudioOpen,
+    setIsDistrictsStudioOpen,
+    districtsStudioInitialAction,
+    setDistrictsStudioInitialAction,
   } = useApp();
 
   // Search & Filters
@@ -60,7 +64,6 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
 
   // Modals state
   const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [isDistrictsStudioOpen, setIsDistrictsStudioOpen] = useState(false);
   const [editingComp, setEditingComp] = useState<Competition | null>(null);
   const [editorInitialType, setEditorInitialType] = useState<CompetitionType>('Competition');
   const [editorInitialTab, setEditorInitialTab] = useState<'details' | 'schedule' | 'prizes' | 'questions'>('details');
@@ -288,16 +291,46 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
             <span>Question Paper Studio</span>
           </button>
 
-          {/* 25 Districts Studio & Quest Manager */}
+          {/* Create Island Quest Option (Kahoot, Quizizz, Trivia Crack, Brain Out) */}
+          <button
+            type="button"
+            id="btn-create-island-quest"
+            onClick={() => {
+              setDistrictsStudioInitialAction('create');
+              setIsDistrictsStudioOpen(true);
+            }}
+            className="px-3.5 py-2 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-lg text-xs font-bold hover:from-amber-700 hover:to-orange-700 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+            title="Create Gamified HNC Arena Island Quest (தீவுப் போட்டி உருவாக்கு)"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+            <span>
+              {language === 'ta'
+                ? '+ தீவுப் போட்டி (Quest)'
+                : language === 'si'
+                ? '+ දූපත් තරඟය (Quest)'
+                : '+ Create Island Quest'}
+            </span>
+          </button>
+
+          {/* 25 Districts Studio & Study Gaming Arena */}
           <button
             type="button"
             id="btn-open-districts-studio"
-            onClick={() => setIsDistrictsStudioOpen(true)}
+            onClick={() => {
+              setDistrictsStudioInitialAction('list');
+              setIsDistrictsStudioOpen(true);
+            }}
             className="px-3.5 py-2 bg-gradient-to-r from-indigo-700 to-blue-700 text-white rounded-lg text-xs font-bold hover:from-indigo-800 hover:to-blue-800 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
-            title="இலங்கையின் 25 மாவட்டப் போட்டிகள் மற்றும் பிரசுரிக்கும் அரங்கம் (25 Districts Studio)"
+            title="HNC Edu-Arena / Study Gaming Mode (இலங்கையின் 25 மாவட்டப் போட்டிகள் அரங்கம்)"
           >
             <MapPin className="w-3.5 h-3.5 text-amber-300" />
-            <span>🎯 25 மாவட்டங்கள் அரங்கம்</span>
+            <span>
+              {language === 'ta'
+                ? '🎯 HNC Edu-Arena (25 மாவட்டங்கள்)'
+                : language === 'si'
+                ? '🎯 HNC Edu-Arena (දිස්ත්‍රික්ක 25)'
+                : '🎯 HNC Edu-Arena (25 Districts)'}
+            </span>
           </button>
         </div>
       </div>
@@ -761,6 +794,7 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
           isOpen={isDistrictsStudioOpen}
           onClose={() => setIsDistrictsStudioOpen(false)}
           role={role}
+          initialAction={districtsStudioInitialAction}
           onCreateFormalCompetition={(district) => {
             const newCode = `HNC-${district.nameEn.slice(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
             const today = new Date();

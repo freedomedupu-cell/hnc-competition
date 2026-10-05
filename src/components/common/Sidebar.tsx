@@ -58,6 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
     auditLogs,
     t,
     language,
+    openDistrictsStudio,
   } = useApp();
 
   // Strict role enforcement: If user is a student, portal MUST be student
@@ -219,10 +220,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
       id: 'Edu-Arena Quest',
       label:
         language === 'ta'
-          ? '🎯 தீவுப் பயணம் (Quest)'
+          ? '🎯 HNC Edu-Arena (தீவுப் பயணம்)'
           : language === 'si'
-          ? '🎯 දුපත් චාරිකාව (Quest)'
-          : '🎯 Island Quest (Arena)',
+          ? '🎯 HNC Edu-Arena (දූපත් තරඟය)'
+          : '🎯 HNC Edu-Arena (Study Gaming)',
       icon: <Gamepad2 className="w-5 h-5 text-emerald-500" />,
       badge: '⚡ New',
     },
@@ -308,6 +309,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
                 </button>
               );
             })}
+            {/* Quick Edu-Arena Studio Access */}
+            <div className="pt-2 px-1">
+              <button
+                type="button"
+                id="sidebar-btn-edu-arena-studio-sa"
+                onClick={() => {
+                  openDistrictsStudio('list');
+                  onCloseMobile();
+                }}
+                className="w-full p-2.5 rounded-xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white shadow-2xs flex items-center justify-between text-xs font-bold hover:from-slate-800 hover:to-indigo-900 transition border border-indigo-800/40 cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="p-1 rounded-lg bg-amber-400/20 text-amber-300">
+                    <Gamepad2 className="w-3.5 h-3.5" />
+                  </span>
+                  <span>
+                    {language === 'ta'
+                      ? '🎯 Edu-Arena ஸ்டுடியோ'
+                      : language === 'si'
+                      ? '🎯 Edu-Arena මැදිරිය'
+                      : '🎯 Edu-Arena Studio'}
+                  </span>
+                </div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black">25 Dist</span>
+              </button>
+            </div>
           </div>
         );
 
@@ -356,6 +383,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
                 </button>
               );
             })}
+            {/* Quick Edu-Arena Studio Access */}
+            <div className="pt-2 px-1">
+              <button
+                type="button"
+                id="sidebar-btn-edu-arena-studio-adm"
+                onClick={() => {
+                  openDistrictsStudio('list');
+                  onCloseMobile();
+                }}
+                className="w-full p-2.5 rounded-xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white shadow-2xs flex items-center justify-between text-xs font-bold hover:from-slate-800 hover:to-indigo-900 transition border border-indigo-800/40 cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="p-1 rounded-lg bg-amber-400/20 text-amber-300">
+                    <Gamepad2 className="w-3.5 h-3.5" />
+                  </span>
+                  <span>
+                    {language === 'ta'
+                      ? '🎯 Edu-Arena ஸ்டுடியோ'
+                      : language === 'si'
+                      ? '🎯 Edu-Arena මැදිරිය'
+                      : '🎯 Edu-Arena Studio'}
+                  </span>
+                </div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black">25 Dist</span>
+              </button>
+            </div>
           </div>
         );
 

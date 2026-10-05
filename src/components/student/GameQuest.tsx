@@ -3,7 +3,11 @@ import { useApp } from '../../context/AppContext';
 import {
   SRI_LANKA_25_DISTRICTS,
   PROVINCES_OF_SRI_LANKA,
+  STUDY_GAMING_METHODS,
+  StudyGamingMode,
   DISTRICT_QUEST_STORAGE_KEY,
+  getGamingMethodById,
+  getLocalizedDistrict,
 } from '../../data/sriLankaDistricts';
 import {
   Trophy,
@@ -30,22 +34,37 @@ import {
   ChevronRight,
   Filter,
   Globe,
+  Crown,
+  RotateCw,
+  Brain,
+  Lightbulb,
+  Search,
+  Languages,
 } from 'lucide-react';
 
 interface Question {
   id: string;
   questionText: string;
+  questionTextEn?: string;
+  questionTextSi?: string;
+  category?: string;
   options: {
     shape: 'triangle' | 'square' | 'circle' | 'diamond';
     symbol: string;
     text: string;
+    textEn?: string;
+    textSi?: string;
     color: string;
     hoverColor: string;
     borderColor: string;
   }[];
   correctIndex: number;
   hint: string;
+  hintEn?: string;
+  hintSi?: string;
   explanation: string;
+  explanationEn?: string;
+  explanationSi?: string;
 }
 
 interface DistrictLevel {
@@ -53,10 +72,14 @@ interface DistrictLevel {
   districtKey: string;
   district: string;
   districtEn: string;
+  districtSi?: string;
   province: string;
   provinceEn: string;
+  provinceSi?: string;
   name: string;
   gradeSubject: string;
+  gradeSubjectEn?: string;
+  gradeSubjectSi?: string;
   locked: boolean;
   isPublished: boolean;
   status: 'Completed' | 'In Progress' | 'Locked';
@@ -65,6 +88,14 @@ interface DistrictLevel {
   bgGradient: string;
   accentColor: string;
   description: string;
+  descriptionEn?: string;
+  descriptionSi?: string;
+  gamingMode: StudyGamingMode;
+  questionTimerSeconds?: number;
+  maxLivesCount?: number;
+  passingAccuracyPercent?: number;
+  difficultyTier?: 'easy' | 'medium' | 'hard' | 'master';
+  enablePowerUps?: boolean;
   questions: Question[];
 }
 
@@ -81,17 +112,22 @@ const defaultGradients = [
   'from-lime-600 to-emerald-700',
 ];
 
-// Generate 25 default district levels
+// Generate initial 25 levels
 const buildInitial25Levels = (): DistrictLevel[] => {
+  const modes: StudyGamingMode[] = ['kahoot', 'quizizz', 'trivia_crack', 'brain_out'];
   return SRI_LANKA_25_DISTRICTS.map((d, index) => ({
     id: d.levelNumber,
     districtKey: d.id,
     district: d.nameTa,
     districtEn: d.nameEn,
+    districtSi: d.nameSi,
     province: d.provinceTa,
     provinceEn: d.provinceEn,
+    provinceSi: d.provinceSi || d.provinceEn,
     name: `${d.nameTa} (${d.gradeSubject})`,
     gradeSubject: d.gradeSubject,
+    gradeSubjectEn: d.gradeSubjectEn,
+    gradeSubjectSi: d.gradeSubjectSi || d.gradeSubjectEn,
     locked: d.levelNumber > 1,
     isPublished: true,
     status: d.levelNumber === 1 ? 'In Progress' : 'Locked',
@@ -100,12 +136,15 @@ const buildInitial25Levels = (): DistrictLevel[] => {
     bgGradient: defaultGradients[index % defaultGradients.length],
     accentColor: 'blue',
     description: d.descriptionTa,
+    descriptionEn: d.descriptionEn,
+    descriptionSi: d.descriptionSi || d.descriptionEn,
+    gamingMode: d.defaultGamingMode || modes[index % modes.length],
     questions: d.initialQuestions,
   }));
 };
 
-// Built-in Web Audio API sound synthesizer
-const playChime = (type: 'correct' | 'wrong' | 'victory' | 'click' | 'powerup') => {
+// Web Audio API sound synthesizer
+const playChime = (type: 'correct' | 'wrong' | 'victory' | 'click' | 'powerup' | 'spin' | 'eureka') => {
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
@@ -165,19 +204,33 @@ const playChime = (type: 'correct' | 'wrong' | 'victory' | 'click' | 'powerup') 
         osc.start(now + i * 0.1);
         osc.stop(now + i * 0.1 + 0.35);
       });
-    } else if (type === 'powerup') {
+    } else if (type === 'powerup' || type === 'eureka') {
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(300, now);
-      osc.frequency.exponentialRampToValueAtTime(800, now + 0.2);
-      gain.gain.setValueAtTime(0.15, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.frequency.setValueAtTime(350, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.22);
+      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(now);
-      osc.stop(now + 0.25);
+      osc.stop(now + 0.28);
+    } else if (type === 'spin') {
+      const now = ctx.currentTime;
+      for (let j = 0; j < 8; j++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(300 + j * 40, now + j * 0.06);
+        gain.gain.setValueAtTime(0.05, now + j * 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + j * 0.06 + 0.05);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + j * 0.06);
+        osc.stop(now + j * 0.06 + 0.05);
+      }
     }
   } catch {}
 };
@@ -185,13 +238,15 @@ const playChime = (type: 'correct' | 'wrong' | 'victory' | 'click' | 'powerup') 
 const STUDENT_PROGRESS_STORAGE_KEY = 'hnc_edu_arena_student_progress_v2';
 
 export const GameQuest: React.FC = () => {
-  const { currentAuthUser, currentStudent, language } = useApp();
+  const { currentAuthUser, currentStudent, language: appLanguage, setLanguage: setAppLanguage } = useApp();
 
-  // Load 25 district levels dynamically merged with admin updates and student completion progress
+  // Trilingual language state: Tamil (ta), English (en), Sinhala (si)
+  const [questLang, setQuestLang] = useState<'ta' | 'en' | 'si'>('ta');
+
+  // Load 25 district levels dynamically merged with admin updates and student progress
   const [levels, setLevels] = useState<DistrictLevel[]>(() => {
     const baseLevels = buildInitial25Levels();
     try {
-      // 1. Check if Admin/SuperAdmin customized questions or published status in Studio
       const adminStudioData = localStorage.getItem(DISTRICT_QUEST_STORAGE_KEY);
       let merged = [...baseLevels];
       if (adminStudioData) {
@@ -202,8 +257,14 @@ export const GameQuest: React.FC = () => {
             return {
               ...lvl,
               isPublished: match.isPublished ?? true,
+              gamingMode: match.gamingMode || lvl.gamingMode,
               gradeSubject: match.gradeSubject || lvl.gradeSubject,
               points: match.defaultPoints || lvl.points,
+              questionTimerSeconds: match.questionTimerSeconds || lvl.questionTimerSeconds,
+              maxLivesCount: match.maxLivesCount || lvl.maxLivesCount,
+              passingAccuracyPercent: match.passingAccuracyPercent || lvl.passingAccuracyPercent,
+              difficultyTier: match.difficultyTier || lvl.difficultyTier,
+              enablePowerUps: match.enablePowerUps ?? lvl.enablePowerUps,
               questions: match.initialQuestions || lvl.questions,
             };
           }
@@ -211,7 +272,6 @@ export const GameQuest: React.FC = () => {
         });
       }
 
-      // 2. Check student's own unlocked levels and scores
       const studentProgressData = localStorage.getItem(STUDENT_PROGRESS_STORAGE_KEY);
       if (studentProgressData) {
         const parsedStudent = JSON.parse(studentProgressData);
@@ -237,6 +297,7 @@ export const GameQuest: React.FC = () => {
 
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedProvinceTab, setSelectedProvinceTab] = useState<string>('all');
+  const [selectedGamingModeFilter, setSelectedGamingModeFilter] = useState<string>('all');
 
   // Active game play session state
   const [selectedLevel, setSelectedLevel] = useState<DistrictLevel | null>(null);
@@ -244,17 +305,29 @@ export const GameQuest: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState(20);
   const [timerActive, setTimerActive] = useState(false);
 
-  // Lifelines
+  // Lifelines (Quizizz & Kahoot)
   const [powerUp5050Used, setPowerUp5050Used] = useState(false);
   const [hiddenOptions, setHiddenOptions] = useState<number[]>([]);
   const [extraTimeUsed, setExtraTimeUsed] = useState(false);
+  const [shieldActive, setShieldActive] = useState(false);
   const [hintActive, setHintActive] = useState(false);
+
+  // Trivia Crack / QuizUp Specific States
+  const [isWheelSpinning, setIsWheelSpinning] = useState(false);
+  const [selectedCategoryWheel, setSelectedCategoryWheel] = useState<string | null>(null);
+  const [conqueredCrowns, setConqueredCrowns] = useState<string[]>([]);
+
+  // Brain Out Specific States
+  const [brainIQRating, setBrainIQRating] = useState<number>(100);
+  const [clueRevealed, setClueRevealed] = useState<boolean>(false);
 
   // Answer feedback
   const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
   const [streakCount, setStreakCount] = useState(0);
   const [sessionScore, setSessionScore] = useState(0);
+  const [lastEarnedPoints, setLastEarnedPoints] = useState<number>(0);
+  const [isLevelMultiplierActive, setIsLevelMultiplierActive] = useState<boolean>(false);
 
   // Level completion modal
   const [showLevelSummary, setShowLevelSummary] = useState(false);
@@ -281,7 +354,7 @@ export const GameQuest: React.FC = () => {
   }, [levels]);
 
   // Audio helper
-  const triggerSound = (type: 'correct' | 'wrong' | 'victory' | 'click' | 'powerup') => {
+  const triggerSound = (type: 'correct' | 'wrong' | 'victory' | 'click' | 'powerup' | 'spin' | 'eureka') => {
     if (soundEnabled) {
       playChime(type);
     }
@@ -293,17 +366,22 @@ export const GameQuest: React.FC = () => {
     triggerSound('click');
     setSelectedLevel(level);
     setCurrentQuestionIndex(0);
-    setTimeLeft(20);
+    setTimeLeft(level.questionTimerSeconds || (level.gamingMode === 'kahoot' ? 20 : 30));
     setTimerActive(true);
     setPowerUp5050Used(false);
     setHiddenOptions([]);
     setExtraTimeUsed(false);
+    setShieldActive(false);
     setHintActive(false);
     setSelectedOptionIndex(null);
     setIsAnswerRevealed(false);
     setStreakCount(0);
     setSessionScore(0);
+    setLastEarnedPoints(0);
+    setIsLevelMultiplierActive(false);
     setShowLevelSummary(false);
+    setSelectedCategoryWheel(null);
+    setClueRevealed(false);
   };
 
   // Timer Tick
@@ -358,11 +436,41 @@ export const GameQuest: React.FC = () => {
     setTimeLeft((prev) => prev + 15);
   };
 
+  // Shield Power-Up (Quizizz)
+  const handleUseShield = () => {
+    if (shieldActive || isAnswerRevealed) return;
+    triggerSound('powerup');
+    setShieldActive(true);
+  };
+
   // Toggle Hint
   const handleToggleHint = () => {
     if (isAnswerRevealed) return;
     triggerSound('powerup');
     setHintActive(!hintActive);
+  };
+
+  // Trivia Crack Wheel Spin Simulation
+  const handleSpinTriviaWheel = () => {
+    if (isWheelSpinning) return;
+    setIsWheelSpinning(true);
+    triggerSound('spin');
+
+    const categories = [
+      'வரலாறு (History)',
+      'புவியியல் (Geography)',
+      'விஞ்ஞானம் (Science)',
+      'இலக்கியம் (Literature)',
+      'கணிதம் (Math)',
+      'பொது அறிவு (GK)',
+    ];
+
+    setTimeout(() => {
+      const chosen = categories[Math.floor(Math.random() * categories.length)];
+      setSelectedCategoryWheel(chosen);
+      setIsWheelSpinning(false);
+      triggerSound('powerup');
+    }, 1200);
   };
 
   // Answer selected
@@ -378,15 +486,40 @@ export const GameQuest: React.FC = () => {
 
     if (isCorrect) {
       triggerSound('correct');
-      const timeBonus = Math.floor(timeLeft * 2);
-      const streakBonus = streakCount * 15;
+      // Kahoot / HNC Speed Rush speed multiplier bonus
+      const speedMultiplier = selectedLevel.gamingMode === 'kahoot' ? (timeLeft > 12 ? 2.5 : timeLeft > 6 ? 1.8 : 1.2) : 1;
       const basePoints = 50;
-      const totalEarned = basePoints + timeBonus + streakBonus;
-      setSessionScore((prev) => prev + totalEarned);
+      const streakBonus = streakCount * 15;
+
+      // Level Multiplier Feature: Students earn 1.5x points for streak-based correct answers, encouraging sustained engagement!
+      const isStreakActive = streakCount >= 1;
+      const levelMultiplier = isStreakActive ? 1.5 : 1.0;
+      const earned = Math.round((basePoints + timeLeft * 2 + streakBonus) * speedMultiplier * levelMultiplier);
+
+      setLastEarnedPoints(earned);
+      setIsLevelMultiplierActive(isStreakActive);
+      setSessionScore((prev) => prev + earned);
       setStreakCount((prev) => prev + 1);
+
+      if (selectedLevel.gamingMode === 'trivia_crack' && selectedCategoryWheel) {
+        setConqueredCrowns((prev) => Array.from(new Set([...prev, selectedCategoryWheel])));
+      }
+
+      if (selectedLevel.gamingMode === 'brain_out') {
+        setBrainIQRating((prev) => prev + 12);
+        triggerSound('eureka');
+      }
     } else {
-      triggerSound('wrong');
-      setStreakCount(0);
+      setLastEarnedPoints(0);
+      setIsLevelMultiplierActive(false);
+      if (shieldActive) {
+        // Protected by shield!
+        triggerSound('powerup');
+        setShieldActive(false);
+      } else {
+        triggerSound('wrong');
+        setStreakCount(0);
+      }
     }
   };
 
@@ -398,12 +531,16 @@ export const GameQuest: React.FC = () => {
     const nextIdx = currentQuestionIndex + 1;
     if (nextIdx < selectedLevel.questions.length) {
       setCurrentQuestionIndex(nextIdx);
-      setTimeLeft(20);
+      setTimeLeft(selectedLevel.questionTimerSeconds || (selectedLevel.gamingMode === 'kahoot' ? 20 : 30));
       setTimerActive(true);
       setHiddenOptions([]);
       setHintActive(false);
       setSelectedOptionIndex(null);
       setIsAnswerRevealed(false);
+      setLastEarnedPoints(0);
+      setIsLevelMultiplierActive(false);
+      setSelectedCategoryWheel(null);
+      setClueRevealed(false);
     } else {
       handleFinishLevel();
     }
@@ -454,7 +591,14 @@ export const GameQuest: React.FC = () => {
 
   // Reset Quest Progress
   const handleResetProgress = () => {
-    if (window.confirm('நீங்கள் தீவுப் பயண நிலைகளை மீண்டும் தொடக்க விரும்புகிறீர்களா? (Reset all 25 levels progress?)')) {
+    const confirmPrompt =
+      questLang === 'ta'
+        ? 'நீங்கள் தீவுப் பயண நிலைகளை மீண்டும் தொடக்க விரும்புகிறீர்களா?'
+        : questLang === 'si'
+        ? 'ඔබට මෙම ප්‍රගතිය නැවත මුල සිට ආරම්භ කිරීමට අවශ්‍යද?'
+        : 'Do you want to reset all district progress?';
+
+    if (window.confirm(confirmPrompt)) {
       localStorage.removeItem(STUDENT_PROGRESS_STORAGE_KEY);
       setLevels(buildInitial25Levels());
     }
@@ -465,72 +609,170 @@ export const GameQuest: React.FC = () => {
   const completedCount = levels.filter((l) => l.status === 'Completed').length;
   const currentLevelQ = selectedLevel?.questions[currentQuestionIndex];
 
-  // Filtered by province
+  // Helper for trilingual question text
+  const getQuestionPrompt = (q?: Question) => {
+    if (!q) return '';
+    if (questLang === 'en' && q.questionTextEn) return q.questionTextEn;
+    if (questLang === 'si' && q.questionTextSi) return q.questionTextSi;
+    return q.questionText;
+  };
+
+  const getOptionText = (opt: any) => {
+    if (questLang === 'en' && opt.textEn) return opt.textEn;
+    if (questLang === 'si' && opt.textSi) return opt.textSi;
+    return opt.text;
+  };
+
+  const getHintText = (q?: Question) => {
+    if (!q) return '';
+    if (questLang === 'en' && q.hintEn) return q.hintEn;
+    if (questLang === 'si' && q.hintSi) return q.hintSi;
+    return q.hint;
+  };
+
+  const getExplanationText = (q?: Question) => {
+    if (!q) return '';
+    if (questLang === 'en' && q.explanationEn) return q.explanationEn;
+    if (questLang === 'si' && q.explanationSi) return q.explanationSi;
+    return q.explanation;
+  };
+
+  // Filtered by province and gaming mode
   const displayedLevels = levels.filter((l) => {
-    if (selectedProvinceTab === 'all') return true;
-    const prov = PROVINCES_OF_SRI_LANKA.find((p) => p.id === selectedProvinceTab);
-    return prov ? prov.districts.includes(l.districtKey) : true;
+    const matchesProvince =
+      selectedProvinceTab === 'all'
+        ? true
+        : PROVINCES_OF_SRI_LANKA.find((p) => p.id === selectedProvinceTab)?.districts.includes(l.districtKey);
+
+    const matchesMode =
+      selectedGamingModeFilter === 'all' ? true : l.gamingMode === selectedGamingModeFilter;
+
+    return matchesProvince && matchesMode;
   });
 
   return (
     <div className="space-y-6">
-      {/* Top Banner / Quest Header */}
+      {/* Top Banner / Quest Header with Trilingual Switcher */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950 via-slate-900 to-blue-950 p-6 sm:p-8 text-white shadow-xl border border-indigo-800/40">
         <div className="absolute -right-12 -top-12 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
         <div className="absolute right-1/4 -bottom-12 h-48 w-48 rounded-full bg-amber-500/10 blur-2xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-semibold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>HNC Edu-Arena • 25 Districts All-Island Quest</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>HNC Edu-Arena • Study Gaming Mode</span>
+              </span>
+              <span className="text-xs text-indigo-300 font-bold px-2.5 py-0.5 rounded-full bg-indigo-900/60 border border-indigo-700/50">
+                25 Sri Lankan Districts
+              </span>
             </div>
+
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
-              <span>🎯 HNC Edu-Arena: தீவுப் பயணம் (25 மாவட்டங்கள்)</span>
+              <span>
+                {questLang === 'ta'
+                  ? '🎯 HNC Edu-Arena: தீவுப் பயணம்'
+                  : questLang === 'si'
+                  ? '🎯 HNC Edu-Arena: දූපත් චාරිකාව'
+                  : '🎯 HNC Edu-Arena: 25 Districts Island Quest'}
+              </span>
             </h1>
+
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              இலங்கையின் 9 மாகாணங்களில் உள்ள 25 மாவட்டங்களையும் கடந்து உங்கள் கல்விச் சிகரத்தை அடையுங்கள்! வரலாறு, புவியியல், தமிழ், விஞ்ஞானம் மற்றும் கணிதப் புதிர்களை விடுவித்து நிலைகளை வெல்லுங்கள்!
+              {questLang === 'ta'
+                ? 'இலங்கையின் 25 மாவட்டங்களை HNC Speed Rush, Power Battle, Wheel Duel மற்றும் Brain Logic ஆகிய விளையாட்டு முறைகளில் வென்று உங்கள் கல்விச் சிகரத்தை அடையுங்கள்!'
+                : questLang === 'si'
+                ? 'ශ්‍රී ලංකාවේ දිස්ත්‍රික්ක 25 HNC Edu-Arena ක්‍රීඩා මාදිලි 4න් ජය ගන්න!'
+                : 'Conquer all 25 districts of Sri Lanka powered by native HNC Arena interactive gaming modes!'}
             </p>
           </div>
 
-          {/* Quick Stats Badges */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 px-4 border border-white/15 text-center min-w-[110px]">
-              <div className="flex items-center justify-center gap-1.5 text-amber-400 mb-0.5">
-                <Trophy className="w-4 h-4" />
-                <span className="text-xs uppercase font-bold tracking-wider">ஈட்டிய XP</span>
-              </div>
-              <div className="text-2xl font-black text-white">{totalXp}</div>
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 px-4 border border-white/15 text-center min-w-[110px]">
-              <div className="flex items-center justify-center gap-1.5 text-emerald-400 mb-0.5">
-                <Shield className="w-4 h-4" />
-                <span className="text-xs uppercase font-bold tracking-wider">வென்ற மாவட்டங்கள்</span>
-              </div>
-              <div className="text-2xl font-black text-white">
-                {completedCount} <span className="text-xs font-normal text-slate-400">/ 25</span>
-              </div>
-            </div>
-
-            {/* Sound toggle & reset */}
-            <div className="flex flex-col gap-2">
+          {/* Quick Stats Badges & Trilingual Toggle */}
+          <div className="flex flex-col gap-3 items-end">
+            {/* Trilingual Switcher */}
+            <div className="inline-flex rounded-xl bg-white/10 p-1 border border-white/20 text-xs font-bold self-start md:self-auto">
               <button
                 type="button"
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className="inline-flex items-center justify-center p-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white transition text-xs font-medium cursor-pointer"
-                title={soundEnabled ? 'ஒலியை முடக்கு (Mute)' : 'ஒலியை இயக்கு (Unmute)'}
+                onClick={() => {
+                  setQuestLang('ta');
+                  setAppLanguage('ta');
+                }}
+                className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                  questLang === 'ta'
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+                    : 'text-slate-300 hover:text-white'
+                }`}
               >
-                {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-300" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
+                தமிழ்
               </button>
               <button
                 type="button"
-                onClick={handleResetProgress}
-                className="inline-flex items-center justify-center p-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-slate-300 hover:text-white transition text-xs cursor-pointer"
-                title="நிலைகளை மீட்டமை (Reset Progress)"
+                onClick={() => {
+                  setQuestLang('en');
+                  setAppLanguage('en');
+                }}
+                className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                  questLang === 'en'
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+                    : 'text-slate-300 hover:text-white'
+                }`}
               >
-                <RotateCcw className="w-4 h-4" />
+                English
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setQuestLang('si');
+                  setAppLanguage('si');
+                }}
+                className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                  questLang === 'si'
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                සිංහල
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 px-4 border border-white/15 text-center min-w-[100px]">
+                <div className="flex items-center justify-center gap-1.5 text-amber-400 mb-0.5">
+                  <Trophy className="w-3.5 h-3.5" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider">XP Points</span>
+                </div>
+                <div className="text-xl font-black text-white">{totalXp}</div>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 px-4 border border-white/15 text-center min-w-[100px]">
+                <div className="flex items-center justify-center gap-1.5 text-emerald-400 mb-0.5">
+                  <Shield className="w-3.5 h-3.5" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider">Districts</span>
+                </div>
+                <div className="text-xl font-black text-white">
+                  {completedCount} <span className="text-xs font-normal text-slate-400">/ 25</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white transition text-xs font-medium cursor-pointer"
+                  title={soundEnabled ? 'Mute Sound' : 'Unmute Sound'}
+                >
+                  {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-300" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetProgress}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-slate-300 hover:text-white transition text-xs cursor-pointer"
+                  title="Reset Progress"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -539,8 +781,10 @@ export const GameQuest: React.FC = () => {
         <div className="mt-6 pt-5 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-300">
           <div className="flex items-center gap-2">
             <Compass className="w-4 h-4 text-blue-400 animate-spin" />
-            <span className="font-semibold text-white">அனைத்திலங்கை தீவுப் பயண முன்னேற்றம்:</span>
-            <span>{Math.round((completedCount / levels.length) * 100)}% நிறைவுற்றது ({completedCount} / 25 மாவட்டங்கள்)</span>
+            <span className="font-semibold text-white">
+              {questLang === 'ta' ? 'அனைத்திலங்கை தீவுப் பயண முன்னேற்றம்:' : questLang === 'si' ? 'දූපත් චාරිකා ප්‍රගතිය:' : 'All-Island Quest Progress:'}
+            </span>
+            <span>{Math.round((completedCount / levels.length) * 100)}% ({completedCount} / 25)</span>
           </div>
           <div className="w-full sm:w-64 bg-slate-800 rounded-full h-2.5 overflow-hidden border border-white/10">
             <div
@@ -551,12 +795,59 @@ export const GameQuest: React.FC = () => {
         </div>
       </div>
 
+      {/* 4 Study Gaming Modes Filter Strip */}
+      <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2 text-xs">
+        <div className="flex items-center justify-between">
+          <span className="font-extrabold text-slate-800 flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <span>Study Gaming Modes (கேமிங் முறைமைகள்):</span>
+          </span>
+          <span className="text-[11px] text-slate-400">
+            {questLang === 'ta' ? 'முறை வாரியாக விளையாடவும்' : 'Filter by Gaming Method'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <button
+            type="button"
+            onClick={() => setSelectedGamingModeFilter('all')}
+            className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap cursor-pointer ${
+              selectedGamingModeFilter === 'all'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            அனைத்து முறைகளும் (All Modes)
+          </button>
+
+          {STUDY_GAMING_METHODS.map((m) => {
+            const isSelected = selectedGamingModeFilter === m.id;
+
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setSelectedGamingModeFilter(isSelected ? 'all' : m.id)}
+                className={`px-3.5 py-1.5 rounded-xl font-bold transition whitespace-nowrap flex items-center gap-2 cursor-pointer border ${
+                  isSelected
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span className="text-sm">{m.icon}</span>
+                <span>{questLang === 'ta' ? m.nameTa : questLang === 'si' ? m.nameSi : m.nameEn}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* 9 Provinces Navigation Bar Tabs */}
       <div className="bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-1.5 overflow-x-auto text-xs">
         <button
           type="button"
           onClick={() => setSelectedProvinceTab('all')}
-          className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap ${
+          className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap cursor-pointer ${
             selectedProvinceTab === 'all'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -570,13 +861,13 @@ export const GameQuest: React.FC = () => {
             key={prov.id}
             type="button"
             onClick={() => setSelectedProvinceTab(prov.id)}
-            className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap cursor-pointer ${
               selectedProvinceTab === prov.id
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            {prov.nameTa}
+            {questLang === 'ta' ? prov.nameTa : questLang === 'si' ? prov.nameSi : prov.nameEn}
           </button>
         ))}
       </div>
@@ -586,16 +877,26 @@ export const GameQuest: React.FC = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <MapPin className="w-5 h-5 text-blue-600" />
-            <span>இலங்கையின் 25 மாவட்டப் போர்க்களங்கள்</span>
+            <span>
+              {questLang === 'ta'
+                ? 'இலங்கையின் 25 மாவட்டப் போர்க்களங்கள்'
+                : questLang === 'si'
+                ? 'ශ්‍රී ලංකාවේ දිස්ත්‍රික්ක 25 පිටිය'
+                : 'Sri Lanka 25 District Arenas'}
+            </span>
           </h2>
           <span className="text-xs font-semibold text-slate-500">
-            காண்பிக்கப்படுவது: {displayedLevels.length} மாவட்டங்கள்
+            {displayedLevels.length} {questLang === 'ta' ? 'மாவட்டங்கள்' : 'Districts'}
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {displayedLevels.map((level) => {
             const isCompleted = level.status === 'Completed';
+            const modeMeta = getGamingMethodById(level.gamingMode || 'kahoot');
+            const distName = questLang === 'ta' ? level.district : questLang === 'si' ? (level.districtSi || level.districtEn) : level.districtEn;
+            const provName = questLang === 'ta' ? level.province : questLang === 'si' ? (level.provinceSi || level.provinceEn) : level.provinceEn;
+            const subjName = questLang === 'ta' ? level.gradeSubject : questLang === 'si' ? (level.gradeSubjectSi || level.gradeSubjectEn) : (level.gradeSubjectEn || level.gradeSubject);
 
             return (
               <div
@@ -611,7 +912,7 @@ export const GameQuest: React.FC = () => {
                     : 'bg-white border-blue-200 shadow-sm hover:shadow-lg hover:border-blue-400 hover:-translate-y-0.5 cursor-pointer ring-1 ring-blue-500/20'
                 }`}
               >
-                {/* Level Card Header with District Badge */}
+                {/* Level Card Header with District Badge & Gaming Method */}
                 <div className="p-5 pb-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2.5">
@@ -619,9 +920,9 @@ export const GameQuest: React.FC = () => {
                         {level.iconName}
                       </span>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span
-                            className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                               !level.isPublished
                                 ? 'bg-amber-100 text-amber-800'
                                 : level.locked
@@ -633,10 +934,10 @@ export const GameQuest: React.FC = () => {
                           >
                             Level {level.id}
                           </span>
-                          <span className="text-xs text-slate-400 font-medium">{level.province}</span>
+                          <span className="text-xs text-slate-400 font-medium">{provName}</span>
                         </div>
                         <h3 className="text-base font-bold text-slate-900 mt-1 group-hover:text-blue-600 transition-colors">
-                          {level.district}{' '}
+                          {distName}{' '}
                           <span className="text-xs font-normal text-slate-400">({level.districtEn})</span>
                         </h3>
                       </div>
@@ -645,7 +946,7 @@ export const GameQuest: React.FC = () => {
                     <div>
                       {!level.isPublished ? (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800">
-                          <span>வரைவு (Draft)</span>
+                          <span>Draft</span>
                         </span>
                       ) : level.locked ? (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-200 text-slate-600">
@@ -655,7 +956,7 @@ export const GameQuest: React.FC = () => {
                       ) : isCompleted ? (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700">
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>வெற்றி</span>
+                          <span>Won</span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm group-hover:shadow">
@@ -665,15 +966,29 @@ export const GameQuest: React.FC = () => {
                     </div>
                   </div>
 
-                  <p className="text-xs text-slate-500 mt-3 line-clamp-2 leading-relaxed">
-                    {level.description}
+                  {/* Gaming Mode Pill & Level Multiplier Badge */}
+                  <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-indigo-50 border border-indigo-200/60 text-[11px] font-bold text-indigo-900">
+                      <span>{modeMeta.icon}</span>
+                      <span>{questLang === 'ta' ? modeMeta.nameTa : questLang === 'si' ? modeMeta.nameSi : modeMeta.nameEn}</span>
+                    </div>
+                    {level.isPublished && !level.locked && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 text-[10px] font-black border border-amber-200/80">
+                        <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+                        1.5x Streak Multiplier
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">
+                    {questLang === 'en' ? level.descriptionEn : level.description}
                   </p>
                 </div>
 
                 {/* Card Footer / Points & Subject */}
                 <div className="p-4 px-5 pt-3 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between text-xs text-slate-600">
                   <span className="font-medium text-slate-700 truncate max-w-[170px]">
-                    {level.gradeSubject}
+                    {subjName}
                   </span>
 
                   {level.isPublished && !level.locked ? (
@@ -683,7 +998,7 @@ export const GameQuest: React.FC = () => {
                     </span>
                   ) : (
                     <span className="text-[11px] text-slate-400 italic">
-                      {!level.isPublished ? 'விரைவில் வெளியாகும்' : 'முந்தைய நிலையை வெல்லவும்'}
+                      {!level.isPublished ? 'Unpublished' : 'Complete previous'}
                     </span>
                   )}
                 </div>
@@ -693,35 +1008,42 @@ export const GameQuest: React.FC = () => {
         </div>
       </div>
 
-      {/* ACTIVE GAME MODAL (Kahoot-style Interface) */}
+      {/* ACTIVE GAME PLAY MODAL WITH 4 SPECIALIZED GAMING METHODS */}
       {selectedLevel && currentLevelQ && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-8 relative shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-8 relative shadow-2xl border border-slate-200 flex flex-col max-h-[94vh] overflow-y-auto">
             {/* Close Button */}
             <button
               onClick={() => {
                 triggerSound('click');
                 setSelectedLevel(null);
               }}
-              className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-              title="வெளியேறு (Close)"
+              className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              title="Close"
             >
               <X className="w-6 h-6" />
             </button>
 
             {/* Game Header */}
             <div className="pr-8 mb-4">
-              <div className="flex items-center gap-2 text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">
-                <span>{selectedLevel.name}</span>
+              <div className="flex items-center gap-2 text-xs font-bold text-blue-600 uppercase tracking-wider mb-1 flex-wrap">
+                <span>{selectedLevel.district}</span>
                 <span>•</span>
-                <span>கேள்வி {currentQuestionIndex + 1} / {selectedLevel.questions.length}</span>
+                <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                  {getGamingMethodById(selectedLevel.gamingMode).icon} {selectedLevel.gamingMode.toUpperCase()} MODE
+                </span>
+                <span>•</span>
+                <span>
+                  {questLang === 'ta' ? 'கேள்வி' : questLang === 'si' ? 'ප්‍රශ්නය' : 'Question'}{' '}
+                  {currentQuestionIndex + 1} / {selectedLevel.questions.length}
+                </span>
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                {selectedLevel.district} போர்க்களம் ⚔️
+                {questLang === 'ta' ? selectedLevel.district : selectedLevel.districtEn} போர்க்களம் ⚔️
               </h2>
             </div>
 
-            {/* Kahoot-Style Controls & Timer Bar */}
+            {/* MODE 1 & 2: Kahoot / Quizizz Bar */}
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-4 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 {/* Timer Badge */}
@@ -735,18 +1057,26 @@ export const GameQuest: React.FC = () => {
                   }`}
                 >
                   <Clock className="w-4 h-4" />
-                  <span>டைமர்: {timeLeft} வினாடிகள்</span>
+                  <span>
+                    {questLang === 'ta' ? 'டைமர்' : questLang === 'si' ? 'ටයිමරය' : 'Timer'}: {timeLeft}s
+                  </span>
                 </div>
 
-                {/* Score & Streak */}
-                <div className="flex items-center gap-2.5">
-                  {streakCount > 1 && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-100 text-orange-800 font-black text-xs border border-orange-200 animate-bounce">
-                      <Flame className="w-3.5 h-3.5 text-orange-600" />
-                      <span>{streakCount}x Streak!</span>
+                {/* Score & Streak & Level Multiplier */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {streakCount >= 1 && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-xs shadow-xs animate-pulse">
+                      <Sparkles className="w-3.5 h-3.5 text-yellow-200" />
+                      <span>1.5x Level Multiplier</span>
                     </span>
                   )}
-                  <span className="inline-flex items-center gap-1 font-bold text-slate-800 bg-white px-3 py-1 rounded-lg border border-slate-200 text-xs">
+                  {streakCount > 1 && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-100 text-orange-800 font-black text-xs border border-orange-200">
+                      <Flame className="w-3.5 h-3.5 text-orange-600" />
+                      <span>{streakCount}x Streak</span>
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1 font-bold text-slate-800 bg-white px-3 py-1 rounded-lg border border-slate-200 text-xs shadow-2xs">
                     <Trophy className="w-3.5 h-3.5 text-amber-500" />
                     <span>{sessionScore} XP</span>
                   </span>
@@ -759,22 +1089,22 @@ export const GameQuest: React.FC = () => {
                   className={`h-2 rounded-full transition-all duration-1000 ${
                     timeLeft <= 5 ? 'bg-rose-500' : timeLeft <= 10 ? 'bg-amber-500' : 'bg-blue-600'
                   }`}
-                  style={{ width: `${(timeLeft / 20) * 100}%` }}
+                  style={{ width: `${(timeLeft / (selectedLevel.questionTimerSeconds || (selectedLevel.gamingMode === 'kahoot' ? 20 : 30))) * 100}%` }}
                 />
               </div>
 
-              {/* Power-up Lifelines */}
+              {/* MODE 2: Quizizz Power-ups tray */}
               <div className="pt-1 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span className="text-slate-500 font-medium">பவர்-அப்கள் (Power-ups):</span>
+                <span className="text-slate-500 font-medium">Power-ups:</span>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={handleUse5050}
                     disabled={powerUp5050Used || isAnswerRevealed}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold border transition ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer ${
                       powerUp5050Used
                         ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                        : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 cursor-pointer shadow-sm'
+                        : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 shadow-sm'
                     }`}
                   >
                     <Zap className="w-3 h-3 text-amber-600" />
@@ -785,24 +1115,40 @@ export const GameQuest: React.FC = () => {
                     type="button"
                     onClick={handleUseExtraTime}
                     disabled={extraTimeUsed || isAnswerRevealed}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold border transition ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer ${
                       extraTimeUsed
                         ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                        : 'bg-blue-100 hover:bg-blue-200 text-blue-900 border-blue-300 cursor-pointer shadow-sm'
+                        : 'bg-blue-100 hover:bg-blue-200 text-blue-900 border-blue-300 shadow-sm'
                     }`}
                   >
                     <Clock className="w-3 h-3 text-blue-600" />
-                    <span>⏱️ +15s Time</span>
+                    <span>⏱️ +15s Freeze</span>
                   </button>
+
+                  {selectedLevel.gamingMode === 'quizizz' && (
+                    <button
+                      type="button"
+                      onClick={handleUseShield}
+                      disabled={shieldActive || isAnswerRevealed}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer ${
+                        shieldActive
+                          ? 'bg-emerald-200 text-emerald-900 border-emerald-400'
+                          : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border-emerald-300 shadow-sm'
+                      }`}
+                    >
+                      <Shield className="w-3 h-3 text-emerald-600" />
+                      <span>🛡️ Shield</span>
+                    </button>
+                  )}
 
                   <button
                     type="button"
                     onClick={handleToggleHint}
                     disabled={isAnswerRevealed}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold border transition ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer ${
                       hintActive
                         ? 'bg-purple-200 text-purple-900 border-purple-400'
-                        : 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300 cursor-pointer shadow-sm'
+                        : 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300 shadow-sm'
                     }`}
                   >
                     <HelpCircle className="w-3 h-3 text-purple-600" />
@@ -817,19 +1163,84 @@ export const GameQuest: React.FC = () => {
                   <Sparkles className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold">குறிப்பு (Hint): </span>
-                    <span>{currentLevelQ.hint}</span>
+                    <span>{getHintText(currentLevelQ)}</span>
                   </div>
                 </div>
               )}
             </div>
 
+            {/* MODE 3: Trivia Crack / QuizUp Category Wheel Spinner Banner */}
+            {selectedLevel.gamingMode === 'trivia_crack' && (
+              <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-teal-900 via-slate-900 to-indigo-950 text-white border border-teal-500/30 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-teal-500/20 text-teal-300 flex items-center justify-center text-xl font-bold border border-teal-400/40">
+                    🎡
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-teal-300 block">
+                      HNC Wheel Duel Category
+                    </span>
+                    <span className="text-sm font-bold">
+                      {selectedCategoryWheel || 'சக்கரத்தைச் சுழற்றுங்கள் (Spin to Play Category)'}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSpinTriviaWheel}
+                  disabled={isWheelSpinning || isAnswerRevealed}
+                  className="px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-slate-950 font-black rounded-xl text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCw className={`w-3.5 h-3.5 ${isWheelSpinning ? 'animate-spin' : ''}`} />
+                  <span>{isWheelSpinning ? 'சுழல்கிறது...' : 'SPIN WHEEL'}</span>
+                </button>
+              </div>
+            )}
+
+            {/* MODE 4: Brain Out Riddle IQ Index Banner */}
+            {selectedLevel.gamingMode === 'brain_out' && (
+              <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-pink-950 via-slate-900 to-purple-950 text-white border border-pink-500/30 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <Brain className="w-6 h-6 text-pink-400" />
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-pink-300 block">
+                      HNC Brain Logic IQ Rating
+                    </span>
+                    <span className="text-sm font-black text-white">IQ: {brainIQRating} pts</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClueRevealed(!clueRevealed);
+                    triggerSound('eureka');
+                  }}
+                  className="px-3.5 py-1.5 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Lightbulb className="w-3.5 h-3.5" />
+                  <span>{clueRevealed ? 'தடயம் தெரிந்தது' : 'தடயத்தை ஸ்கேன் செய்'}</span>
+                </button>
+              </div>
+            )}
+
+            {clueRevealed && selectedLevel.gamingMode === 'brain_out' && (
+              <div className="mb-4 p-3 bg-pink-50 rounded-xl border border-pink-200 text-xs text-pink-900 flex items-center gap-2 animate-in fade-in">
+                <Search className="w-4 h-4 text-pink-600 shrink-0" />
+                <span>
+                  <strong>தடயம் (Riddle Clue):</strong> {getHintText(currentLevelQ)}
+                </span>
+              </div>
+            )}
+
             {/* Question Card Box */}
             <div className="p-5 sm:p-6 bg-slate-900 text-white rounded-2xl mb-5 shadow-inner">
               <span className="text-xs uppercase font-extrabold tracking-wider text-amber-400 block mb-1.5">
-                வினா #{currentQuestionIndex + 1}:
+                {questLang === 'ta' ? 'வினா' : questLang === 'si' ? 'ප්‍රශ්නය' : 'Question'} #{currentQuestionIndex + 1}:
               </span>
               <p className="text-base sm:text-lg font-bold leading-relaxed">
-                {currentLevelQ.questionText}
+                {getQuestionPrompt(currentLevelQ)}
               </p>
             </div>
 
@@ -869,13 +1280,13 @@ export const GameQuest: React.FC = () => {
                     type="button"
                     disabled={isAnswerRevealed}
                     onClick={() => handleSelectAnswer(idx)}
-                    className={`p-4 rounded-2xl font-bold text-left transition-all duration-150 flex items-center justify-between gap-3 text-sm sm:text-base border border-white/20 ${btnStyles}`}
+                    className={`p-4 rounded-2xl font-bold text-left transition-all duration-150 flex items-center justify-between gap-3 text-sm sm:text-base border border-white/20 cursor-pointer ${btnStyles}`}
                   >
                     <div className="flex items-center gap-3">
                       <span className="w-8 h-8 rounded-xl bg-black/20 flex items-center justify-center text-lg font-black shrink-0">
                         {opt.symbol}
                       </span>
-                      <span className="leading-snug">{opt.text}</span>
+                      <span className="leading-snug">{getOptionText(opt)}</span>
                     </div>
 
                     {isAnswerRevealed && (
@@ -906,13 +1317,26 @@ export const GameQuest: React.FC = () => {
                     <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                   )}
                   <div>
-                    <span className="font-extrabold text-slate-900 block">
-                      {selectedOptionIndex === currentLevelQ.correctIndex
-                        ? '🎉 அருமை! சரியான விடை!'
-                        : '❌ தவறான பதில்!'}
-                    </span>
-                    <p className="text-slate-600 mt-0.5 leading-relaxed">
-                      {currentLevelQ.explanation}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-extrabold text-slate-900 block">
+                        {selectedOptionIndex === currentLevelQ.correctIndex
+                          ? (questLang === 'ta' ? '🎉 அருமை! சரியான விடை!' : questLang === 'si' ? '🎉 විශිෂ්ටයි! නිවැරදි පිළිතුර!' : '🎉 Great Job! Correct Answer!')
+                          : (questLang === 'ta' ? '❌ தவறான பதில்!' : questLang === 'si' ? '❌ වැරදි පිළිතුරක්!' : '❌ Incorrect Answer!')}
+                      </span>
+                      {selectedOptionIndex === currentLevelQ.correctIndex && lastEarnedPoints > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black border border-emerald-300">
+                          +{lastEarnedPoints} XP
+                        </span>
+                      )}
+                      {selectedOptionIndex === currentLevelQ.correctIndex && isLevelMultiplierActive && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[11px] font-black shadow-xs animate-bounce">
+                          <Sparkles className="w-3 h-3 text-yellow-200" />
+                          1.5x Level Multiplier Active!
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-slate-600 mt-1 leading-relaxed">
+                      {getExplanationText(currentLevelQ)}
                     </p>
                   </div>
                 </div>
@@ -925,8 +1349,8 @@ export const GameQuest: React.FC = () => {
                   >
                     <span>
                       {currentQuestionIndex + 1 < selectedLevel.questions.length
-                        ? 'அடுத்த கேள்வி (Next Question)'
-                        : 'போர்க்களத்தை நிறைவு செய் (Complete Level)'}
+                        ? (questLang === 'ta' ? 'அடுத்த கேள்வி' : questLang === 'si' ? 'මීළඟ ප්‍රශ්නය' : 'Next Question')
+                        : (questLang === 'ta' ? 'போர்க்களத்தை நிறைவு செய்' : questLang === 'si' ? 'අවසන් කරන්න' : 'Complete Arena')}
                     </span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
@@ -946,23 +1370,23 @@ export const GameQuest: React.FC = () => {
             </div>
 
             <span className="text-xs uppercase font-extrabold tracking-wider text-amber-600 block mb-1">
-              District Conquered!
+              Arena Victory!
             </span>
             <h2 className="text-2xl font-black text-slate-900 mb-1">
               {completedLevelData.level.district} வெற்றி பெறப்பட்டது!
             </h2>
             <p className="text-xs text-slate-500 mb-6">
-              இலங்கையின் 25 மாவட்டப் போர்க்களத்தில் ஒரு முக்கிய சிகரத்தை வெற்றிகரமாக எட்டிவிட்டீர்கள்!
+              இலங்கையின் 25 மாவட்டப் போர்க்களத்தில் ஒரு முக்கிய சிகரத்தை எட்டிவிட்டீர்கள்!
             </p>
 
             {/* Stats Breakdown */}
             <div className="grid grid-cols-2 gap-3 mb-6 text-left">
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-                <span className="text-[11px] text-slate-400 font-semibold block mb-0.5">ஈட்டிய புள்ளிகள் (XP)</span>
+                <span className="text-[11px] text-slate-400 font-semibold block mb-0.5">ஈட்டிய XP</span>
                 <span className="text-xl font-black text-amber-600">+{completedLevelData.earnedXp} XP</span>
               </div>
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-                <span className="text-[11px] text-slate-400 font-semibold block mb-0.5">துல்லியத்தன்மை (Accuracy)</span>
+                <span className="text-[11px] text-slate-400 font-semibold block mb-0.5">துல்லியம் (Accuracy)</span>
                 <span className="text-xl font-black text-emerald-600">{completedLevelData.accuracy}%</span>
               </div>
             </div>
@@ -970,7 +1394,7 @@ export const GameQuest: React.FC = () => {
             {completedLevelData.unlockedNext && (
               <div className="p-3.5 mb-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-bold flex items-center justify-center gap-2">
                 <Unlock className="w-4 h-4 text-emerald-600" />
-                <span>அடுத்த மாவட்ட நிலை திறக்கப்பட்டது! (Next District Level Unlocked)</span>
+                <span>அடுத்த மாவட்ட நிலை திறக்கப்பட்டது! (Next District Unlocked)</span>
               </div>
             )}
 
@@ -979,7 +1403,7 @@ export const GameQuest: React.FC = () => {
               onClick={() => setShowLevelSummary(false)}
               className="w-full py-3 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-sm shadow-lg shadow-blue-500/20 transition cursor-pointer"
             >
-              தொடர்க (Continue Island Quest)
+              தொடர்க (Continue Edu-Arena)
             </button>
           </div>
         </div>

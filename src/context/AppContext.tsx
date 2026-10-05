@@ -159,6 +159,13 @@ interface AppContextType {
   studentNav: StudentNav;
   setStudentNav: (tab: StudentNav) => void;
 
+  // Districts Quest & Study Gaming Studio State
+  isDistrictsStudioOpen: boolean;
+  setIsDistrictsStudioOpen: (open: boolean) => void;
+  districtsStudioInitialAction: 'list' | 'create';
+  setDistrictsStudioInitialAction: (action: 'list' | 'create') => void;
+  openDistrictsStudio: (action?: 'list' | 'create') => void;
+
   // User identities mapped to current authenticated user
   superAdminUser: SuperAdminUser;
   currentAdmin: AdminUser;
@@ -410,6 +417,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Phase 08: Advertisements & Sponsor Billboard State
   const [advertisements, setAdvertisements] = useState<DbAdvertisement[]>([]);
   const [isAdManagerOpen, setIsAdManagerOpen] = useState<boolean>(false);
+
+  // Districts Quest & Study Gaming Studio State
+  const [isDistrictsStudioOpen, setIsDistrictsStudioOpen] = useState<boolean>(false);
+  const [districtsStudioInitialAction, setDistrictsStudioInitialAction] = useState<'list' | 'create'>('list');
+
+  const openDistrictsStudio = (action: 'list' | 'create' = 'list') => {
+    setDistrictsStudioInitialAction(action);
+    if (currentPortal === 'student') {
+      setStudentNav('Edu-Arena Quest');
+    } else if (currentPortal === 'super_admin') {
+      setSuperAdminNav('Competition Management');
+      setIsDistrictsStudioOpen(true);
+    } else {
+      setAdminNav('Competition Management');
+      setIsDistrictsStudioOpen(true);
+    }
+  };
 
   // Portal Setter: Allows Super Admin & Admins to switch/preview Student Portal view
   const setCurrentPortal = (targetRole: PortalRole) => {
@@ -2446,6 +2470,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recordAdClick,
         isAdManagerOpen,
         setIsAdManagerOpen,
+        isDistrictsStudioOpen,
+        setIsDistrictsStudioOpen,
+        districtsStudioInitialAction,
+        setDistrictsStudioInitialAction,
+        openDistrictsStudio,
         purgeDemoCompetitions: async () => {
           return await purgeAllDemoCompetitions();
         },

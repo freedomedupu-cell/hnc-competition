@@ -532,8 +532,8 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
               {language === 'ta'
-                ? 'இலங்கையின் மாவட்டங்களைக் கடந்து உங்கள் கல்விச் சிகரத்தை அடையுங்கள்! 50-50, டைமர் மற்றும் Kahoot பாணி போர்க்களத்தில் பங்கேற்று XP புள்ளிகளை வெல்லுங்கள்!'
-                : 'Conquer the academic challenges across Sri Lankan districts! Compete in rapid Kahoot-style arena battles with 50-50 power-ups and earn XP!'}
+                ? 'இலங்கையின் 25 மாவட்டங்களைக் கடந்து உங்கள் கல்விச் சிகரத்தை அடையுங்கள்! 50-50, நேர முடக்கம் மற்றும் HNC Arena போர்க்களத்தில் பங்கேற்று XP புள்ளிகளை வெல்லுங்கள்!'
+                : 'Conquer the academic challenges across 25 Sri Lankan districts! Compete in rapid HNC Arena battles with 50-50 power-ups and earn XP!'}
             </p>
           </div>
 
