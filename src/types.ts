@@ -566,6 +566,7 @@ export interface DbAdvertisement {
   category?: string;
   mediaType?: 'image' | 'video';
   imageUrl?: string;
+  galleryImages?: string[];
   videoUrl?: string;
   promoCode?: string;
   discountPercentage?: number;

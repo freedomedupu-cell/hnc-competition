@@ -15,6 +15,7 @@ import {
   XCircle,
   BarChart2,
   Megaphone,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { AdvertisementManagementModal } from './AdvertisementManagementModal';
 import { DynamicAdBillboard } from '../common/DynamicAdBillboard';
@@ -222,7 +223,15 @@ export const SponsorsAndAdsView: React.FC = () => {
                           </div>
                         )}
                         <div>
-                          <span className="block text-slate-900 font-bold">{ad.brandName}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="block text-slate-900 font-bold">{ad.brandName}</span>
+                            {ad.galleryImages && ad.galleryImages.length > 1 && (
+                              <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[9px] font-black border border-amber-300 flex items-center gap-0.5">
+                                <ImageIcon className="w-2.5 h-2.5 text-amber-600" />
+                                <span>{ad.galleryImages.length} P</span>
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[10px] text-slate-400 font-normal">{ad.category || 'Sponsor'}</span>
                         </div>
                       </div>

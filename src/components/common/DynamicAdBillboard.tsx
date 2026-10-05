@@ -17,6 +17,9 @@ import {
   Activity,
   Database,
   RefreshCw,
+  Image as ImageIcon,
+  Maximize2,
+  X,
 } from 'lucide-react';
 
 const DEFAULT_FALLBACK_ADS: DbAdvertisement[] = [];
@@ -33,6 +36,8 @@ export const DynamicAdBillboard: React.FC = () => {
 
   // 1. ALL useState hooks declared together at the top
   const [activeIndex, setActiveIndex] = useState(0);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   const [showDiagnosticPanel, setShowDiagnosticPanel] = useState(false);
@@ -96,6 +101,21 @@ export const DynamicAdBillboard: React.FC = () => {
     }, 8000);
     return () => clearInterval(interval);
   }, [displayAds.length]);
+
+  // Reset active photo index when active ad changes
+  useEffect(() => {
+    setActivePhotoIndex(0);
+  }, [currentAd?.id]);
+
+  // Auto-slide between photos every 3.5 seconds if current ad has multiple photos (>2 photos)
+  useEffect(() => {
+    const gallery = currentAd?.galleryImages;
+    if (!gallery || gallery.length <= 1) return;
+    const interval = setInterval(() => {
+      setActivePhotoIndex((prev) => (prev + 1) % gallery.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [currentAd?.id, currentAd?.galleryImages?.length]);
 
   useEffect(() => {
     let isMounted = true;
@@ -167,6 +187,10 @@ export const DynamicAdBillboard: React.FC = () => {
 
   const mediaSource = resolvedVideoUrl || currentAd.videoUrl;
   const imageSource = resolvedImageUrl || currentAd.imageUrl;
+  const gallery = currentAd.galleryImages && currentAd.galleryImages.length > 0
+    ? currentAd.galleryImages
+    : (imageSource ? [imageSource] : []);
+  const currentPhotoSrc = gallery[activePhotoIndex % gallery.length] || imageSource || '';
 
   return (
     <div
@@ -188,6 +212,15 @@ export const DynamicAdBillboard: React.FC = () => {
           <span className="text-xs font-bold text-amber-200/90 truncate">
             {currentAd.brandName}
           </span>
+
+          {gallery.length > 1 && (
+            <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-bold border border-amber-400/30 flex items-center gap-1">
+              <ImageIcon className="w-3 h-3 text-amber-400" />
+              <span>
+                {language === 'ta' ? `${gallery.length} படங்கள்` : `${gallery.length} Photos`}
+              </span>
+            </span>
+          )}
 
           {currentAd.status === 'inactive' && isSuperAdminOrAdmin && (
             <span className="px-2 py-0.5 rounded-full bg-red-900/60 text-red-200 text-[10px] font-bold border border-red-500/40">
@@ -243,6 +276,31 @@ export const DynamicAdBillboard: React.FC = () => {
           <p className="text-xs sm:text-sm text-slate-200/90 leading-relaxed max-w-2xl">
             {currentAd.description}
           </p>
+
+          {/* Mini Thumbnail Row for Multi-Photo Sponsors */}
+          {gallery.length > 1 && (
+            <div className="pt-1 flex items-center gap-1.5 flex-wrap justify-center md:justify-start">
+              <span className="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider flex items-center gap-1 mr-1">
+                <ImageIcon className="w-3 h-3 text-amber-400" />
+                <span>{language === 'ta' ? 'படங்கள்:' : 'Photos:'}</span>
+              </span>
+              {gallery.map((gImg, gIdx) => (
+                <button
+                  key={gIdx}
+                  type="button"
+                  onClick={() => setActivePhotoIndex(gIdx)}
+                  className={`relative w-8 h-6 rounded-md overflow-hidden border transition cursor-pointer shrink-0 ${
+                    gIdx === activePhotoIndex % gallery.length
+                      ? 'border-amber-400 ring-2 ring-amber-400/70 scale-110 shadow-md'
+                      : 'border-white/20 opacity-60 hover:opacity-100 hover:scale-105'
+                  }`}
+                  title={`View Photo #${gIdx + 1}`}
+                >
+                  <img src={gImg} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Promo Code & Action Button Row */}
           <div className="pt-2 flex flex-col sm:flex-row items-center gap-2 sm:gap-3 justify-center md:justify-start flex-wrap">
@@ -311,8 +369,8 @@ export const DynamicAdBillboard: React.FC = () => {
           )}
         </div>
 
-        {/* Right Column: High-Res Image or Video Banner */}
-        {(mediaSource || imageSource) && (
+        {/* Right Column: High-Res Image, Multi-Photo Carousel, or Video Banner */}
+        {(mediaSource || imageSource || gallery.length > 0) && (
           <div className="w-full sm:w-56 lg:w-64 h-36 sm:h-40 rounded-2xl overflow-hidden border-2 border-amber-400/40 shadow-lg shrink-0 relative group bg-slate-950 flex items-center justify-center">
             {currentAd.mediaType === 'video' || mediaSource ? (
               <video
@@ -324,20 +382,186 @@ export const DynamicAdBillboard: React.FC = () => {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <img
-                src={imageSource || ''}
-                alt={currentAd.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-              />
+              <div
+                className="relative w-full h-full cursor-pointer overflow-hidden"
+                onClick={() => setLightboxPhoto(currentPhotoSrc)}
+                title="Click to enlarge photo"
+              >
+                <img
+                  src={currentPhotoSrc}
+                  alt={currentAd.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                />
+
+                {/* Multi-Photo Counter Overlay */}
+                {gallery.length > 1 && (
+                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/75 backdrop-blur-xs text-amber-300 text-[10px] font-black border border-amber-400/30 flex items-center gap-1 z-10 shadow">
+                    <ImageIcon className="w-3 h-3 text-amber-400" />
+                    <span>
+                      {(activePhotoIndex % gallery.length) + 1} / {gallery.length}
+                    </span>
+                  </div>
+                )}
+
+                {/* Next / Previous Arrow Controls */}
+                {gallery.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActivePhotoIndex(
+                          (prev) => (prev - 1 + gallery.length) % gallery.length
+                        );
+                      }}
+                      className="absolute left-1.5 top-1/2 -translate-y-1/2 p-1 rounded-full bg-black/70 hover:bg-black text-white opacity-0 group-hover:opacity-100 transition z-10 cursor-pointer shadow"
+                      title="Previous Photo"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActivePhotoIndex((prev) => (prev + 1) % gallery.length);
+                      }}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-full bg-black/70 hover:bg-black text-white opacity-0 group-hover:opacity-100 transition z-10 cursor-pointer shadow"
+                      title="Next Photo"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
+
+                {/* Pagination Dots at bottom */}
+                {gallery.length > 1 && (
+                  <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1 z-10 pointer-events-auto">
+                    {gallery.map((_, pIdx) => (
+                      <button
+                        key={pIdx}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActivePhotoIndex(pIdx);
+                        }}
+                        className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                          pIdx === activePhotoIndex % gallery.length
+                            ? 'w-4 bg-amber-400'
+                            : 'w-1.5 bg-white/50 hover:bg-white/80'
+                        }`}
+                        title={`Go to photo ${pIdx + 1}`}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Enlarge Hint Icon */}
+                <div className="absolute bottom-2 right-2 p-1 rounded-md bg-black/60 text-white opacity-0 group-hover:opacity-100 transition z-10">
+                  <Maximize2 className="w-3 h-3 text-amber-300" />
+                </div>
+              </div>
             )}
             {currentAd.discountPercentage && (
-              <div className="absolute top-2 right-2 bg-red-600 text-white font-black text-[10px] uppercase px-2 py-0.5 rounded-full shadow-md z-10">
+              <div className="absolute top-2 right-2 bg-red-600 text-white font-black text-[10px] uppercase px-2 py-0.5 rounded-full shadow-md z-10 pointer-events-none">
                 {currentAd.discountPercentage}% OFF
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* FULLSCREEN LIGHTBOX MODAL FOR MULTI-PHOTO ADS */}
+      {lightboxPhoto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center p-4"
+          onClick={() => setLightboxPhoto(null)}
+        >
+          <div
+            className="relative max-w-4xl w-full bg-slate-950 rounded-3xl border border-amber-500/40 p-4 space-y-3 overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-xs">
+                  {currentAd.brandName}
+                </span>
+                <span className="text-white font-bold text-sm truncate">{currentAd.title}</span>
+                {gallery.length > 1 && (
+                  <span className="text-amber-400 font-mono text-xs">
+                    ({(activePhotoIndex % gallery.length) + 1} / {gallery.length})
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setLightboxPhoto(null)}
+                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="relative h-72 sm:h-96 w-full rounded-2xl overflow-hidden bg-black flex items-center justify-center">
+              <img
+                src={lightboxPhoto}
+                alt="Enlarged Sponsor Photo"
+                className="w-full h-full object-contain"
+              />
+
+              {gallery.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextIdx = (activePhotoIndex - 1 + gallery.length) % gallery.length;
+                      setActivePhotoIndex(nextIdx);
+                      setLightboxPhoto(gallery[nextIdx]);
+                    }}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/70 hover:bg-black text-white cursor-pointer shadow-lg"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextIdx = (activePhotoIndex + 1) % gallery.length;
+                      setActivePhotoIndex(nextIdx);
+                      setLightboxPhoto(gallery[nextIdx]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/70 hover:bg-black text-white cursor-pointer shadow-lg"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Thumbnail selector */}
+            {gallery.length > 1 && (
+              <div className="flex items-center justify-center gap-2 overflow-x-auto pt-2">
+                {gallery.map((gImg, gIdx) => (
+                  <button
+                    key={gIdx}
+                    type="button"
+                    onClick={() => {
+                      setActivePhotoIndex(gIdx);
+                      setLightboxPhoto(gImg);
+                    }}
+                    className={`relative w-14 h-10 rounded-xl overflow-hidden border-2 transition cursor-pointer shrink-0 ${
+                      gImg === lightboxPhoto
+                        ? 'border-amber-400 ring-2 ring-amber-400/50 scale-105'
+                        : 'border-white/20 opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={gImg} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Slide Navigation Controls */}
       {displayAds.length > 1 && (

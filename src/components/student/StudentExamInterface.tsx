@@ -614,18 +614,28 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
               {/* Type 2: True / False */}
               {currentQuestion.type === 'true_false' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {['True', 'False'].map((choice) => {
-                    const isSelected = currentAnswer.toLowerCase() === choice.toLowerCase();
+                  {(currentQuestion.options && currentQuestion.options.length === 2
+                    ? currentQuestion.options
+                    : (language === 'ta' ? ['சரி (True)', 'தவறு (False)'] : ['True', 'False'])
+                  ).map((choice) => {
+                    const normAnswer = (currentAnswer || '').toLowerCase();
+                    const normChoice = choice.toLowerCase();
+                    const isSelected =
+                      normAnswer === normChoice ||
+                      (normChoice.includes('true') && (normAnswer === 'true' || normAnswer.includes('சரி') || normAnswer === 'a')) ||
+                      (normChoice.includes('false') && (normAnswer === 'false' || normAnswer.includes('தவறு') || normAnswer === 'b')) ||
+                      (normChoice.includes('சரி') && normAnswer.includes('true'));
+
                     return (
                       <button
                         key={choice}
-                        id={`tf-${currentQuestion.id}-${choice.toLowerCase()}`}
+                        id={`tf-${currentQuestion.id}-${choice.replace(/\s+/g, '-').toLowerCase()}`}
                         type="button"
                         onClick={() => handleSelectAnswer(currentQuestion.id, choice)}
                         disabled={isLocked}
                         className={`rounded-2xl border p-6 text-center flex flex-col items-center justify-center gap-2 transition duration-150 ${
                           isSelected
-                            ? choice === 'True'
+                            ? choice.toLowerCase().includes('true') || choice.includes('சரி')
                               ? 'border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-500/30 font-bold'
                               : 'border-rose-600 bg-rose-50 text-rose-950 ring-2 ring-rose-500/30 font-bold'
                             : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 text-slate-800'
@@ -633,7 +643,7 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
                       >
                         <span className="text-xl font-bold">{choice}</span>
                         <span className="text-xs text-slate-500">
-                          {isSelected ? '✓ Selected Answer' : 'Click to select'}
+                          {isSelected ? (language === 'ta' ? '✓ தேர்ந்தெடுக்கப்பட்ட விடை' : '✓ Selected Answer') : (language === 'ta' ? 'தேர்ந்தெடுக்க கிளிக் செய்க' : 'Click to select')}
                         </span>
                       </button>
                     );

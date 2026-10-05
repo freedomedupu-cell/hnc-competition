@@ -13,6 +13,7 @@ import {
   User,
   ShieldCheck,
   Eye,
+  EyeOff,
   Trash2,
   AlertTriangle,
   Coins,
@@ -23,10 +24,13 @@ import {
   Plus,
   Sparkles,
   ArrowUpDown,
+  Key,
+  Lock,
+  RotateCcw,
 } from 'lucide-react';
 
 export const StudentManagement: React.FC = () => {
-  const { students, competitions, results, deleteStudentAccount, adjustStudentPoints, language } = useApp();
+  const { students, competitions, results, deleteStudentAccount, updateStudentPassword, adjustStudentPoints, language } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'default' | 'points_desc' | 'referrals_desc' | 'awards_desc' | 'name'>('default');
@@ -35,11 +39,65 @@ export const StudentManagement: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
+  // Password visibility state in table
+  const [revealedStudentPasswords, setRevealedStudentPasswords] = useState<Record<string, boolean>>({});
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Password change state in modal
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [showModalPassword, setShowModalPassword] = useState(false);
+  const [passwordChangeToast, setPasswordChangeToast] = useState<string | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
   // Bonus points adjustment state
   const [customPointsInput, setCustomPointsInput] = useState('');
   const [pointsReason, setPointsReason] = useState('');
   const [pointAdjustToast, setPointAdjustToast] = useState<string | null>(null);
   const [isAdjustingPoints, setIsAdjustingPoints] = useState(false);
+
+  const handleCopyText = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const toggleStudentPasswordReveal = (studentId: string) => {
+    setRevealedStudentPasswords((prev) => ({
+      ...prev,
+      [studentId]: !prev[studentId],
+    }));
+  };
+
+  const handleUpdateStudentPassword = async () => {
+    if (!selectedStudent || !newPasswordInput.trim()) return;
+    if (newPasswordInput.trim().length < 4) {
+      setPasswordChangeToast(
+        language === 'ta' ? 'கடவுச்சொல் குறைந்தது 4 எழுத்துக்கள் இருக்க வேண்டும்.' : 'Password must be at least 4 characters.'
+      );
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await updateStudentPassword(selectedStudent.id, newPasswordInput.trim());
+      setSelectedStudent({
+        ...selectedStudent,
+        initialPassword: newPasswordInput.trim(),
+      });
+      setPasswordChangeToast(
+        language === 'ta'
+          ? 'கடவுச்சொல் வெற்றிகரமாக மாற்றப்பட்டது!'
+          : 'Password updated successfully!'
+      );
+      setNewPasswordInput('');
+      setTimeout(() => setPasswordChangeToast(null), 3500);
+    } catch (err: any) {
+      console.error('Password change error:', err);
+      setPasswordChangeToast(err.message || 'Failed to update password');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   const totalCirculatingPoints = students.reduce(
     (acc, s) => acc + (s.referralPoints !== undefined ? s.referralPoints : 25),
@@ -238,6 +296,7 @@ export const StudentManagement: React.FC = () => {
             <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               <tr>
                 <th className="px-5 py-3.5">Candidate & ID</th>
+                <th className="px-5 py-3.5">Password (கடவுச்சொல்)</th>
                 <th className="px-5 py-3.5">Educational Institution</th>
                 <th className="px-5 py-3.5">Grade Level</th>
                 <th className="px-5 py-3.5 text-center">
@@ -255,13 +314,16 @@ export const StudentManagement: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-8 text-center text-slate-400">
+                  <td colSpan={9} className="px-5 py-8 text-center text-slate-400">
                     No student records match your query.
                   </td>
                 </tr>
               ) : (
                 filteredStudents.map((std) => {
                   const points = std.referralPoints !== undefined ? std.referralPoints : 25;
+                  const isPassRevealed = Boolean(revealedStudentPasswords[std.id]);
+                  const displayPass = std.initialPassword || 'HNC@12345';
+
                   return (
                     <tr key={std.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="px-5 py-3.5">
@@ -271,8 +333,8 @@ export const StudentManagement: React.FC = () => {
                           </div>
                           <div>
                             <p className="font-bold text-slate-900">{std.name}</p>
-                            <p className="text-[11px] font-mono text-slate-400">
-                              {std.studentId}
+                            <p className="text-[11px] font-mono text-slate-500">
+                              {std.studentId} {std.username ? `(@${std.username})` : ''}
                             </p>
                             {std.referralCode && (
                               <span className="text-[10px] font-mono text-amber-700 bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-200/50 inline-block mt-0.5">
@@ -280,6 +342,39 @@ export const StudentManagement: React.FC = () => {
                               </span>
                             )}
                           </div>
+                        </div>
+                      </td>
+
+                      {/* Password Column with Reveal & Copy */}
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 w-fit">
+                          <span className="font-mono text-[11px] font-semibold text-slate-800">
+                            {isPassRevealed ? displayPass : '••••••••••••'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleStudentPasswordReveal(std.id)}
+                            title={isPassRevealed ? 'Hide Password' : 'Show Password (கடவுச்சொல்லைக் காட்டு)'}
+                            className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors"
+                          >
+                            {isPassRevealed ? (
+                              <EyeOff className="w-3.5 h-3.5 text-slate-600" />
+                            ) : (
+                              <Eye className="w-3.5 h-3.5 text-blue-600" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(displayPass, `pass-${std.id}`)}
+                            title="Copy Password"
+                            className="p-1 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                          >
+                            {copiedKey === `pass-${std.id}` ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
                         </div>
                       </td>
 
@@ -590,28 +685,112 @@ export const StudentManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-3 border border-slate-200 rounded-lg space-y-2 bg-white">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Participation Metrics
-                </span>
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Active Competitions:</span>
-                  <span className="font-bold text-slate-800">
-                    {selectedStudent.competitionsEnrolled}
+              <div className="p-3 border border-slate-200 rounded-lg space-y-2 bg-white flex flex-col justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                    Participation Metrics
+                  </span>
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-500">Active Competitions:</span>
+                    <span className="font-bold text-slate-800">
+                      {selectedStudent.competitionsEnrolled}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-500">Olympiad Awards:</span>
+                    <span className="font-bold text-amber-700">
+                      {selectedStudent.awardsCount} Honors
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-slate-500">Enrollment Date:</span>
+                    <span className="font-mono text-slate-700">
+                      {selectedStudent.createdAt}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SUPER ADMIN DIRECT PASSWORD MANAGEMENT & RESET BOX */}
+            <div className="p-4 bg-slate-900 border border-slate-800 text-white rounded-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Key className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-bold text-amber-300">
+                    {language === 'ta' ? 'கடவுச்சொல் முகாமைத்துவம் (Super Admin Password Reset)' : 'Student Password Management'}
                   </span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Olympiad Awards:</span>
-                  <span className="font-bold text-amber-700">
-                    {selectedStudent.awardsCount} Honors
+                {passwordChangeToast && (
+                  <span className="text-[11px] font-bold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/50">
+                    {passwordChangeToast}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between gap-2 bg-slate-800/80 p-2.5 rounded-xl border border-slate-700">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-semibold">
+                    {language === 'ta' ? 'தற்போதைய கடவுச்சொல் (Current Password):' : 'Current Password:'}
+                  </span>
+                  <span className="font-mono text-xs font-bold text-amber-300">
+                    {showModalPassword ? (selectedStudent.initialPassword || 'HNC@12345') : '••••••••••••'}
                   </span>
                 </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-slate-500">Enrollment Date:</span>
-                  <span className="font-mono text-slate-700">
-                    {selectedStudent.createdAt}
-                  </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowModalPassword(!showModalPassword)}
+                    className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors"
+                    title={showModalPassword ? 'Hide Password' : 'Show Password'}
+                  >
+                    {showModalPassword ? <EyeOff className="w-3.5 h-3.5 text-amber-400" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(selectedStudent.initialPassword || 'HNC@12345', 'modal-pass')}
+                    className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors"
+                    title="Copy Password"
+                  >
+                    {copiedKey === 'modal-pass' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
                 </div>
+              </div>
+
+              {/* Password Change Form */}
+              <div className="flex items-center gap-2 pt-1">
+                <div className="relative flex-1">
+                  <Lock className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder={language === 'ta' ? 'புதிய கடவுச்சொல் தட்டச்சு செய்க...' : 'Enter new password for student...'}
+                    value={newPasswordInput}
+                    onChange={(e) => setNewPasswordInput(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-800 border border-slate-700 text-white rounded-xl placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+                    let gen = 'HNC@';
+                    for (let i = 0; i < 5; i++) gen += chars.charAt(Math.floor(Math.random() * chars.length));
+                    setNewPasswordInput(gen);
+                  }}
+                  className="px-2.5 py-1.5 text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-colors flex items-center gap-1"
+                  title="Generate Random Password"
+                >
+                  <RotateCcw className="w-3 h-3 text-amber-400" />
+                  <span>Gen</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={isChangingPassword || !newPasswordInput.trim()}
+                  onClick={handleUpdateStudentPassword}
+                  className="px-3.5 py-1.5 text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 rounded-xl transition-all shadow-md disabled:opacity-50"
+                >
+                  {isChangingPassword ? 'Saving...' : (language === 'ta' ? 'மாற்று' : 'Save Password')}
+                </button>
               </div>
             </div>
 

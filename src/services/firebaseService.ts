@@ -2304,6 +2304,9 @@ export function subscribeToAdvertisements(
           badgeText: data.badgeText || 'SPONSORED',
           category: data.category || 'General',
           imageUrl: data.imageUrl || '',
+          galleryImages: Array.isArray(data.galleryImages)
+            ? data.galleryImages
+            : (data.imageUrl ? [data.imageUrl] : []),
           videoUrl: data.videoUrl || '',
           mediaType: data.mediaType || (data.videoUrl ? 'video' : 'image'),
           promoCode: data.promoCode || '',
@@ -2450,6 +2453,128 @@ export async function incrementAdClicksInFirestore(adId: string): Promise<void> 
   } catch (err) {
     console.warn('incrementAdClicks error:', err);
   }
+}
+
+/**
+ * Super Admin / Admin updates student password directly in Firestore
+ */
+export async function updateStudentPasswordInFirestore(
+  studentUid: string,
+  newPassword: string
+): Promise<void> {
+  const trimmedPass = newPassword.trim();
+  if (!trimmedPass || trimmedPass.length < 4) {
+    throw new Error('Password must be at least 4 characters long.');
+  }
+
+  const computedHash = await hashCredential(trimmedPass);
+  const updatedAt = new Date().toISOString();
+
+  // 1. Update in 'users' collection
+  try {
+    const userRef = doc(db, 'users', studentUid);
+    await setDoc(
+      userRef,
+      {
+        passwordHash: computedHash,
+        initialPassword: trimmedPass,
+        password: trimmedPass,
+        updatedAt,
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('Error updating password in users collection:', err);
+  }
+
+  // 2. Update in 'students' collection
+  try {
+    const studentRef = doc(db, 'students', studentUid);
+    await setDoc(
+      studentRef,
+      {
+        passwordHash: computedHash,
+        initialPassword: trimmedPass,
+        password: trimmedPass,
+        updatedAt,
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('Error updating password in students collection:', err);
+  }
+}
+
+/**
+ * Forgot Password Lookup & Recovery for Student / Staff
+ */
+export async function resetUserPasswordByLookup(
+  identifier: string,
+  newPassword?: string
+): Promise<{ uid: string; fullName: string; studentId?: string; username?: string; email: string; assignedPassword: string }> {
+  const raw = identifier.trim();
+  const normalized = raw.toLowerCase();
+  if (!raw) {
+    throw new Error('Please enter a Student ID, Username, or Email.');
+  }
+
+  // Find user by studentId, username, or email
+  let userSnap = await getDocs(query(collection(db, 'users'), where('studentId', '==', raw)));
+  if (userSnap.empty) {
+    userSnap = await getDocs(query(collection(db, 'users'), where('studentId', '==', raw.toUpperCase())));
+  }
+  if (userSnap.empty) {
+    userSnap = await getDocs(query(collection(db, 'users'), where('username', '==', normalized)));
+  }
+  if (userSnap.empty) {
+    userSnap = await getDocs(query(collection(db, 'users'), where('email', '==', normalized)));
+  }
+
+  if (userSnap.empty) {
+    // Fallback: search 'students' collection
+    userSnap = await getDocs(query(collection(db, 'students'), where('studentId', '==', raw)));
+    if (userSnap.empty) {
+      userSnap = await getDocs(query(collection(db, 'students'), where('studentId', '==', raw.toUpperCase())));
+    }
+    if (userSnap.empty) {
+      userSnap = await getDocs(query(collection(db, 'students'), where('username', '==', normalized)));
+    }
+    if (userSnap.empty) {
+      userSnap = await getDocs(query(collection(db, 'students'), where('email', '==', normalized)));
+    }
+  }
+
+  if (userSnap.empty) {
+    throw new Error('No account found matching this Student ID, Username, or Email.');
+  }
+
+  const userDoc = userSnap.docs[0];
+  const userData = userDoc.data();
+  const uid = userDoc.id || userData.uid;
+
+  // Generate or use new password
+  const assignedPassword =
+    newPassword && newPassword.trim().length >= 4
+      ? newPassword.trim()
+      : `HNC@${Math.floor(100000 + Math.random() * 900000)}`;
+
+  await updateStudentPasswordInFirestore(uid, assignedPassword);
+
+  // Attempt Firebase Auth reset email if email is present
+  if (userData.email && userData.email.includes('@')) {
+    try {
+      await sendPasswordResetEmail(auth, userData.email);
+    } catch {}
+  }
+
+  return {
+    uid,
+    fullName: userData.fullName || userData.name || 'Student Candidate',
+    studentId: userData.studentId,
+    username: userData.username,
+    email: userData.email || '',
+    assignedPassword,
+  };
 }
 
 

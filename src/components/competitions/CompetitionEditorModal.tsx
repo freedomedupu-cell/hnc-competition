@@ -271,28 +271,36 @@ const QuestionEditorCard = React.memo<QuestionEditorCardProps>(({
       {q.type === 'true_false' && (
         <div className="pt-1">
           <span className="text-[11px] font-semibold text-slate-600 block mb-1.5">
-            Correct Answer:
+            Correct Answer (சரியான விடை):
           </span>
           <div className="flex gap-4">
-            {['True', 'False'].map((tfVal) => (
-              <label
-                key={tfVal}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-xs cursor-pointer font-semibold transition-all ${
-                  q.correctAnswer === tfVal
-                    ? 'bg-emerald-50 border-emerald-500 text-emerald-950 ring-1 ring-emerald-500'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name={`tf-${q.id}`}
-                  checked={q.correctAnswer === tfVal}
-                  onChange={() => onUpdateQuestion(q.id, { correctAnswer: tfVal })}
-                  className="text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
-                />
-                <span>{tfVal}</span>
-              </label>
-            ))}
+            {['True', 'False'].map((tfVal) => {
+              const normAns = (q.correctAnswer || '').toLowerCase().trim();
+              const isSelected =
+                tfVal === 'True'
+                  ? normAns === 'true' || normAns.includes('true') || normAns.includes('சரி') || normAns === 'a' || normAns === '1'
+                  : normAns === 'false' || normAns.includes('false') || normAns.includes('தவறு') || normAns === 'b' || normAns === '2';
+
+              return (
+                <label
+                  key={tfVal}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-xs cursor-pointer font-semibold transition-all ${
+                    isSelected
+                      ? 'bg-emerald-50 border-emerald-500 text-emerald-950 ring-1 ring-emerald-500'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={`tf-${q.id}`}
+                    checked={isSelected}
+                    onChange={() => onUpdateQuestion(q.id, { correctAnswer: tfVal, options: ['True', 'False'] })}
+                    className="text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                  />
+                  <span>{tfVal === 'True' ? 'True (சரி)' : 'False (தவறு)'}</span>
+                </label>
+              );
+            })}
           </div>
         </div>
       )}
@@ -1315,6 +1323,11 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-semibold text-slate-900"
                   />
                   <datalist id="grade-presets-list">
+                    <option value="Grade 1" />
+                    <option value="Grade 2" />
+                    <option value="Grade 3" />
+                    <option value="Grade 4" />
+                    <option value="Grade 5 (Scholarship / புலமைப்பரிசில்)" />
                     <option value="Grade 6" />
                     <option value="Grade 7" />
                     <option value="Grade 8" />
@@ -1323,7 +1336,13 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                     <option value="Grade 11 (O/L)" />
                     <option value="Grade 12 (A/L)" />
                     <option value="Grade 13 (A/L)" />
-                    <option value="Open (All Grades)" />
+                    <option value="After School - Teaching Exam (ஆசிரியர் பரீட்சை)" />
+                    <option value="After School - GS (Gramasewaka / கிராம உத்தியோகத்தர்)" />
+                    <option value="After School - MA (Management Assistant / மேலாண்மை உதவியாளர்)" />
+                    <option value="After School - SLEAS (SL Education Admin Service)" />
+                    <option value="After School - SLAS (SL Administrative Service)" />
+                    <option value="After School - General Competitive Exam (பொது போட்டிப் பரீட்சை)" />
+                    <option value="Open (All Grades / அனைத்து பிரிவுகளும்)" />
                   </datalist>
                   <p className="text-[10px] text-slate-500 mt-1">
                     குறிப்பிட்ட வகுப்புக்கு மட்டும் தெரிய வேண்டுமெனில் (எ.கா: Grade 11 (O/L)) தெரிவு செய்யவும். அனைத்து மாணவர்களுக்கும் தெரிய வேண்டுமெனில் <strong>Open (All Grades)</strong> என வைக்கவும்.
@@ -2242,7 +2261,7 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                         onChange={(e) => setGrade(e.target.value)}
                         className="mt-0.5 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800"
                       >
-                        {['Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11 (O/L)', 'A/L', 'Open'].map((g) => (
+                        {['Grade 1-5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11 (O/L)', 'Grade 12 (A/L)', 'Grade 13 (A/L)', 'Teaching Exam', 'GS Exam', 'MA Exam', 'SLEAS Exam', 'SLAS Exam', 'General Competitive', 'Open'].map((g) => (
                           <option key={g} value={g}>{g}</option>
                         ))}
                       </select>
@@ -2523,6 +2542,7 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
           existingCount={questions.length}
           currentLanguage={language === 'Tamil' ? 'ta' : language === 'Sinhala' ? 'si' : 'en'}
           defaultMarks={5}
+          competitionType={competitionType}
         />
       )}
     </>

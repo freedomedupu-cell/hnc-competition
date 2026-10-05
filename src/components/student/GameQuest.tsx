@@ -9,6 +9,7 @@ import {
   getGamingMethodById,
   getLocalizedDistrict,
 } from '../../data/sriLankaDistricts';
+import { DistrictLeaderboardModal } from '../common/DistrictLeaderboardModal';
 import {
   Trophy,
   Zap,
@@ -77,6 +78,7 @@ interface DistrictLevel {
   provinceEn: string;
   provinceSi?: string;
   name: string;
+  gradeCategory?: 'primary' | 'junior' | 'senior' | 'advanced' | 'after_school';
   gradeSubject: string;
   gradeSubjectEn?: string;
   gradeSubjectSi?: string;
@@ -112,35 +114,66 @@ const defaultGradients = [
   'from-lime-600 to-emerald-700',
 ];
 
+const getGradeCategoryByLevel = (levelNum: number): 'primary' | 'junior' | 'senior' | 'advanced' | 'after_school' => {
+  if (levelNum <= 5) return 'primary';
+  if (levelNum <= 10) return 'junior';
+  if (levelNum <= 16) return 'senior';
+  if (levelNum <= 21) return 'advanced';
+  return 'after_school';
+};
+
+const getDifficultyTierByLevel = (levelNum: number): 'easy' | 'medium' | 'hard' | 'master' => {
+  if (levelNum <= 5) return 'easy';
+  if (levelNum <= 12) return 'medium';
+  if (levelNum <= 19) return 'hard';
+  return 'master';
+};
+
 // Generate initial 25 levels
 const buildInitial25Levels = (): DistrictLevel[] => {
   const modes: StudyGamingMode[] = ['kahoot', 'quizizz', 'trivia_crack', 'brain_out'];
-  return SRI_LANKA_25_DISTRICTS.map((d, index) => ({
-    id: d.levelNumber,
-    districtKey: d.id,
-    district: d.nameTa,
-    districtEn: d.nameEn,
-    districtSi: d.nameSi,
-    province: d.provinceTa,
-    provinceEn: d.provinceEn,
-    provinceSi: d.provinceSi || d.provinceEn,
-    name: `${d.nameTa} (${d.gradeSubject})`,
-    gradeSubject: d.gradeSubject,
-    gradeSubjectEn: d.gradeSubjectEn,
-    gradeSubjectSi: d.gradeSubjectSi || d.gradeSubjectEn,
-    locked: d.levelNumber > 1,
-    isPublished: true,
-    status: d.levelNumber === 1 ? 'In Progress' : 'Locked',
-    points: d.defaultPoints,
-    iconName: d.icon,
-    bgGradient: defaultGradients[index % defaultGradients.length],
-    accentColor: 'blue',
-    description: d.descriptionTa,
-    descriptionEn: d.descriptionEn,
-    descriptionSi: d.descriptionSi || d.descriptionEn,
-    gamingMode: d.defaultGamingMode || modes[index % modes.length],
-    questions: d.initialQuestions,
-  }));
+  return SRI_LANKA_25_DISTRICTS.map((d, index) => {
+    const lvlNum = d.levelNumber;
+    const gCat = getGradeCategoryByLevel(lvlNum);
+    const dTier = getDifficultyTierByLevel(lvlNum);
+
+    const timerSecs = dTier === 'easy' ? 30 : dTier === 'medium' ? 20 : dTier === 'hard' ? 15 : 10;
+    const lives = dTier === 'easy' ? 5 : dTier === 'medium' ? 4 : dTier === 'hard' ? 3 : 2;
+    const passAcc = dTier === 'easy' ? 50 : dTier === 'medium' ? 60 : dTier === 'hard' ? 70 : 80;
+
+    return {
+      id: lvlNum,
+      districtKey: d.id,
+      district: d.nameTa,
+      districtEn: d.nameEn,
+      districtSi: d.nameSi,
+      province: d.provinceTa,
+      provinceEn: d.provinceEn,
+      provinceSi: d.provinceSi || d.provinceEn,
+      name: `${d.nameTa} (${d.gradeSubject})`,
+      gradeCategory: gCat,
+      gradeSubject: d.gradeSubject,
+      gradeSubjectEn: d.gradeSubjectEn,
+      gradeSubjectSi: d.gradeSubjectSi || d.gradeSubjectEn,
+      locked: lvlNum > 1,
+      isPublished: true,
+      status: lvlNum === 1 ? 'In Progress' : 'Locked',
+      points: d.defaultPoints,
+      iconName: d.icon,
+      bgGradient: defaultGradients[index % defaultGradients.length],
+      accentColor: 'blue',
+      description: d.descriptionTa,
+      descriptionEn: d.descriptionEn,
+      descriptionSi: d.descriptionSi || d.descriptionEn,
+      gamingMode: d.defaultGamingMode || modes[index % modes.length],
+      questionTimerSeconds: timerSecs,
+      maxLivesCount: lives,
+      passingAccuracyPercent: passAcc,
+      difficultyTier: dTier,
+      enablePowerUps: true,
+      questions: d.initialQuestions,
+    };
+  });
 };
 
 // Web Audio API sound synthesizer
@@ -298,6 +331,10 @@ export const GameQuest: React.FC = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedProvinceTab, setSelectedProvinceTab] = useState<string>('all');
   const [selectedGamingModeFilter, setSelectedGamingModeFilter] = useState<string>('all');
+  const [selectedGradeFilter, setSelectedGradeFilter] = useState<
+    'all' | 'primary' | 'junior' | 'senior' | 'advanced' | 'after_school'
+  >('all');
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
 
   // Active game play session state
   const [selectedLevel, setSelectedLevel] = useState<DistrictLevel | null>(null);
@@ -321,7 +358,8 @@ export const GameQuest: React.FC = () => {
   const [brainIQRating, setBrainIQRating] = useState<number>(100);
   const [clueRevealed, setClueRevealed] = useState<boolean>(false);
 
-  // Answer feedback
+  // Answer feedback & 100% Score tracking
+  const [correctAnswersCount, setCorrectAnswersCount] = useState<number>(0);
   const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
   const [streakCount, setStreakCount] = useState(0);
@@ -335,6 +373,9 @@ export const GameQuest: React.FC = () => {
     level: DistrictLevel;
     earnedXp: number;
     accuracy: number;
+    correctCount: number;
+    totalQuestions: number;
+    isPerfect100: boolean;
     unlockedNext: boolean;
   } | null>(null);
 
@@ -377,6 +418,7 @@ export const GameQuest: React.FC = () => {
     setIsAnswerRevealed(false);
     setStreakCount(0);
     setSessionScore(0);
+    setCorrectAnswersCount(0);
     setLastEarnedPoints(0);
     setIsLevelMultiplierActive(false);
     setShowLevelSummary(false);
@@ -486,6 +528,7 @@ export const GameQuest: React.FC = () => {
 
     if (isCorrect) {
       triggerSound('correct');
+      setCorrectAnswersCount((prev) => prev + 1);
       // Kahoot / HNC Speed Rush speed multiplier bonus
       const speedMultiplier = selectedLevel.gamingMode === 'kahoot' ? (timeLeft > 12 ? 2.5 : timeLeft > 6 ? 1.8 : 1.2) : 1;
       const basePoints = 50;
@@ -546,43 +589,51 @@ export const GameQuest: React.FC = () => {
     }
   };
 
-  // Finish Level & Unlock next
+  // Finish Level & Unlock next ONLY if 100% perfect score achieved
   const handleFinishLevel = () => {
     if (!selectedLevel) return;
-    triggerSound('victory');
 
-    const totalQuestions = selectedLevel.questions.length;
-    const earnedXp = sessionScore + 100;
-    const accuracy = Math.round((sessionScore / (totalQuestions * 90)) * 100);
+    const totalQuestions = Math.max(1, selectedLevel.questions.length);
+    const isPerfect100 = correctAnswersCount >= totalQuestions;
+    const accuracy = Math.round((correctAnswersCount / totalQuestions) * 100);
+    const earnedXp = sessionScore + (isPerfect100 ? 150 : 30);
 
     const currentId = selectedLevel.id;
     let unlockedNext = false;
 
-    setLevels((prev) => {
-      return prev.map((lvl) => {
-        if (lvl.id === currentId) {
-          return {
-            ...lvl,
-            status: 'Completed',
-            points: Math.max(lvl.points, earnedXp),
-          };
-        }
-        if (lvl.id === currentId + 1 && lvl.locked) {
-          unlockedNext = true;
-          return {
-            ...lvl,
-            locked: false,
-            status: 'In Progress',
-          };
-        }
-        return lvl;
+    if (isPerfect100) {
+      triggerSound('victory');
+      setLevels((prev) => {
+        return prev.map((lvl) => {
+          if (lvl.id === currentId) {
+            return {
+              ...lvl,
+              status: 'Completed',
+              points: Math.max(lvl.points, earnedXp),
+            };
+          }
+          if (lvl.id === currentId + 1 && lvl.locked) {
+            unlockedNext = true;
+            return {
+              ...lvl,
+              locked: false,
+              status: 'In Progress',
+            };
+          }
+          return lvl;
+        });
       });
-    });
+    } else {
+      triggerSound('wrong');
+    }
 
     setCompletedLevelData({
       level: selectedLevel,
       earnedXp,
-      accuracy: Math.min(100, Math.max(35, accuracy)),
+      accuracy,
+      correctCount: correctAnswersCount,
+      totalQuestions,
+      isPerfect100,
       unlockedNext,
     });
     setShowLevelSummary(true);
@@ -637,7 +688,7 @@ export const GameQuest: React.FC = () => {
     return q.explanation;
   };
 
-  // Filtered by province and gaming mode
+  // Filtered by province, gaming mode, and grade category
   const displayedLevels = levels.filter((l) => {
     const matchesProvince =
       selectedProvinceTab === 'all'
@@ -647,7 +698,10 @@ export const GameQuest: React.FC = () => {
     const matchesMode =
       selectedGamingModeFilter === 'all' ? true : l.gamingMode === selectedGamingModeFilter;
 
-    return matchesProvince && matchesMode;
+    const matchesGrade =
+      selectedGradeFilter === 'all' ? true : l.gradeCategory === selectedGradeFilter;
+
+    return matchesProvince && matchesMode && matchesGrade;
   });
 
   return (
@@ -737,6 +791,22 @@ export const GameQuest: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              {/* Leaderboard Button */}
+              <button
+                type="button"
+                onClick={() => setIsLeaderboardOpen(true)}
+                className="bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-950 font-extrabold text-xs px-3.5 py-2 rounded-2xl shadow-md hover:shadow-lg transition flex items-center gap-1.5 cursor-pointer border border-amber-300 active:scale-95"
+              >
+                <Trophy className="w-4 h-4 fill-amber-950 text-slate-950" />
+                <span>
+                  {questLang === 'ta'
+                    ? '🏆 25 மாவட்ட தரவரிசை'
+                    : questLang === 'si'
+                    ? '🏆 දිස්ත්‍රික් 25 ශ්‍රේණිගත කිරීම්'
+                    : '🏆 25 Districts Leaderboard'}
+                </span>
+              </button>
+
               <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 px-4 border border-white/15 text-center min-w-[100px]">
                 <div className="flex items-center justify-center gap-1.5 text-amber-400 mb-0.5">
                   <Trophy className="w-3.5 h-3.5" />
@@ -792,6 +862,93 @@ export const GameQuest: React.FC = () => {
               style={{ width: `${(completedCount / levels.length) * 100}%` }}
             />
           </div>
+        </div>
+      </div>
+
+      {/* Grade Level Category Filter Bar */}
+      <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2 text-xs">
+        <div className="flex items-center justify-between">
+          <span className="font-extrabold text-slate-800 flex items-center gap-1.5">
+            <Award className="w-4 h-4 text-indigo-600" />
+            <span>{questLang === 'ta' ? 'வகுப்பு நிலை வடிகட்டி (Grade Wise Levels):' : 'Grade Level Categories:'}</span>
+          </span>
+          <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+            {questLang === 'ta' ? 'தகுந்த வகுப்பு மட்டத்தைத் தேர்வு செய்க' : 'Select Academic Grade'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <button
+            type="button"
+            onClick={() => setSelectedGradeFilter('all')}
+            className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap cursor-pointer ${
+              selectedGradeFilter === 'all'
+                ? 'bg-indigo-900 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            {questLang === 'ta' ? 'அனைத்து வகுப்புகளும் (All Grades)' : 'All Grade Levels'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedGradeFilter('primary')}
+            className={`px-3.5 py-1.5 rounded-xl font-bold transition whitespace-nowrap border cursor-pointer ${
+              selectedGradeFilter === 'primary'
+                ? 'bg-amber-600 text-white border-amber-600 shadow-xs font-black'
+                : 'bg-amber-50/70 text-amber-950 border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            {questLang === 'ta' ? '🌱 ஆரம்பப் பிரிவு (Grades 1-5)' : '🌱 Primary (Grades 1-5)'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedGradeFilter('junior')}
+            className={`px-3.5 py-1.5 rounded-xl font-bold transition whitespace-nowrap border cursor-pointer ${
+              selectedGradeFilter === 'junior'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs font-black'
+                : 'bg-blue-50/70 text-blue-950 border-blue-200 hover:bg-blue-100'
+            }`}
+          >
+            {questLang === 'ta' ? '📘 இடைநிலைப் பிரிவு (Grades 6-9)' : '📘 Junior (Grades 6-9)'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedGradeFilter('senior')}
+            className={`px-3.5 py-1.5 rounded-xl font-bold transition whitespace-nowrap border cursor-pointer ${
+              selectedGradeFilter === 'senior'
+                ? 'bg-purple-600 text-white border-purple-600 shadow-xs font-black'
+                : 'bg-purple-50/70 text-purple-950 border-purple-200 hover:bg-purple-100'
+            }`}
+          >
+            {questLang === 'ta' ? '🎓 சாதாரண தரம் O/L (Grades 10-11)' : '🎓 Senior O/L (Grades 10-11)'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedGradeFilter('advanced')}
+            className={`px-3.5 py-1.5 rounded-xl font-bold transition whitespace-nowrap border cursor-pointer ${
+              selectedGradeFilter === 'advanced'
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs font-black'
+                : 'bg-emerald-50/70 text-emerald-950 border-emerald-200 hover:bg-emerald-100'
+            }`}
+          >
+            {questLang === 'ta' ? '🔥 உயர்தரம் A/L (Grades 12-13)' : '🔥 Advanced A/L (Grades 12-13)'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedGradeFilter('after_school')}
+            className={`px-3.5 py-1.5 rounded-xl font-bold transition whitespace-nowrap border cursor-pointer ${
+              selectedGradeFilter === 'after_school'
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs font-black'
+                : 'bg-indigo-50/70 text-indigo-950 border-indigo-200 hover:bg-indigo-100'
+            }`}
+          >
+            {questLang === 'ta' ? '👔 பாடசாலைக்குப் பிந்திய போட்டிப் பரீட்சைகள் (Teaching, GS, MA, SLEAS, SLAS)' : '👔 After School Competitions (Teaching, GS, MA, SLEAS, SLAS)'}
+          </button>
         </div>
       </div>
 
@@ -966,18 +1123,38 @@ export const GameQuest: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Gaming Mode Pill & Level Multiplier Badge */}
+                  {/* Gaming Mode Pill, Grade Level & Difficulty Tier Badges */}
                   <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-indigo-50 border border-indigo-200/60 text-[11px] font-bold text-indigo-900">
                       <span>{modeMeta.icon}</span>
                       <span>{questLang === 'ta' ? modeMeta.nameTa : questLang === 'si' ? modeMeta.nameSi : modeMeta.nameEn}</span>
                     </div>
-                    {level.isPublished && !level.locked && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 text-[10px] font-black border border-amber-200/80">
-                        <Sparkles className="w-2.5 h-2.5 text-amber-500" />
-                        1.5x Streak Multiplier
-                      </span>
-                    )}
+
+                    {/* Grade Level Category Badge */}
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-900 text-[10px] font-bold border border-purple-200">
+                      {level.gradeCategory === 'primary' && '🌱 Gr 1-5'}
+                      {level.gradeCategory === 'junior' && '📘 Gr 6-9'}
+                      {level.gradeCategory === 'senior' && '🎓 Gr 10-11 O/L'}
+                      {level.gradeCategory === 'advanced' && '🔥 Gr 12-13 A/L'}
+                    </span>
+
+                    {/* Difficulty Tier Badge */}
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                        level.difficultyTier === 'master'
+                          ? 'bg-rose-100 text-rose-950 border-rose-300 animate-pulse'
+                          : level.difficultyTier === 'hard'
+                          ? 'bg-amber-100 text-amber-950 border-amber-300'
+                          : level.difficultyTier === 'medium'
+                          ? 'bg-blue-100 text-blue-950 border-blue-200'
+                          : 'bg-emerald-100 text-emerald-950 border-emerald-200'
+                      }`}
+                    >
+                      {level.difficultyTier === 'master' && '🔴 Boss Master (10s)'}
+                      {level.difficultyTier === 'hard' && '🟠 Tough (15s)'}
+                      {level.difficultyTier === 'medium' && '🟡 Medium (20s)'}
+                      {level.difficultyTier === 'easy' && '🟢 Easy (30s)'}
+                    </span>
                   </div>
 
                   <p className="text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">
@@ -1361,52 +1538,111 @@ export const GameQuest: React.FC = () => {
         </div>
       )}
 
-      {/* LEVEL SUMMARY / VICTORY MODAL */}
+      {/* LEVEL SUMMARY / VICTORY & RETRY MODAL */}
       {showLevelSummary && completedLevelData && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in zoom-in-95 duration-200">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 text-center relative shadow-2xl border border-slate-100">
-            <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-amber-400 to-amber-600 text-white flex items-center justify-center text-4xl shadow-xl shadow-amber-500/20 mb-4 animate-bounce">
-              🏆
-            </div>
+            {completedLevelData.isPerfect100 ? (
+              <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-amber-400 to-amber-600 text-white flex items-center justify-center text-4xl shadow-xl shadow-amber-500/20 mb-4 animate-bounce">
+                🏆
+              </div>
+            ) : (
+              <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-rose-500 to-amber-600 text-white flex items-center justify-center text-4xl shadow-xl shadow-rose-500/20 mb-4">
+                🎯
+              </div>
+            )}
 
-            <span className="text-xs uppercase font-extrabold tracking-wider text-amber-600 block mb-1">
-              Arena Victory!
+            <span className={`text-xs uppercase font-extrabold tracking-wider block mb-1 ${completedLevelData.isPerfect100 ? 'text-amber-600' : 'text-rose-600'}`}>
+              {completedLevelData.isPerfect100 ? '🎉 100% Perfect Mastered Score!' : '🎯 100% Accuracy Required!'}
             </span>
+
             <h2 className="text-2xl font-black text-slate-900 mb-1">
-              {completedLevelData.level.district} வெற்றி பெறப்பட்டது!
+              {completedLevelData.isPerfect100
+                ? `${completedLevelData.level.district} வெற்றி பெறப்பட்டது!`
+                : `${completedLevelData.level.district} - மீண்டும் முயற்சிக்கவும்`}
             </h2>
-            <p className="text-xs text-slate-500 mb-6">
-              இலங்கையின் 25 மாவட்டப் போர்க்களத்தில் ஒரு முக்கிய சிகரத்தை எட்டிவிட்டீர்கள்!
+
+            <p className="text-xs text-slate-500 mb-5 leading-relaxed">
+              {completedLevelData.isPerfect100
+                ? 'அனைத்து வினாக்களுக்கும் 100% சரியாக விடையளித்து அடுத்த மாவட்டப் போர்க்களத்தைத் திறந்துவிட்டீர்கள்!'
+                : `நீங்கள் ${completedLevelData.correctCount} / ${completedLevelData.totalQuestions} வினாக்களுக்கு மட்டுமே சரியாக விடையளித்துள்ளீர்கள்.`}
             </p>
 
             {/* Stats Breakdown */}
-            <div className="grid grid-cols-2 gap-3 mb-6 text-left">
+            <div className="grid grid-cols-2 gap-3 mb-5 text-left">
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
                 <span className="text-[11px] text-slate-400 font-semibold block mb-0.5">ஈட்டிய XP</span>
                 <span className="text-xl font-black text-amber-600">+{completedLevelData.earnedXp} XP</span>
               </div>
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
                 <span className="text-[11px] text-slate-400 font-semibold block mb-0.5">துல்லியம் (Accuracy)</span>
-                <span className="text-xl font-black text-emerald-600">{completedLevelData.accuracy}%</span>
+                <span className={`text-xl font-black ${completedLevelData.isPerfect100 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {completedLevelData.accuracy}%
+                </span>
               </div>
             </div>
 
-            {completedLevelData.unlockedNext && (
-              <div className="p-3.5 mb-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-bold flex items-center justify-center gap-2">
+            {completedLevelData.isPerfect100 && completedLevelData.unlockedNext ? (
+              <div className="p-3.5 mb-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-bold flex items-center justify-center gap-2">
                 <Unlock className="w-4 h-4 text-emerald-600" />
                 <span>அடுத்த மாவட்ட நிலை திறக்கப்பட்டது! (Next District Unlocked)</span>
               </div>
-            )}
+            ) : !completedLevelData.isPerfect100 ? (
+              <div className="p-3.5 mb-5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-900 font-bold flex items-center justify-center gap-2 text-left">
+                <Lock className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>அடுத்த நிலையைத் திறக்க 100% மதிப்பெண் தேவை! மீண்டும் விளையாடி வெற்றி பெறுங்கள்.</span>
+              </div>
+            ) : null}
 
-            <button
-              type="button"
-              onClick={() => setShowLevelSummary(false)}
-              className="w-full py-3 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-sm shadow-lg shadow-blue-500/20 transition cursor-pointer"
-            >
-              தொடர்க (Continue Edu-Arena)
-            </button>
+            <div className="flex flex-col gap-2.5">
+              {!completedLevelData.isPerfect100 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLevelSummary(false);
+                    handleStartLevel(completedLevelData.level);
+                  }}
+                  className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/20 transition cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+                >
+                  <RotateCcw className="w-4 h-4 text-slate-950" />
+                  <span>🔄 மீண்டும் விளையாடி 100% பெறுக (Retry District)</span>
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLevelSummary(false);
+                  setIsLeaderboardOpen(true);
+                }}
+                className="w-full py-3 px-6 rounded-2xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-extrabold text-xs transition cursor-pointer flex items-center justify-center gap-2 border border-amber-300"
+              >
+                <Trophy className="w-4 h-4 text-amber-800" />
+                <span>{questLang === 'ta' ? '25 மாவட்டங்களின் தரவரிசையைப் பார்க்க' : 'View District Leaderboard & Rankings'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowLevelSummary(false)}
+                className="w-full py-2.5 px-6 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs transition cursor-pointer"
+              >
+                {questLang === 'ta' ? 'நிலைகள் வரைபடத்திற்குத் திரும்புக' : 'Back to District Map'}
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* 25 Districts Leaderboard Modal */}
+      {isLeaderboardOpen && (
+        <DistrictLeaderboardModal
+          isOpen={isLeaderboardOpen}
+          onClose={() => setIsLeaderboardOpen(false)}
+          currentUserXp={totalXp}
+          currentUserCompletedCount={completedCount}
+          currentUserDistrictKey={currentStudent?.district || currentAuthUser?.district}
+          currentLanguage={questLang}
+        />
       )}
     </div>
   );

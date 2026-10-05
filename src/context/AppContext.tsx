@@ -70,6 +70,7 @@ import {
   purgeLegacyDemoFirestoreData,
   purgeAllDemoCompetitions,
   deleteStudentAccountFromFirestore,
+  updateStudentPasswordInFirestore,
   deleteResultFromFirestore,
   getSavedActiveUser,
   saveActiveUser,
@@ -206,6 +207,7 @@ interface AppContextType {
   updateSettings: (newSettings: Partial<PlatformSettings>) => void;
   updateStudentProfile: (profile: Partial<StudentUser>) => void;
   deleteStudentAccount: (studentUid: string) => Promise<void>;
+  updateStudentPassword: (studentUid: string, newPassword: string) => Promise<void>;
   updateAdminProfile: (profile: Partial<AdminUser>) => void;
 
   // Phase 07: Monthly Membership & Payment System
@@ -1551,6 +1553,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateStudentPassword = async (studentUid: string, newPassword: string) => {
+    try {
+      await updateStudentPasswordInFirestore(studentUid, newPassword);
+      setStudents((prev) =>
+        prev.map((s) => (s.id === studentUid ? { ...s, initialPassword: newPassword } : s))
+      );
+    } catch (err) {
+      console.error('Failed to update student password:', err);
+      throw err;
+    }
+  };
+
   // -------------------------------------------------------------
   // Phase 4: Student Exam & Competition Attempt Handlers
   // -------------------------------------------------------------
@@ -2418,6 +2432,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateSettings,
         updateStudentProfile,
         deleteStudentAccount,
+        updateStudentPassword,
         updateAdminProfile,
         memberships,
         currentMembership,

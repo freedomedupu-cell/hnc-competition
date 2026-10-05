@@ -14,6 +14,14 @@ import {
   Image as ImageIcon,
   Play,
   Film,
+  ChevronLeft,
+  ChevronRight,
+  ArrowLeft,
+  ArrowRight,
+  Copy,
+  Layers,
+  Check,
+  Eye,
 } from 'lucide-react';
 import { DbAdvertisement } from '../../types';
 import { useApp } from '../../context/AppContext';
@@ -47,7 +55,20 @@ export const AdvertisementManagementModal: React.FC<AdvertisementManagementModal
     adToEdit?.mediaType || (adToEdit?.videoUrl ? 'video' : 'image')
   );
   const [imageUrl, setImageUrl] = useState(adToEdit?.imageUrl || '');
+  const [galleryImages, setGalleryImages] = useState<string[]>(() => {
+    if (adToEdit?.galleryImages && adToEdit.galleryImages.length > 0) {
+      return adToEdit.galleryImages;
+    }
+    return adToEdit?.imageUrl ? [adToEdit.imageUrl] : [];
+  });
+  const [newPhotoUrlInput, setNewPhotoUrlInput] = useState('');
   const [videoUrl, setVideoUrl] = useState(adToEdit?.videoUrl || '');
+
+  // Multi-Photo Add Options (Supports >2 photos via file upload, individual slots, bulk URLs, and presets)
+  const [photoAddMethod, setPhotoAddMethod] = useState<'upload' | 'slots' | 'bulk'>('upload');
+  const [bulkUrlsInput, setBulkUrlsInput] = useState('');
+  const [previewSlideIdx, setPreviewSlideIdx] = useState(0);
+  const [customPhotoSlots, setCustomPhotoSlots] = useState<string[]>(['', '', '']);
 
   const [promoCode, setPromoCode] = useState(adToEdit?.promoCode || '');
   const [discountPercentage, setDiscountPercentage] = useState<number>(adToEdit?.discountPercentage || 0);
@@ -71,6 +92,18 @@ export const AdvertisementManagementModal: React.FC<AdvertisementManagementModal
       setCategory(adToEdit?.category || 'Education & Sponsor');
       setMediaType(adToEdit?.mediaType || (adToEdit?.videoUrl ? 'video' : 'image'));
       setImageUrl(adToEdit?.imageUrl || '');
+      const initialGallery = adToEdit?.galleryImages && adToEdit.galleryImages.length > 0
+        ? adToEdit.galleryImages
+        : (adToEdit?.imageUrl ? [adToEdit.imageUrl] : []);
+      setGalleryImages(initialGallery);
+      setNewPhotoUrlInput('');
+      setBulkUrlsInput('');
+      setPreviewSlideIdx(0);
+      setCustomPhotoSlots(
+        initialGallery.length > 0
+          ? [...initialGallery, ...Array(Math.max(0, 3 - initialGallery.length)).fill('')]
+          : ['', '', '']
+      );
       setVideoUrl(adToEdit?.videoUrl || '');
       setPromoCode(adToEdit?.promoCode || '');
       setDiscountPercentage(adToEdit?.discountPercentage || 0);
@@ -82,37 +115,168 @@ export const AdvertisementManagementModal: React.FC<AdvertisementManagementModal
     }
   }, [adToEdit, isOpen]);
 
+  // Live Auto-Slide for In-Modal Multi-Photo Preview when 2+ photos exist
+  useEffect(() => {
+    if (galleryImages.length <= 1) return;
+    const timer = setInterval(() => {
+      setPreviewSlideIdx((prev) => (prev + 1) % galleryImages.length);
+    }, 3200);
+    return () => clearInterval(timer);
+  }, [galleryImages.length]);
+
   if (!isOpen) return null;
 
-  // Handle Photo File Upload with client-side downscaling and compression
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      setErrorMsg('Please select a valid image file (JPG, PNG, WebP).');
-      return;
-    }
+  // Handle Multiple or Single Photo Files Upload (Supports 2+ photos)
+  const handlePhotosUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setUploadLoading(true);
     setErrorMsg(null);
 
-    try {
-      // Downscale and compress image to stay safely under 100KB
-      const compressedDataUrl = await compressImageFile(file, 1200, 700, 0.75);
-      setImageUrl(compressedDataUrl);
-      setMediaType('image');
-    } catch (err) {
-      console.warn('Image compression fallback:', err);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setImageUrl(event.target?.result as string);
-        setMediaType('image');
-      };
-      reader.readAsDataURL(file);
-    } finally {
-      setUploadLoading(false);
+    const uploadedList: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!file.type.startsWith('image/')) continue;
+
+      try {
+        const compressedDataUrl = await compressImageFile(file, 1200, 700, 0.75);
+        uploadedList.push(compressedDataUrl);
+      } catch (err) {
+        console.warn('Fallback reader for:', file.name, err);
+        const dataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (event) => resolve(event.target?.result as string);
+          reader.readAsDataURL(file);
+        });
+        if (dataUrl) uploadedList.push(dataUrl);
+      }
     }
+
+    if (uploadedList.length > 0) {
+      setGalleryImages((prev) => {
+        const combined = [...prev, ...uploadedList];
+        if (!imageUrl || prev.length === 0) {
+          setImageUrl(combined[0]);
+        }
+        return combined;
+      });
+      setMediaType('image');
+    }
+
+    setUploadLoading(false);
+    e.target.value = '';
+  };
+
+  const handleAddPhotoByUrl = () => {
+    if (!newPhotoUrlInput.trim()) return;
+    const url = newPhotoUrlInput.trim();
+    setGalleryImages((prev) => {
+      const combined = [...prev, url];
+      if (!imageUrl || prev.length === 0) setImageUrl(combined[0]);
+      return combined;
+    });
+    setNewPhotoUrlInput('');
+    setMediaType('image');
+  };
+
+  // Add individual slot for "+ மற்றொரு புகைப்படம் சேர்க்க / Add Another Photo Slot"
+  const handleAddPhotoSlot = () => {
+    setCustomPhotoSlots((prev) => [...prev, '']);
+  };
+
+  const handleUpdatePhotoSlot = (index: number, val: string) => {
+    setCustomPhotoSlots((prev) => {
+      const copy = [...prev];
+      copy[index] = val;
+      return copy;
+    });
+  };
+
+  const handleRemovePhotoSlot = (index: number) => {
+    setCustomPhotoSlots((prev) => {
+      if (prev.length <= 1) return [''];
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const handleApplyCustomSlotsToGallery = () => {
+    const validUrls = customPhotoSlots.map((u) => u.trim()).filter(Boolean);
+    if (validUrls.length === 0) {
+      setErrorMsg(
+        language === 'ta'
+          ? 'தயவுசெய்து குறைந்தது ஒரு புகைப்பட இணைப்பை உள்ளிடவும்.'
+          : 'Please enter at least one photo URL in the slots.'
+      );
+      return;
+    }
+    setGalleryImages(validUrls);
+    setImageUrl(validUrls[0] || '');
+    setMediaType('image');
+    setErrorMsg(null);
+  };
+
+  // Bulk URL Importer (Allows pasting 2, 3, 5+ links at once)
+  const handleImportBulkUrls = () => {
+    if (!bulkUrlsInput.trim()) return;
+    const urls = bulkUrlsInput
+      .split(/[\n,]+/)
+      .map((u) => u.trim())
+      .filter((u) => u.length > 5 && (u.startsWith('http') || u.startsWith('data:image')));
+
+    if (urls.length === 0) {
+      setErrorMsg(
+        language === 'ta'
+          ? 'செல்லுபடியாகும் புகைப்பட இணைய முகவரிகளைக் காணவில்லை.'
+          : 'No valid image URLs found.'
+      );
+      return;
+    }
+
+    setGalleryImages((prev) => {
+      const combined = [...prev, ...urls];
+      if (!imageUrl || prev.length === 0) setImageUrl(combined[0]);
+      return combined;
+    });
+    setBulkUrlsInput('');
+    setMediaType('image');
+    setErrorMsg(null);
+  };
+
+  const handleRemovePhoto = (idx: number) => {
+    setGalleryImages((prev) => {
+      const updated = prev.filter((_, i) => i !== idx);
+      if (imageUrl === prev[idx] || updated.length === 0) {
+        setImageUrl(updated[0] || '');
+      }
+      return updated;
+    });
+  };
+
+  const handleSetPrimaryCover = (idx: number) => {
+    setGalleryImages((prev) => {
+      if (idx === 0) return prev;
+      const target = prev[idx];
+      const rest = prev.filter((_, i) => i !== idx);
+      const reordered = [target, ...rest];
+      setImageUrl(target);
+      setPreviewSlideIdx(0);
+      return reordered;
+    });
+  };
+
+  const handleMovePhoto = (idx: number, direction: 'left' | 'right') => {
+    setGalleryImages((prev) => {
+      const targetIdx = direction === 'left' ? idx - 1 : idx + 1;
+      if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+      const copy = [...prev];
+      const temp = copy[idx];
+      copy[idx] = copy[targetIdx];
+      copy[targetIdx] = temp;
+      setImageUrl(copy[0]);
+      return copy;
+    });
   };
 
   // Handle Video File Upload with automatic poster thumbnail extraction
@@ -178,7 +342,12 @@ export const AdvertisementManagementModal: React.FC<AdvertisementManagementModal
         badgeText: badgeText.trim() || 'Featured Partner',
         category: category.trim() || 'General Sponsor',
         mediaType,
-        imageUrl: mediaType === 'image' ? imageUrl.trim() : (imageUrl.trim() || undefined),
+        imageUrl: mediaType === 'image'
+          ? (galleryImages[0] || imageUrl.trim() || undefined)
+          : (galleryImages[0] || imageUrl.trim() || undefined),
+        galleryImages: mediaType === 'image'
+          ? (galleryImages.length > 0 ? galleryImages : (imageUrl.trim() ? [imageUrl.trim()] : []))
+          : [],
         videoUrl: mediaType === 'video' ? videoUrl.trim() : (videoUrl.trim() || undefined),
         promoCode: promoCode.trim().toUpperCase(),
         discountPercentage: Number(discountPercentage) || 0,
@@ -371,70 +540,566 @@ export const AdvertisementManagementModal: React.FC<AdvertisementManagementModal
 
             {/* Media Upload Control depending on Media Type */}
             {mediaType === 'image' ? (
-              <div className="space-y-2">
-                <div className="flex flex-col sm:flex-row items-center gap-3">
-                  {/* Photo File Upload Button */}
-                  <label className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition shadow-xs flex items-center gap-2 cursor-pointer shrink-0">
-                    <Upload className="w-4 h-4" />
-                    <span>{language === 'ta' ? 'புகைப்படம் பதிவேற்றுக (Upload Photo)' : 'Upload Photo File'}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePhotoUpload}
-                      className="hidden"
-                    />
-                  </label>
+              <div className="space-y-4">
+                {/* Multi-Photo Feature Header & Mode Switcher */}
+                <div className="bg-white/80 p-3 rounded-2xl border border-amber-300 shadow-2xs space-y-2.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 rounded-lg bg-amber-500 text-slate-950 font-black text-xs flex items-center gap-1 shadow-2xs">
+                        <ImageIcon className="w-3.5 h-3.5" />
+                        <span>2+ Photos</span>
+                      </span>
+                      <div>
+                        <span className="font-extrabold text-slate-900 text-xs block">
+                          {language === 'ta'
+                            ? 'பல புகைப்படங்கள் இணைக்கும் விருப்பங்கள் (Multi-Photo Showcase)'
+                            : 'Multi-Photo Advertisement Options (2+ Photos Supported)'}
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          {language === 'ta'
+                            ? '2 முதல் 10+ வரை புகைப்படங்களை சேர்க்கலாம். மாணவர் பலகையில் அழகிய ஸ்லைடராக சுழலும்.'
+                            : 'Add 2 to 10+ photos to create an engaging auto-rotating sponsor carousel for students.'}
+                        </span>
+                      </div>
+                    </div>
 
-                  <span className="text-[11px] text-slate-500 font-medium">or enter Direct Image URL:</span>
+                    {/* Method Selector Tabs */}
+                    <div className="flex items-center gap-1 bg-amber-100/80 p-1 rounded-xl text-[11px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setPhotoAddMethod('upload')}
+                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                          photoAddMethod === 'upload'
+                            ? 'bg-amber-600 text-white shadow-2xs'
+                            : 'text-amber-900 hover:text-amber-950'
+                        }`}
+                      >
+                        <Upload className="w-3 h-3" />
+                        <span>{language === 'ta' ? 'கோப்பு பதிவேற்றம்' : 'File Upload'}</span>
+                      </button>
 
-                  <input
-                    type="url"
-                    placeholder="https://images.unsplash.com/photo-..."
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    className="flex-1 w-full px-3 py-1.5 bg-white border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
+                      <button
+                        type="button"
+                        onClick={() => setPhotoAddMethod('slots')}
+                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                          photoAddMethod === 'slots'
+                            ? 'bg-amber-600 text-white shadow-2xs'
+                            : 'text-amber-900 hover:text-amber-950'
+                        }`}
+                      >
+                        <Layers className="w-3 h-3" />
+                        <span>{language === 'ta' ? 'தனித்தனி ஸ்லாட்டுகள்' : 'Photo Slots (1,2,3...)'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPhotoAddMethod('bulk')}
+                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                          photoAddMethod === 'bulk'
+                            ? 'bg-amber-600 text-white shadow-2xs'
+                            : 'text-amber-900 hover:text-amber-950'
+                        }`}
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>{language === 'ta' ? 'மொத்த இணைப்புகள்' : 'Bulk URLs'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* OPTION 1: MULTI-FILE UPLOAD (Supports selecting 2, 3, 5+ files at once) */}
+                  {photoAddMethod === 'upload' && (
+                    <div className="space-y-2 pt-2 border-t border-amber-200">
+                      <div className="flex flex-col sm:flex-row items-center gap-2.5">
+                        <label className="w-full sm:w-auto px-4 py-3 bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 hover:from-amber-700 hover:to-amber-900 text-white font-extrabold rounded-xl text-xs transition shadow-md flex items-center justify-center gap-2 cursor-pointer shrink-0">
+                          {uploadLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Upload className="w-4 h-4" />
+                          )}
+                          <span>
+                            {language === 'ta'
+                              ? '📁 கணினியிலிருந்து பல படங்களைத் தேர்ந்தெடுக்கவும் (Upload 2+ Photos)'
+                              : '📁 Select Multiple Photo Files (2+ Photos from Device)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handlePhotosUpload}
+                            className="hidden"
+                          />
+                        </label>
+
+                        <div className="flex-1 w-full flex items-center gap-1.5">
+                          <input
+                            type="url"
+                            placeholder={
+                              language === 'ta'
+                                ? 'அல்லது ஒற்றை புகைப்பட இணைய முகவரி (Image URL)...'
+                                : 'Or enter single image URL to add to gallery...'
+                            }
+                            value={newPhotoUrlInput}
+                            onChange={(e) => setNewPhotoUrlInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddPhotoByUrl();
+                              }
+                            }}
+                            className="flex-1 px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddPhotoByUrl}
+                            disabled={!newPhotoUrlInput.trim()}
+                            className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition cursor-pointer shrink-0"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>{language === 'ta' ? '+ சேர்' : '+ Add'}</span>
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-amber-900/80 font-medium">
+                        💡 {language === 'ta'
+                          ? 'குறிப்பு: ஒரே நேரத்தில் 2, 3, 4 அல்லது அதற்கு மேற்பட்ட புகைப்படங்களை Ctrl அல்லது Shift அழுத்தி தேர்ந்தெடுக்கலாம்.'
+                          : 'Pro Tip: Hold Ctrl (or Cmd on Mac) / Shift to multi-select 2, 3, or more photos simultaneously.'}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* OPTION 2: MULTI-SLOT URL MANAGER (Photo 1, Photo 2, Photo 3... with Add Slot button) */}
+                  {photoAddMethod === 'slots' && (
+                    <div className="space-y-3 pt-2 border-t border-amber-200">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-amber-950">
+                          {language === 'ta'
+                            ? 'ஒவ்வொரு புகைப்படத்திற்கும் தனித்தனி ஸ்லாட்டுகள்:'
+                            : 'Dedicated Photo Slots (Manage Individual Photo URLs):'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleAddPhotoSlot}
+                          className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-extrabold rounded-lg text-xs flex items-center gap-1 shadow-2xs transition cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>
+                            {language === 'ta'
+                              ? '+ மற்றொரு புகைப்பட ஸ்லாட் சேர்க்க'
+                              : `+ Add Photo #${customPhotoSlots.length + 1} Slot`}
+                          </span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {customPhotoSlots.map((slotVal, sIdx) => (
+                          <div
+                            key={sIdx}
+                            className="flex items-center gap-2 p-2 rounded-xl bg-amber-50 border border-amber-200"
+                          >
+                            <span className="px-2 py-1 rounded-md bg-amber-200 text-amber-950 text-[10px] font-black shrink-0">
+                              #{sIdx + 1} {sIdx === 0 ? '(Cover)' : ''}
+                            </span>
+                            <input
+                              type="url"
+                              placeholder={`Enter Photo #${sIdx + 1} direct URL (https://...)...`}
+                              value={slotVal}
+                              onChange={(e) => handleUpdatePhotoSlot(sIdx, e.target.value)}
+                              className="flex-1 px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                            />
+                            {customPhotoSlots.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePhotoSlot(sIdx)}
+                                className="p-1.5 text-rose-600 hover:bg-rose-100 rounded-lg transition cursor-pointer shrink-0"
+                                title="Delete this slot"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleApplyCustomSlotsToGallery}
+                          className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-extrabold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>
+                            {language === 'ta'
+                              ? '✓ அனைத்து ஸ்லாட்டுகளையும் கேலரியில் இணைக்க'
+                              : '✓ Apply All Photo Slots to Gallery'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* OPTION 3: BULK URL IMPORTER (Paste 2, 3, 5+ links at once) */}
+                  {photoAddMethod === 'bulk' && (
+                    <div className="space-y-2 pt-2 border-t border-amber-200">
+                      <label className="block text-xs font-bold text-amber-950">
+                        {language === 'ta'
+                          ? 'பல புகைப்பட இணைப்புகளை ஒரே நேரத்தில் ஒட்டவும் (ஒவ்வொரு வரியிலும் ஒரு இணைப்பு):'
+                          : 'Bulk Paste Photo URLs (One URL per line or comma-separated):'}
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder={
+                          "https://images.unsplash.com/photo-1576092768241...\nhttps://images.unsplash.com/photo-1594631252845...\nhttps://images.unsplash.com/photo-15447872197f4..."
+                        }
+                        value={bulkUrlsInput}
+                        onChange={(e) => setBulkUrlsInput(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                      />
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <span className="text-[10px] text-slate-500">
+                          {language === 'ta'
+                            ? 'ஒரே நேரத்தில் 3, 4, 5 அல்லது 10 இணைய முகவரிகளையும் இணைக்கலாம்.'
+                            : 'Paste 2, 3, 4, 5+ image links and import them all with one click.'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleImportBulkUrls}
+                          disabled={!bulkUrlsInput.trim()}
+                          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>
+                            {language === 'ta'
+                              ? 'அனைத்து லிங்க்குகளையும் இணைக்க (Import All)'
+                              : 'Import All URLs to Gallery'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Stock Photo Presets */}
-                <div className="flex items-center gap-2 flex-wrap text-[10px]">
-                  <span className="text-slate-500 font-bold">Preset Photo Banners:</span>
+                {/* Preset Multi-Photo Packages (Rich 3 to 4 Photo Collections) */}
+                <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+                  <span className="text-slate-600 font-bold">
+                    {language === 'ta' ? 'மாதிரி புகைப்பட தொகுப்புகள் (1-Click Presets):' : '1-Click Multi-Photo Presets:'}
+                  </span>
                   <button
                     type="button"
-                    onClick={() =>
-                      setImageUrl(
-                        'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=1200&q=80'
-                      )
-                    }
-                    className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-semibold rounded-md border border-amber-300 transition cursor-pointer"
+                    onClick={() => {
+                      const list = [
+                        'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=1200&q=80',
+                        'https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9?auto=format&fit=crop&w=1200&q=80',
+                        'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=1200&q=80',
+                        'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?auto=format&fit=crop&w=1200&q=80',
+                      ];
+                      setGalleryImages(list);
+                      setImageUrl(list[0]);
+                      setPreviewSlideIdx(0);
+                    }}
+                    className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-lg border border-amber-300 transition cursor-pointer"
                   >
-                    🍃 Ponder Sip Ceylon Tea
+                    🍃 Ceylon Tea (4 Photos)
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      setImageUrl(
-                        'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1200&q=80'
-                      )
-                    }
-                    className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-semibold rounded-md border border-amber-300 transition cursor-pointer"
+                    onClick={() => {
+                      const list = [
+                        'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1200&q=80',
+                        'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80',
+                        'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=1200&q=80',
+                        'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
+                      ];
+                      setGalleryImages(list);
+                      setImageUrl(list[0]);
+                      setPreviewSlideIdx(0);
+                    }}
+                    className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-lg border border-amber-300 transition cursor-pointer"
                   >
-                    🎓 STEM Scholarship
+                    🎓 STEM & Academy (4 Photos)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const list = [
+                        'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=1200&q=80',
+                        'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=1200&q=80',
+                        'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1200&q=80',
+                      ];
+                      setGalleryImages(list);
+                      setImageUrl(list[0]);
+                      setPreviewSlideIdx(0);
+                    }}
+                    className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-lg border border-amber-300 transition cursor-pointer"
+                  >
+                    📚 Book Fair & Stationery (3 Photos)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const list = [
+                        'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=1200&q=80',
+                        'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&q=80',
+                        'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80',
+                        'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80',
+                      ];
+                      setGalleryImages(list);
+                      setImageUrl(list[0]);
+                      setPreviewSlideIdx(0);
+                    }}
+                    className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-lg border border-amber-300 transition cursor-pointer"
+                  >
+                    💻 Tech & AI Innovations (4 Photos)
                   </button>
                 </div>
 
-                {/* Image Preview */}
-                {imageUrl && (
-                  <div className="relative w-full h-36 rounded-xl overflow-hidden border-2 border-amber-400/40 bg-slate-900">
-                    <img src={imageUrl} alt="Banner Preview" className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => setImageUrl('')}
-                      className="absolute top-2 right-2 p-1 bg-black/70 hover:bg-black text-white rounded-full transition cursor-pointer"
-                      title="Clear Photo"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                {/* Photo Gallery Grid & Live Carousel Preview */}
+                {galleryImages.length > 0 && (
+                  <div className="space-y-3 pt-3 border-t border-amber-300">
+                    {/* Status notification banner for 2+ photos */}
+                    <div className="flex items-center justify-between text-xs font-bold text-amber-950 flex-wrap gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <ImageIcon className="w-4 h-4 text-amber-700" />
+                        <span>
+                          {language === 'ta'
+                            ? `இணைக்கப்பட்ட புகைப்படங்கள் (${galleryImages.length} படங்கள்)`
+                            : `Attached Photos Gallery (${galleryImages.length} Photos)`}
+                        </span>
+                        {galleryImages.length >= 2 ? (
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black border border-emerald-300 flex items-center gap-1 shadow-2xs">
+                            <Sparkles className="w-3 h-3 text-emerald-600 animate-pulse" />
+                            <span>
+                              {language === 'ta'
+                                ? `✓ 2-க்கும் மேற்பட்ட படங்கள் உள்ளன (Auto Carousel Active - ${galleryImages.length} படங்கள்)`
+                                : `✓ Multi-Photo Carousel Active (${galleryImages.length} Photos)`}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-300">
+                            {language === 'ta'
+                              ? '💡 2-க்கும் மேற்பட்ட படங்களைச் சேர்த்தால் ஸ்லைடராக மாறும்'
+                              : '💡 Add 2 or more photos to activate carousel slider'}
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGalleryImages([]);
+                          setImageUrl('');
+                          setPreviewSlideIdx(0);
+                        }}
+                        className="text-[11px] text-red-600 hover:text-red-800 font-bold transition cursor-pointer"
+                      >
+                        {language === 'ta' ? 'அனைத்தையும் நீக்கு (Clear All)' : 'Clear All'}
+                      </button>
+                    </div>
+
+                    {/* LIVE IN-MODAL MULTI-PHOTO CAROUSEL PREVIEW */}
+                    <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-950 via-slate-900 to-amber-950 text-white border-2 border-amber-500/40 shadow-md">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-extrabold text-amber-300 flex items-center gap-1">
+                          <Eye className="w-3.5 h-3.5 text-amber-400" />
+                          <span>
+                            {language === 'ta'
+                              ? 'நேரடி மாதிரி காட்சி (Student Billboard Live Preview)'
+                              : 'Live Student Billboard Multi-Photo Carousel Preview:'}
+                          </span>
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 bg-black/60 rounded-full text-amber-200 border border-amber-400/30">
+                          {galleryImages.length > 0 ? `${(previewSlideIdx % galleryImages.length) + 1} / ${galleryImages.length}` : '0 / 0'}
+                        </span>
+                      </div>
+
+                      <div className="relative h-44 sm:h-52 rounded-xl overflow-hidden bg-black/80 flex items-center justify-center border border-white/10 group">
+                        {galleryImages.length > 0 ? (
+                          <>
+                            <img
+                              src={galleryImages[previewSlideIdx % galleryImages.length]}
+                              alt={`Slide ${(previewSlideIdx % galleryImages.length) + 1}`}
+                              className="w-full h-full object-cover transition duration-500"
+                            />
+
+                            {/* Slide Counter Overlay */}
+                            <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-xs text-amber-300 text-[10px] font-black border border-amber-400/40 flex items-center gap-1.5 shadow">
+                              <ImageIcon className="w-3 h-3 text-amber-400" />
+                              <span>
+                                Photo {(previewSlideIdx % galleryImages.length) + 1} of {galleryImages.length}
+                              </span>
+                              {(previewSlideIdx % galleryImages.length) === 0 && (
+                                <span className="text-emerald-400 ml-1">★ Cover</span>
+                              )}
+                            </div>
+
+                            {/* Next / Prev Controls */}
+                            {galleryImages.length > 1 && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPreviewSlideIdx(
+                                      (prev) => (prev - 1 + galleryImages.length) % galleryImages.length
+                                    )
+                                  }
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/70 hover:bg-black text-white transition cursor-pointer shadow-lg"
+                                  title="Previous Slide"
+                                >
+                                  <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPreviewSlideIdx((prev) => (prev + 1) % galleryImages.length)
+                                  }
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/70 hover:bg-black text-white transition cursor-pointer shadow-lg"
+                                  title="Next Slide"
+                                >
+                                  <ChevronRight className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+
+                            {/* Pagination Dots */}
+                            {galleryImages.length > 1 && (
+                              <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1.5 z-10">
+                                {galleryImages.map((_, pIdx) => (
+                                  <button
+                                    key={pIdx}
+                                    type="button"
+                                    onClick={() => setPreviewSlideIdx(pIdx)}
+                                    className={`h-2 rounded-full transition-all cursor-pointer ${
+                                      pIdx === previewSlideIdx % galleryImages.length
+                                        ? 'w-6 bg-amber-400'
+                                        : 'w-2 bg-white/40 hover:bg-white/70'
+                                    }`}
+                                    title={`Go to photo ${pIdx + 1}`}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-slate-400 text-xs">No photos attached yet</span>
+                        )}
+                      </div>
+
+                      {/* Thumbnail strip */}
+                      {galleryImages.length > 1 && (
+                        <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1">
+                          {galleryImages.map((imgSrc, tIdx) => (
+                            <button
+                              key={tIdx}
+                              type="button"
+                              onClick={() => setPreviewSlideIdx(tIdx)}
+                              className={`relative w-12 h-9 rounded-lg overflow-hidden border-2 shrink-0 transition cursor-pointer ${
+                                tIdx === previewSlideIdx % galleryImages.length
+                                  ? 'border-amber-400 ring-2 ring-amber-400/50 scale-105'
+                                  : 'border-white/20 opacity-70 hover:opacity-100'
+                              }`}
+                            >
+                              <img src={imgSrc} alt="" className="w-full h-full object-cover" />
+                              <span className="absolute bottom-0 right-0 px-1 text-[8px] bg-black/80 font-bold text-white rounded-tl">
+                                #{tIdx + 1}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* PHOTO MANAGEMENT GRID WITH RE-ORDERING & COVER SETTINGS */}
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-bold text-slate-700 block">
+                        {language === 'ta'
+                          ? 'படங்களை வரிசைப்படுத்துக / முதன்மை அட்டை மாற்றுக (Reorder & Set Cover):'
+                          : 'Manage Attached Photos (Reorder, Set Cover, or Remove):'}
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                        {galleryImages.map((imgSrc, idx) => {
+                          const isPrimary = idx === 0;
+
+                          return (
+                            <div
+                              key={idx}
+                              className={`relative rounded-xl overflow-hidden border-2 transition group flex flex-col justify-between bg-slate-900 ${
+                                isPrimary
+                                  ? 'border-amber-500 ring-2 ring-amber-400/50 shadow-md'
+                                  : 'border-slate-200 hover:border-amber-300'
+                              }`}
+                            >
+                              <div className="relative h-24 w-full overflow-hidden bg-slate-950">
+                                <img
+                                  src={imgSrc}
+                                  alt={`Ad Photo ${idx + 1}`}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                                />
+
+                                {/* Number Badge */}
+                                <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-black/75 text-white text-[10px] font-bold rounded">
+                                  #{idx + 1}
+                                </span>
+
+                                {/* Primary Cover Badge */}
+                                {isPrimary && (
+                                  <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider rounded shadow-xs">
+                                    Cover
+                                  </span>
+                                )}
+
+                                {/* Move Arrows (Reorder Left / Right) */}
+                                <div className="absolute top-1.5 left-8 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                  {idx > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMovePhoto(idx, 'left')}
+                                      className="p-1 bg-black/80 hover:bg-black text-amber-300 rounded text-[9px] font-bold transition cursor-pointer"
+                                      title="Move Left / Earlier"
+                                    >
+                                      ◀
+                                    </button>
+                                  )}
+                                  {idx < galleryImages.length - 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMovePhoto(idx, 'right')}
+                                      className="p-1 bg-black/80 hover:bg-black text-amber-300 rounded text-[9px] font-bold transition cursor-pointer"
+                                      title="Move Right / Later"
+                                    >
+                                      ▶
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Delete Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePhoto(idx)}
+                                  className="absolute bottom-1.5 right-1.5 p-1 bg-rose-600/90 hover:bg-rose-700 text-white rounded-md transition shadow cursor-pointer"
+                                  title="Remove this photo"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              {/* Set As Cover Button */}
+                              {!isPrimary ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetPrimaryCover(idx)}
+                                  className="w-full py-1 text-center bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 text-[10px] font-bold border-t border-slate-200 transition cursor-pointer"
+                                >
+                                  {language === 'ta' ? 'முகப்புப் படம் (Set Cover)' : 'Set as Cover'}
+                                </button>
+                              ) : (
+                                <div className="w-full py-1 text-center bg-amber-500/20 text-amber-900 text-[10px] font-black border-t border-amber-300">
+                                  ★ {language === 'ta' ? 'முதன்மை முகப்பு அட்டை' : 'Primary Cover'}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

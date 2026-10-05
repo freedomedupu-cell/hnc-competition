@@ -54,6 +54,27 @@ interface DistrictState extends SriLankaDistrictInfo {
   enablePowerUps?: boolean;
 }
 
+const createBlankManualQuestion = (idNum: number) => ({
+  id: `q_manual_${Date.now()}_${idNum}`,
+  questionText: '',
+  questionTextEn: '',
+  questionTextSi: '',
+  category: 'General Knowledge',
+  options: [
+    { shape: 'triangle' as const, symbol: '▲', text: '', textEn: '', textSi: '', color: 'bg-rose-500', hoverColor: 'hover:bg-rose-600', borderColor: 'border-rose-400' },
+    { shape: 'diamond' as const, symbol: '♦', text: '', textEn: '', textSi: '', color: 'bg-blue-600', hoverColor: 'hover:bg-blue-700', borderColor: 'border-blue-400' },
+    { shape: 'circle' as const, symbol: '●', text: '', textEn: '', textSi: '', color: 'bg-amber-500', hoverColor: 'hover:bg-amber-600', borderColor: 'border-amber-400' },
+    { shape: 'square' as const, symbol: '■', text: '', textEn: '', textSi: '', color: 'bg-emerald-600', hoverColor: 'hover:bg-emerald-700', borderColor: 'border-emerald-400' },
+  ],
+  correctIndex: 0,
+  hint: '',
+  hintEn: '',
+  hintSi: '',
+  explanation: '',
+  explanationEn: '',
+  explanationSi: '',
+});
+
 interface DistrictsCompetitionStudioModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -138,6 +159,16 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
   const [newQuestPassingAccuracy, setNewQuestPassingAccuracy] = useState<number>(70);
   const [newQuestDifficultyTier, setNewQuestDifficultyTier] = useState<'easy' | 'medium' | 'hard' | 'master'>('medium');
   const [newQuestEnablePowerups, setNewQuestEnablePowerups] = useState<boolean>(true);
+
+  // Manual questions authored directly in the Quest Creator
+  const [newQuestQuestions, setNewQuestQuestions] = useState<any[]>(() => {
+    const colombo = SRI_LANKA_25_DISTRICTS.find((d) => d.id === 'colombo');
+    if (colombo && colombo.initialQuestions.length > 0) {
+      return JSON.parse(JSON.stringify(colombo.initialQuestions));
+    }
+    return [createBlankManualQuestion(1)];
+  });
+  const [newQuestActiveQTab, setNewQuestActiveQTab] = useState<number>(0);
 
   // Question editing sub-state inside district editor
   const [activeQuestionTab, setActiveQuestionTab] = useState<number>(0);
@@ -283,11 +314,49 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
     setActiveEditingDistrict(null);
   };
 
+  // Question management inside New Island Quest Creator
+  const handleAddNewQuestionToNewQuest = () => {
+    const newQ = createBlankManualQuestion(newQuestQuestions.length + 1);
+    const updated = [...newQuestQuestions, newQ];
+    setNewQuestQuestions(updated);
+    setNewQuestActiveQTab(updated.length - 1);
+    showToast('✨ புதிய வினா சேர்க்கப்பட்டது!');
+  };
+
+  const handleDeleteQuestionFromNewQuest = (idx: number) => {
+    if (newQuestQuestions.length <= 1) {
+      showToast('⚠️ குறைந்தது ஒரு வினா இருக்க வேண்டும்!');
+      return;
+    }
+    const updated = newQuestQuestions.filter((_, i) => i !== idx);
+    setNewQuestQuestions(updated);
+    setNewQuestActiveQTab(Math.max(0, idx - 1));
+    showToast('🗑️ வினா நீக்கப்பட்டது');
+  };
+
+  const handleLoadDistrictTemplateQuestions = () => {
+    const match = districts.find((d) => d.id === newQuestDistrictId);
+    if (match && match.initialQuestions && match.initialQuestions.length > 0) {
+      setNewQuestQuestions(JSON.parse(JSON.stringify(match.initialQuestions)));
+      setNewQuestActiveQTab(0);
+      showToast(`📋 ${match.nameTa} மாவட்டத்தின் மாதிரி வினாக்கள் ஏற்றப்பட்டன!`);
+    } else {
+      showToast('⚠️ வினாக்கள் கிடைக்கவில்லை!');
+    }
+  };
+
   // Handle New Island Quest Creation
   const handleCreateNewQuestSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const targetDistrict = districts.find((d) => d.id === newQuestDistrictId);
     if (!targetDistrict) return;
+
+    // Validate that at least one question has text
+    const validQuestions = newQuestQuestions.filter(
+      (q) => (q.questionText && q.questionText.trim()) || (q.questionTextEn && q.questionTextEn.trim()) || (q.options && q.options.some((o: any) => o.text && o.text.trim()))
+    );
+
+    const finalQuestions = validQuestions.length > 0 ? newQuestQuestions : targetDistrict.initialQuestions;
 
     const updated = districts.map((d) => {
       if (d.id === newQuestDistrictId) {
@@ -301,6 +370,7 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
           passingAccuracyPercent: newQuestPassingAccuracy,
           difficultyTier: newQuestDifficultyTier,
           enablePowerUps: newQuestEnablePowerups,
+          initialQuestions: finalQuestions,
           isPublished: true,
         };
       }
@@ -725,7 +795,7 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
         {/* CREATE NEW ISLAND QUEST MODAL (WIZARD) */}
         {showCreateQuestModal && (
           <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-60 flex items-center justify-center p-3 sm:p-6 overflow-hidden animate-in zoom-in-95">
-            <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
               <div className="p-5 border-b border-slate-200 bg-gradient-to-r from-amber-600 to-indigo-900 text-white flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
@@ -756,7 +826,15 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
                   </label>
                   <select
                     value={newQuestDistrictId}
-                    onChange={(e) => setNewQuestDistrictId(e.target.value)}
+                    onChange={(e) => {
+                      const newId = e.target.value;
+                      setNewQuestDistrictId(newId);
+                      const match = districts.find((d) => d.id === newId);
+                      if (match && match.initialQuestions && match.initialQuestions.length > 0) {
+                        setNewQuestQuestions(JSON.parse(JSON.stringify(match.initialQuestions)));
+                        setNewQuestActiveQTab(0);
+                      }
+                    }}
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900"
                   >
                     {districts.map((d) => (
@@ -972,6 +1050,258 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
                       </select>
                     </div>
                   </div>
+                </div>
+
+                {/* 6. Manual Questions Authoring Section */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <FileQuestion className="w-4 h-4 text-blue-600 shrink-0" />
+                        <span className="font-extrabold text-slate-900 text-xs uppercase tracking-wider">
+                          6. சொந்த வினாக்கள் உருவாக்கம் (Manual Questions Creation)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        இப்போட்டியில் மாணவர்கள் பதிலளிக்க வேண்டிய வினாக்களை நீங்களே நேரடியாக தட்டச்சு செய்து உள்ளிடலாம்.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={handleLoadDistrictTemplateQuestions}
+                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition cursor-pointer"
+                        title="Load existing template questions for selected district"
+                      >
+                        டெம்ப்ளேட் வினாக்களை ஏற்று
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddNewQuestionToNewQuest}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs transition cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ வினா சேர்</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Question Tabs (Q1, Q2, Q3...) */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-100">
+                    {newQuestQuestions.map((q, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setNewQuestActiveQTab(idx)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap flex items-center gap-1.5 ${
+                          newQuestActiveQTab === idx
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        <span>வினா #{idx + 1}</span>
+                        {newQuestQuestions.length > 1 && (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteQuestionFromNewQuest(idx);
+                            }}
+                            className="text-white/70 hover:text-white hover:bg-black/20 rounded p-0.5 text-xs font-black"
+                            title="வினாவை நீக்கு"
+                          >
+                            ×
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Active Question Editor Form */}
+                  {newQuestQuestions[newQuestActiveQTab] && (
+                    <div className="space-y-4 pt-1">
+                      {/* Question Prompt Inputs (Tamil, English, Sinhala) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">
+                            வினா வாசகம் (தமிழ் Prompt) *
+                          </label>
+                          <textarea
+                            rows={2}
+                            required
+                            placeholder="உதாரணம்: இலங்கையின் மிக நீளமான ஆறு எது?"
+                            value={newQuestQuestions[newQuestActiveQTab].questionText}
+                            onChange={(e) => {
+                              const updated = [...newQuestQuestions];
+                              updated[newQuestActiveQTab].questionText = e.target.value;
+                              setNewQuestQuestions(updated);
+                            }}
+                            className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">
+                            Question Prompt (English)
+                          </label>
+                          <textarea
+                            rows={2}
+                            placeholder="e.g. Which is the longest river in Sri Lanka?"
+                            value={newQuestQuestions[newQuestActiveQTab].questionTextEn || ''}
+                            onChange={(e) => {
+                              const updated = [...newQuestQuestions];
+                              updated[newQuestActiveQTab].questionTextEn = e.target.value;
+                              setNewQuestQuestions(updated);
+                            }}
+                            className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">
+                            ප්‍රශ්න විස්තරය (සිංහල Prompt)
+                          </label>
+                          <textarea
+                            rows={2}
+                            placeholder="ශ්‍රී ලංකාවේ දිගම ගංගාව කුමක්ද?"
+                            value={newQuestQuestions[newQuestActiveQTab].questionTextSi || ''}
+                            onChange={(e) => {
+                              const updated = [...newQuestQuestions];
+                              updated[newQuestActiveQTab].questionTextSi = e.target.value;
+                              setNewQuestQuestions(updated);
+                            }}
+                            className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* 4 Answer Options (HNC Arena Gaming Pads) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="font-bold text-slate-700 block text-xs">
+                            4 விடைக் கூறுகள் (HNC Arena Gaming Pads - சரியான விடையைத் தேர்ந்தெடுக்கவும்):
+                          </label>
+                          <span className="text-[10px] text-slate-500">
+                            சரியான விடைக்கு எதிரே உள்ள <strong>'✓ சரி'</strong> பொத்தானை அழுத்தவும்
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {newQuestQuestions[newQuestActiveQTab].options.map((opt: any, oIdx: number) => {
+                            const isCorrect = newQuestQuestions[newQuestActiveQTab].correctIndex === oIdx;
+
+                            return (
+                              <div
+                                key={oIdx}
+                                className={`p-2.5 rounded-xl border flex flex-col gap-2 transition ${
+                                  isCorrect
+                                    ? 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-200'
+                                    : 'bg-white border-slate-200'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-7 h-7 rounded-lg text-white font-bold flex items-center justify-center shrink-0 ${opt.color}`}>
+                                    {opt.symbol}
+                                  </span>
+
+                                  <input
+                                    type="text"
+                                    required
+                                    placeholder={`விடை #${oIdx + 1} (தமிழ்)`}
+                                    value={opt.text}
+                                    onChange={(e) => {
+                                      const updated = [...newQuestQuestions];
+                                      updated[newQuestActiveQTab].options[oIdx].text = e.target.value;
+                                      setNewQuestQuestions(updated);
+                                    }}
+                                    className="flex-1 px-2.5 py-1 border border-slate-200 rounded text-xs bg-white font-medium"
+                                  />
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = [...newQuestQuestions];
+                                      updated[newQuestActiveQTab].correctIndex = oIdx;
+                                      setNewQuestQuestions(updated);
+                                    }}
+                                    className={`px-2.5 py-1 rounded text-[10px] font-black shrink-0 transition cursor-pointer ${
+                                      isCorrect
+                                        ? 'bg-emerald-600 text-white shadow-xs'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                  >
+                                    {isCorrect ? '✓ சரி (Correct)' : 'தேர்ந்தெடு'}
+                                  </button>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-1.5 pl-9">
+                                  <input
+                                    type="text"
+                                    placeholder="English (Optional)"
+                                    value={opt.textEn || ''}
+                                    onChange={(e) => {
+                                      const updated = [...newQuestQuestions];
+                                      updated[newQuestActiveQTab].options[oIdx].textEn = e.target.value;
+                                      setNewQuestQuestions(updated);
+                                    }}
+                                    className="px-2 py-0.5 border border-slate-200 rounded text-[11px] bg-slate-50"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="සිංහල (Optional)"
+                                    value={opt.textSi || ''}
+                                    onChange={(e) => {
+                                      const updated = [...newQuestQuestions];
+                                      updated[newQuestActiveQTab].options[oIdx].textSi = e.target.value;
+                                      setNewQuestQuestions(updated);
+                                    }}
+                                    className="px-2 py-0.5 border border-slate-200 rounded text-[11px] bg-slate-50"
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Hint & Explanation */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">
+                            விளக்கக் குறிப்பு (Hint / உதவிக்குறிப்பு):
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="மாணவர்களுக்கான உதவிக்குறிப்பு..."
+                            value={newQuestQuestions[newQuestActiveQTab].hint || ''}
+                            onChange={(e) => {
+                              const updated = [...newQuestQuestions];
+                              updated[newQuestActiveQTab].hint = e.target.value;
+                              setNewQuestQuestions(updated);
+                            }}
+                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">
+                            பதில் விளக்கம் (Explanation / விரிவான விடை):
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="சரியான விடைக்கான காரணம்..."
+                            value={newQuestQuestions[newQuestActiveQTab].explanation || ''}
+                            onChange={(e) => {
+                              const updated = [...newQuestQuestions];
+                              updated[newQuestActiveQTab].explanation = e.target.value;
+                              setNewQuestQuestions(updated);
+                            }}
+                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer buttons */}

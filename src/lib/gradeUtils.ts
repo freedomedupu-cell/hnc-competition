@@ -94,6 +94,42 @@ export function isGradeEligible(
     // If student has no specific grade, fall back to checking if sanitized matches
   }
 
+  // Check for keywords in After School / Competitive exams like Teaching, GS, MA, SLEAS, SLAS
+  if (
+    compNorm.includes('after school') ||
+    compNorm.includes('teaching') ||
+    compNorm.includes('gs') ||
+    compNorm.includes('gramasewaka') ||
+    compNorm.includes('ma') ||
+    compNorm.includes('management assistant') ||
+    compNorm.includes('sleas') ||
+    compNorm.includes('slas') ||
+    compNorm.includes('competitive') ||
+    compNorm.includes('போட்டி')
+  ) {
+    if (
+      stuNorm.includes('after school') ||
+      stuNorm.includes('teaching') ||
+      stuNorm.includes('gs') ||
+      stuNorm.includes('gramasewaka') ||
+      stuNorm.includes('ma') ||
+      stuNorm.includes('management assistant') ||
+      stuNorm.includes('sleas') ||
+      stuNorm.includes('slas') ||
+      stuNorm.includes('competitive') ||
+      stuNorm.includes('போட்டி')
+    ) {
+      // Check for specific sub-matches or overlapping terms
+      if (compNorm.includes('teaching') && stuNorm.includes('teaching')) return true;
+      if ((compNorm.includes('gs') || compNorm.includes('gramasewaka')) && (stuNorm.includes('gs') || stuNorm.includes('gramasewaka'))) return true;
+      if ((compNorm.includes('ma') || compNorm.includes('management assistant')) && (stuNorm.includes('ma') || stuNorm.includes('management assistant'))) return true;
+      if (compNorm.includes('sleas') && stuNorm.includes('sleas')) return true;
+      if (compNorm.includes('slas') && stuNorm.includes('slas')) return true;
+      if (compNorm.includes('after school') && stuNorm.includes('after school')) return true;
+      if (compNorm.includes('competitive') && stuNorm.includes('competitive')) return true;
+    }
+  }
+
   const compNumbers = extractGradeNumbers(competitionGrade);
   const stuNumbers = extractGradeNumbers(studentGrade);
 
@@ -106,15 +142,20 @@ export function isGradeEligible(
   const cleanComp = compNorm.replace(/[^a-z0-9]/g, '');
   const cleanStu = stuNorm.replace(/[^a-z0-9]/g, '');
 
-  if (cleanComp && cleanStu && cleanComp === cleanStu) return true;
+  if (cleanComp && cleanStu && (cleanComp === cleanStu || cleanComp.includes(cleanStu) || cleanStu.includes(cleanComp))) return true;
 
   return false;
 }
 
 /**
- * Standard list of educational grades in Sri Lankan school system
+ * Standard list of educational grades & after-school competitive exam categories in Sri Lankan system
  */
 export const AVAILABLE_GRADES = [
+  'Grade 1',
+  'Grade 2',
+  'Grade 3',
+  'Grade 4',
+  'Grade 5 (Scholarship / புலமைப்பரிசில்)',
   'Grade 6',
   'Grade 7',
   'Grade 8',
@@ -123,5 +164,11 @@ export const AVAILABLE_GRADES = [
   'Grade 11 (O/L)',
   'Grade 12 (A/L)',
   'Grade 13 (A/L)',
-  'Open (All Grades)',
+  'After School - Teaching Exam (ஆசிரியர் பரீட்சை)',
+  'After School - GS (Gramasewaka / கிராம உத்தியோகத்தர்)',
+  'After School - MA (Management Assistant / மேலாண்மை உதவியாளர்)',
+  'After School - SLEAS (SL Education Admin Service)',
+  'After School - SLAS (SL Administrative Service)',
+  'After School - General Competitive Exam (பொது போட்டிப் பரீட்சை)',
+  'Open (All Grades / அனைத்து பிரிவுகளும்)',
 ];

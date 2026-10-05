@@ -26,10 +26,15 @@ import {
   Clock,
   Share2,
   Trophy,
+  Key,
+  Copy,
+  Check,
+  RotateCcw,
 } from 'lucide-react';
 import {
   loginWithEmailPassword,
   registerStudentAccount,
+  resetUserPasswordByLookup,
 } from '../../services/firebaseService';
 import { AVAILABLE_GRADES } from '../../lib/gradeUtils';
 import { ShareModal } from '../common/ShareModal';
@@ -160,6 +165,57 @@ export const AuthView: React.FC = () => {
   const [isCustomDistrict, setIsCustomDistrict] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
+
+  // Forgot Password Recovery modal state
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [forgotIdentifier, setForgotIdentifier] = useState('');
+  const [forgotCustomNewPassword, setForgotCustomNewPassword] = useState('');
+  const [isForgotLoading, setIsForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
+  const [forgotResult, setForgotResult] = useState<{
+    uid: string;
+    fullName: string;
+    studentId?: string;
+    username?: string;
+    email: string;
+    assignedPassword: string;
+  } | null>(null);
+  const [forgotCopied, setForgotCopied] = useState(false);
+
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError(null);
+    setForgotSuccess(null);
+
+    const target = forgotIdentifier.trim();
+    if (!target) {
+      setForgotError(
+        language === 'ta'
+          ? 'உங்கள் மாணவர் ID, பயனர் பெயர் அல்லது மின்னஞ்சலை உள்ளிடவும்.'
+          : 'Please enter your Student ID, Username, or Email.'
+      );
+      return;
+    }
+
+    setIsForgotLoading(true);
+    try {
+      const res = await resetUserPasswordByLookup(target, forgotCustomNewPassword);
+      setForgotResult(res);
+      setForgotSuccess(
+        language === 'ta'
+          ? `கணக்கு வெற்றிகரமாக உறுதிசெய்யப்பட்டது! புதிய கடவுச்சொல்: ${res.assignedPassword}`
+          : `Account verified successfully! New Password: ${res.assignedPassword}`
+      );
+      setLoginIdentifier(res.studentId || res.username || res.email);
+      setLoginPassword(res.assignedPassword);
+    } catch (err: any) {
+      console.error('Forgot Password recovery error:', err);
+      setForgotError(err.message || 'Failed to locate user account. Please check Student ID / Username.');
+    } finally {
+      setIsForgotLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -634,6 +690,26 @@ export const AuthView: React.FC = () => {
                     tabIndex={-1}
                   >
                     {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <span className="text-slate-500 font-medium">
+                    {language === 'ta' ? 'கடவுச்சொல் நினைவில் இல்லையா?' : 'Forgot your password?'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPasswordModal(true);
+                      setForgotIdentifier(loginIdentifier || '');
+                      setForgotError(null);
+                      setForgotSuccess(null);
+                      setForgotResult(null);
+                    }}
+                    className="font-bold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    <span>{language === 'ta' ? 'கடவுச்சொல்லை மீட்டெடுக்க' : 'Forgot Password?'}</span>
                   </button>
                 </div>
               </div>
@@ -1324,6 +1400,152 @@ export const AuthView: React.FC = () => {
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
         />
+      )}
+
+      {/* Forgot Password Recovery Modal */}
+      {showForgotPasswordModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center relative shadow-2xl border border-slate-100 space-y-4">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center text-2xl shadow-inner">
+              🔑
+            </div>
+
+            <div>
+              <h3 className="text-lg font-black text-slate-900">
+                {language === 'ta' ? 'கடவுச்சொல்லை மீட்டெடுத்தல்' : 'Forgot Password Recovery'}
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                {language === 'ta'
+                  ? 'உங்கள் மாணவர் அடையாள எண் (Student ID), பயனர் பெயர் (Username) அல்லது பதிவுசெய்த மின்னஞ்சலை உள்ளிட்டு கணக்கை மீட்டெடுக்கவும்.'
+                  : 'Enter your Student ID, Username, or Registered Email to recover your account.'}
+              </p>
+            </div>
+
+            {forgotError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-start gap-2 text-left animate-in fade-in">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div className="flex-1 font-medium">{forgotError}</div>
+              </div>
+            )}
+
+            {forgotSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-start gap-2 text-left animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="flex-1 font-medium">{forgotSuccess}</div>
+              </div>
+            )}
+
+            {!forgotResult ? (
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-3 text-left">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    {language === 'ta' ? 'மாணவர் ID / பயனர் பெயர் / மின்னஞ்சல் *' : 'Student ID / Username / Email *'}
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. STU-2026-1002, suganthan, or sugan@gmail.com"
+                      value={forgotIdentifier}
+                      onChange={(e) => setForgotIdentifier(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    {language === 'ta' ? 'விருப்பமான புதிய கடவுச்சொல் (Optional)' : 'Preferred New Password (Optional)'}
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      placeholder="Leaving empty auto-generates a strong key..."
+                      value={forgotCustomNewPassword}
+                      onChange={(e) => setForgotCustomNewPassword(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPasswordModal(false)}
+                    className="px-4 py-2 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isForgotLoading}
+                    className="px-5 py-2 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-xl transition-colors shadow-md disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                  >
+                    {isForgotLoading ? (
+                      <span>Verifying...</span>
+                    ) : (
+                      <>
+                        <Key className="w-3.5 h-3.5" />
+                        <span>{language === 'ta' ? 'கடவுச்சொல்லை ரீசெட் செய்' : 'Reset Password'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left text-xs">
+                <div className="font-extrabold text-slate-900 flex items-center justify-between border-b border-slate-200 pb-2">
+                  <span>Candidate: {forgotResult.fullName}</span>
+                  <span className="text-[10px] font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                    {forgotResult.studentId || forgotResult.username || 'Account Found'}
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                    {language === 'ta' ? 'உங்கள் புதிய கடவுச்சொல் (New Password):' : 'Your New Password:'}
+                  </span>
+                  <div className="flex items-center justify-between gap-2 bg-white p-2.5 rounded-xl border border-slate-300 font-mono">
+                    <span className="font-bold text-sm text-blue-900">{forgotResult.assignedPassword}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(forgotResult.assignedPassword);
+                        setForgotCopied(true);
+                        setTimeout(() => setForgotCopied(false), 2000);
+                      }}
+                      className="p-1 hover:bg-slate-100 rounded text-slate-600 transition-colors flex items-center gap-1 font-sans font-bold text-xs cursor-pointer"
+                    >
+                      {forgotCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+                      <span>{forgotCopied ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-500 italic pt-1">
+                  {language === 'ta'
+                    ? 'உள்நுழைவு படிவத்தில் இந்த கடவுச்சொல் தானாக நிரப்பப்பட்டுள்ளது. இப்போது நேரடியாக உள்நுழையலாம்!'
+                    : 'Credentials have been filled into the login form. You can now click Sign In directly!'}
+                </p>
+
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPasswordModal(false);
+                      setForgotResult(null);
+                    }}
+                    className="w-full py-2.5 text-xs font-black bg-blue-700 hover:bg-blue-800 text-white rounded-xl transition-all shadow-md text-center cursor-pointer"
+                  >
+                    {language === 'ta' ? 'உள்நுழைவு படிவத்திற்குச் செல்க' : 'Proceed to Sign In'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
