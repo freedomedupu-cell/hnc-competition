@@ -632,17 +632,20 @@ export const DistrictLeaderboardModal: React.FC<DistrictLeaderboardModalProps> =
         {/* TOP 3 PODIUM DISPLAY */}
         {filteredLeaderboard.length >= 3 && (
           <div className="grid grid-cols-3 gap-3 pt-2 items-end max-w-2xl mx-auto">
-            {/* Rank #2 Silver */}
+            {/* Rank #2 Silver Medalist */}
             {top2 && (
-              <div className="bg-gradient-to-t from-slate-100 to-white p-3.5 rounded-2xl border border-slate-300 text-center shadow-sm relative space-y-1">
-                <div className="w-10 h-10 mx-auto rounded-full bg-slate-200 text-slate-800 font-black text-sm flex items-center justify-center border-2 border-slate-400 shadow-sm">
+              <div className="bg-gradient-to-t from-slate-200 via-slate-100 to-white p-4 rounded-2xl border-2 border-slate-300 text-center shadow-md relative space-y-1">
+                <div className="w-10 h-10 mx-auto rounded-full bg-gradient-to-br from-slate-200 to-slate-400 text-slate-950 font-black text-sm flex items-center justify-center border-2 border-slate-100 shadow-md">
                   🥈 #2
+                </div>
+                <div className="inline-block px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[9px] font-black uppercase tracking-wider">
+                  Silver Medalist
                 </div>
                 <div className="font-extrabold text-xs text-slate-900 truncate" title={top2.name}>
                   {top2.name}
                 </div>
                 <div className="text-[10px] text-slate-500 font-semibold truncate">{top2.school}</div>
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[10px] font-black">
+                <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-100 text-[10px] font-black shadow-xs">
                   {top2.totalXp} XP
                 </div>
               </div>
@@ -650,34 +653,37 @@ export const DistrictLeaderboardModal: React.FC<DistrictLeaderboardModalProps> =
 
             {/* Rank #1 Gold Champion */}
             {top1 && (
-              <div className="bg-gradient-to-t from-amber-100 via-amber-50 to-white p-4 rounded-3xl border-2 border-amber-400 text-center shadow-md relative space-y-1.5 transform -translate-y-2">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 font-black text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-amber-300 shadow-sm flex items-center gap-1">
-                  <Crown className="w-3 h-3" /> Champion
+              <div className="bg-gradient-to-t from-amber-200 via-amber-100 to-white p-4.5 rounded-3xl border-2 border-amber-400 text-center shadow-xl relative space-y-1.5 transform -translate-y-2.5 ring-4 ring-amber-300/40">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black text-[10px] px-3 py-0.5 rounded-full uppercase tracking-wider border border-amber-300 shadow-md flex items-center gap-1 animate-pulse">
+                  <Crown className="w-3 h-3 text-slate-950" /> Gold Champion
                 </div>
-                <div className="w-12 h-12 mx-auto rounded-full bg-amber-400 text-amber-950 font-black text-base flex items-center justify-center border-2 border-amber-500 shadow-md">
+                <div className="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-amber-300 to-amber-500 text-amber-950 font-black text-base flex items-center justify-center border-2 border-yellow-200 shadow-md">
                   🥇 #1
                 </div>
                 <div className="font-black text-sm text-slate-950 truncate" title={top1.name}>
                   {top1.name}
                 </div>
-                <div className="text-[10px] text-amber-900 font-bold truncate">{top1.school}</div>
-                <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500 text-slate-950 text-xs font-black shadow-xs">
+                <div className="text-[10px] text-amber-950 font-extrabold truncate">{top1.school}</div>
+                <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500 text-slate-950 text-xs font-black shadow-sm">
                   🔥 {top1.totalXp} XP
                 </div>
               </div>
             )}
 
-            {/* Rank #3 Bronze */}
+            {/* Rank #3 Bronze Contender */}
             {top3 && (
-              <div className="bg-gradient-to-t from-amber-50 to-white p-3.5 rounded-2xl border border-amber-200 text-center shadow-sm relative space-y-1">
-                <div className="w-10 h-10 mx-auto rounded-full bg-amber-200 text-amber-900 font-black text-sm flex items-center justify-center border-2 border-amber-400 shadow-sm">
+              <div className="bg-gradient-to-t from-amber-100/80 via-amber-50 to-white p-4 rounded-2xl border-2 border-amber-300/80 text-center shadow-md relative space-y-1">
+                <div className="w-10 h-10 mx-auto rounded-full bg-gradient-to-br from-amber-600 to-amber-800 text-amber-100 font-black text-sm flex items-center justify-center border-2 border-amber-400 shadow-md">
                   🥉 #3
+                </div>
+                <div className="inline-block px-2 py-0.5 rounded-full bg-amber-100 text-amber-950 text-[9px] font-black uppercase tracking-wider">
+                  Bronze Contender
                 </div>
                 <div className="font-extrabold text-xs text-slate-900 truncate" title={top3.name}>
                   {top3.name}
                 </div>
                 <div className="text-[10px] text-slate-500 font-semibold truncate">{top3.school}</div>
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black">
+                <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-900 text-amber-100 text-[10px] font-black shadow-xs">
                   {top3.totalXp} XP
                 </div>
               </div>

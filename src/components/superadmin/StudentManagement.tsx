@@ -38,14 +38,10 @@ export const StudentManagement: React.FC = () => {
   const [studentToDelete, setStudentToDelete] = useState<StudentUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
-
-  // Password visibility state in table
-  const [revealedStudentPasswords, setRevealedStudentPasswords] = useState<Record<string, boolean>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Password change state in modal
   const [newPasswordInput, setNewPasswordInput] = useState('');
-  const [showModalPassword, setShowModalPassword] = useState(false);
   const [passwordChangeToast, setPasswordChangeToast] = useState<string | null>(null);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
@@ -59,13 +55,6 @@ export const StudentManagement: React.FC = () => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
-  };
-
-  const toggleStudentPasswordReveal = (studentId: string) => {
-    setRevealedStudentPasswords((prev) => ({
-      ...prev,
-      [studentId]: !prev[studentId],
-    }));
   };
 
   const handleUpdateStudentPassword = async () => {
@@ -296,7 +285,6 @@ export const StudentManagement: React.FC = () => {
             <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               <tr>
                 <th className="px-5 py-3.5">Candidate & ID</th>
-                <th className="px-5 py-3.5">Password (கடவுச்சொல்)</th>
                 <th className="px-5 py-3.5">Educational Institution</th>
                 <th className="px-5 py-3.5">Grade Level</th>
                 <th className="px-5 py-3.5 text-center">
@@ -314,15 +302,13 @@ export const StudentManagement: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-8 text-center text-slate-400">
+                  <td colSpan={8} className="px-5 py-8 text-center text-slate-400">
                     No student records match your query.
                   </td>
                 </tr>
               ) : (
                 filteredStudents.map((std) => {
                   const points = std.referralPoints !== undefined ? std.referralPoints : 25;
-                  const isPassRevealed = Boolean(revealedStudentPasswords[std.id]);
-                  const displayPass = std.initialPassword || 'HNC@12345';
 
                   return (
                     <tr key={std.id} className="hover:bg-slate-50/70 transition-colors">
@@ -342,39 +328,6 @@ export const StudentManagement: React.FC = () => {
                               </span>
                             )}
                           </div>
-                        </div>
-                      </td>
-
-                      {/* Password Column with Reveal & Copy */}
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 w-fit">
-                          <span className="font-mono text-[11px] font-semibold text-slate-800">
-                            {isPassRevealed ? displayPass : '••••••••••••'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => toggleStudentPasswordReveal(std.id)}
-                            title={isPassRevealed ? 'Hide Password' : 'Show Password (கடவுச்சொல்லைக் காட்டு)'}
-                            className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors"
-                          >
-                            {isPassRevealed ? (
-                              <EyeOff className="w-3.5 h-3.5 text-slate-600" />
-                            ) : (
-                              <Eye className="w-3.5 h-3.5 text-blue-600" />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyText(displayPass, `pass-${std.id}`)}
-                            title="Copy Password"
-                            className="p-1 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                          >
-                            {copiedKey === `pass-${std.id}` ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
                         </div>
                       </td>
 
@@ -718,7 +671,7 @@ export const StudentManagement: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <Key className="w-4 h-4 text-amber-400" />
                   <span className="text-xs font-bold text-amber-300">
-                    {language === 'ta' ? 'கடவுச்சொல் முகாமைத்துவம் (Super Admin Password Reset)' : 'Student Password Management'}
+                    {language === 'ta' ? 'கடவுச்சொல் மீட்டமைப்பு (Password Reset)' : 'Student Password Reset'}
                   </span>
                 </div>
                 {passwordChangeToast && (
@@ -731,29 +684,12 @@ export const StudentManagement: React.FC = () => {
               <div className="flex items-center justify-between gap-2 bg-slate-800/80 p-2.5 rounded-xl border border-slate-700">
                 <div>
                   <span className="text-[10px] text-slate-400 block font-semibold">
-                    {language === 'ta' ? 'தற்போதைய கடவுச்சொல் (Current Password):' : 'Current Password:'}
+                    {language === 'ta' ? 'கடவுச்சொல் நிலை:' : 'Password Security Status:'}
                   </span>
-                  <span className="font-mono text-xs font-bold text-amber-300">
-                    {showModalPassword ? (selectedStudent.initialPassword || 'HNC@12345') : '••••••••••••'}
+                  <span className="font-mono text-xs font-bold text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{language === 'ta' ? 'பாதுகாக்கப்பட்டது & மறைக்கப்பட்டது' : 'Encrypted & Protected'}</span>
                   </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowModalPassword(!showModalPassword)}
-                    className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors"
-                    title={showModalPassword ? 'Hide Password' : 'Show Password'}
-                  >
-                    {showModalPassword ? <EyeOff className="w-3.5 h-3.5 text-amber-400" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyText(selectedStudent.initialPassword || 'HNC@12345', 'modal-pass')}
-                    className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors"
-                    title="Copy Password"
-                  >
-                    {copiedKey === 'modal-pass' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
                 </div>
               </div>
 

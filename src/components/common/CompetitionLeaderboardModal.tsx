@@ -70,25 +70,25 @@ export const CompetitionLeaderboardModal: React.FC<CompetitionLeaderboardModalPr
     switch (rank) {
       case 1:
         return (
-          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs ring-2 ring-amber-400">
-            🥇 1
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black text-xs shadow-md ring-2 ring-amber-400/60 animate-pulse">
+            🥇 1st Gold
           </span>
         );
       case 2:
         return (
-          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-200 text-slate-800 font-extrabold text-xs ring-2 ring-slate-400">
-            🥈 2
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-slate-200 via-slate-100 to-slate-300 text-slate-900 font-black text-xs shadow-md ring-2 ring-slate-300/60">
+            🥈 2nd Silver
           </span>
         );
       case 3:
         return (
-          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-800/20 text-amber-950 font-extrabold text-xs ring-2 ring-amber-700/40">
-            🥉 3
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-200 via-amber-100 to-amber-300 text-amber-950 font-black text-xs shadow-md ring-2 ring-amber-300/60">
+            🥉 3rd Bronze
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 text-slate-600 font-bold text-xs">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 text-slate-600 font-bold text-xs border border-slate-200">
             #{rank}
           </span>
         );
@@ -199,7 +199,13 @@ export const CompetitionLeaderboardModal: React.FC<CompetitionLeaderboardModalPr
                         key={res.id}
                         className={`transition ${
                           isSelf
-                            ? 'bg-blue-50/80 font-semibold ring-1 ring-blue-500/30'
+                            ? 'bg-blue-50/90 font-semibold ring-2 ring-blue-500/40'
+                            : res.computedRank === 1
+                            ? 'bg-amber-50/90 font-semibold border-l-4 border-l-amber-500'
+                            : res.computedRank === 2
+                            ? 'bg-slate-100/80 border-l-4 border-l-slate-400'
+                            : res.computedRank === 3
+                            ? 'bg-amber-50/40 border-l-4 border-l-amber-700'
                             : 'hover:bg-slate-50/60'
                         }`}
                       >

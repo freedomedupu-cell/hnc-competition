@@ -32,6 +32,7 @@ import { GraduationCap, Shield } from 'lucide-react';
 import { APP_LOGO } from '../../assets/logo';
 import { StudentMembershipModal } from './StudentMembershipModal';
 import { DynamicAdBillboard } from '../common/DynamicAdBillboard';
+import { LiveExamLeaderboard } from './LiveExamLeaderboard';
 import { isGradeEligible } from '../../lib/gradeUtils';
 
 export const StudentCompetitionsView: React.FC = () => {
@@ -264,6 +265,9 @@ export const StudentCompetitionsView: React.FC = () => {
           Active Contests: {visibleCompetitions.length}
         </div>
       </div>
+
+      {/* Real-Time Live Exam Leaderboard */}
+      <LiveExamLeaderboard onSelectCompetition={(comp) => setDetailsComp(comp)} />
 
       {/* Registration Toast Feedback */}
       {regToast && (

@@ -27,7 +27,6 @@ export const StudentInfoView: React.FC = () => {
   const { students, competitions, currentAdmin, language, memberships } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<StudentUser | null>(null);
-  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleCopy = (text: string, key: string) => {
@@ -109,7 +108,6 @@ export const StudentInfoView: React.FC = () => {
             <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               <tr>
                 <th className="px-5 py-3.5">Candidate Name & ID</th>
-                <th className="px-5 py-3.5">Password (கடவுச்சொல்)</th>
                 <th className="px-5 py-3.5">School / Institution</th>
                 <th className="px-5 py-3.5">Grade</th>
                 <th className="px-5 py-3.5 text-center">
@@ -127,8 +125,6 @@ export const StudentInfoView: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {filteredStudents.map((std) => {
                 const pts = std.referralPoints !== undefined ? std.referralPoints : 25;
-                const isPassRevealed = Boolean(revealedPasswords[std.id]);
-                const displayPass = std.initialPassword || 'HNC@12345';
 
                 return (
                   <tr key={std.id} className="hover:bg-slate-50/70 transition-colors">
@@ -148,39 +144,6 @@ export const StudentInfoView: React.FC = () => {
                             </span>
                           )}
                         </div>
-                      </div>
-                    </td>
-
-                    {/* Password Column */}
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 w-fit">
-                        <span className="font-mono text-[11px] font-semibold text-slate-800">
-                          {isPassRevealed ? displayPass : '••••••••••••'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setRevealedPasswords((prev) => ({ ...prev, [std.id]: !prev[std.id] }))}
-                          title={isPassRevealed ? 'Hide Password' : 'Show Password (கடவுச்சொல்லைக் காட்டு)'}
-                          className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors cursor-pointer"
-                        >
-                          {isPassRevealed ? (
-                            <EyeOff className="w-3.5 h-3.5 text-slate-600" />
-                          ) : (
-                            <Eye className="w-3.5 h-3.5 text-blue-600" />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(displayPass, `pass-${std.id}`)}
-                          title="Copy Password"
-                          className="p-1 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors cursor-pointer"
-                        >
-                          {copiedKey === `pass-${std.id}` ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
-                        </button>
                       </div>
                     </td>
 

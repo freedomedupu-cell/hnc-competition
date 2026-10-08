@@ -308,9 +308,12 @@ export interface AdminUser extends BaseUser {
 export interface StudentUser extends BaseUser {
   role: 'student';
   studentId: string;
+  fullName?: string;
   username?: string;
   institution: string;
+  school?: string;
   gradeLevel: string;
+  grade?: string;
   district?: string;
   address?: string;
   dateOfBirth?: string;
@@ -325,6 +328,7 @@ export interface StudentUser extends BaseUser {
   totalReferrals?: number;
   sharesCount?: number;
   redeemedPerks?: string[];
+  initialPassword?: string;
 }
 
 export interface ReferralPerk {
@@ -460,6 +464,8 @@ export interface CompetitionResult {
   maxScore: number;
   totalMarks?: number;
   percentage?: number;
+  accuracy?: number;
+  timeTakenSeconds?: number;
   rank: number;
   percentile: number;
   award: 'Grand Champion' | 'Gold Medal' | 'Silver Medal' | 'Bronze Medal' | 'Honorary Mention' | 'Participation' | string;

@@ -43,6 +43,7 @@ import { CompetitionInstructionsModal } from './CompetitionInstructionsModal';
 import { isGradeEligible } from '../../lib/gradeUtils';
 import { SubmissionConfirmationView } from './SubmissionConfirmationView';
 import { CompetitionPaymentModal } from './CompetitionPaymentModal';
+import { StudentAchievements } from './StudentAchievements';
 import { ExamCameraVerificationModal } from './ExamCameraVerificationModal';
 import { StudentMembershipModal } from './StudentMembershipModal';
 import { DynamicAdBillboard } from '../common/DynamicAdBillboard';
@@ -788,6 +789,9 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
         {/* Right: Vector Celebration Graphic */}
         <CelebratingStudentGraphic />
       </div>
+
+      {/* 4.4 STUDENT ACHIEVEMENTS & MILESTONES */}
+      <StudentAchievements compact={true} />
 
       {/* 4.5 OFFICIAL COMMUNITY & SUPPORT BANNER */}
       <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-md space-y-4">

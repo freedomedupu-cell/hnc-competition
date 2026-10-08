@@ -33,6 +33,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { StudentMembershipModal } from './StudentMembershipModal';
+import { StudentAchievements } from './StudentAchievements';
 
 export const StudentProfileView: React.FC = () => {
   const {
@@ -718,6 +719,9 @@ export const StudentProfileView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Student Milestone Achievements & Badges */}
+      <StudentAchievements />
 
       {/* Toast Notification */}
       {avatarToast && (

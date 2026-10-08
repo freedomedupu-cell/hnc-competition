@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 export const AdminManagement: React.FC = () => {
-  const { admins, addAdmin, toggleAdminStatus, deleteAdmin, language } = useApp();
+  const { admins, addAdmin, toggleAdminStatus, deleteAdmin, updateAdminDetails, language } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,6 +35,9 @@ export const AdminManagement: React.FC = () => {
 
   // Admin selected for detailed credentials view modal
   const [selectedCredAdmin, setSelectedCredAdmin] = useState<AdminUser | null>(null);
+  const [editPasswordInput, setEditPasswordInput] = useState('');
+  const [passwordToast, setPasswordToast] = useState<string | null>(null);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // Admin selected for deletion confirmation modal
   const [deleteTargetAdmin, setDeleteTargetAdmin] = useState<AdminUser | null>(null);
@@ -751,6 +754,66 @@ export const AdminManagement: React.FC = () => {
               </div>
             </div>
 
+            {/* Super Admin Password Change Form */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                  <Key className="w-3.5 h-3.5 text-blue-700" />
+                  <span>{language === 'ta' ? 'கடவுச்சொல்லை மாற்று (Change Password)' : 'Change Admin Password'}</span>
+                </span>
+              </div>
+
+              {passwordToast && (
+                <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold rounded-lg flex items-center gap-1.5 animate-in fade-in">
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>{passwordToast}</span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter new password (min 6 chars)..."
+                  value={editPasswordInput}
+                  onChange={(e) => setEditPasswordInput(e.target.value)}
+                  className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+                <button
+                  type="button"
+                  disabled={isUpdatingPassword || !editPasswordInput.trim()}
+                  onClick={async () => {
+                    if (!selectedCredAdmin || !editPasswordInput.trim()) return;
+                    if (editPasswordInput.trim().length < 6) {
+                      setPasswordToast(language === 'ta' ? 'குறைந்தது 6 எழுத்துக்கள் தேவை.' : 'Min 6 characters required.');
+                      return;
+                    }
+                    setIsUpdatingPassword(true);
+                    try {
+                      await updateAdminDetails(selectedCredAdmin.id, {
+                        initialPassword: editPasswordInput.trim(),
+                      });
+                      setSelectedCredAdmin({
+                        ...selectedCredAdmin,
+                        initialPassword: editPasswordInput.trim(),
+                      });
+                      setPasswordToast(
+                        language === 'ta' ? 'கடவுச்சொல் மாற்றப்பட்டது!' : 'Password updated successfully!'
+                      );
+                      setEditPasswordInput('');
+                      setTimeout(() => setPasswordToast(null), 3000);
+                    } catch (err: any) {
+                      setPasswordToast(err.message || 'Failed to update password');
+                    } finally {
+                      setIsUpdatingPassword(false);
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+                >
+                  {isUpdatingPassword ? 'Saving...' : language === 'ta' ? 'சேமி' : 'Save'}
+                </button>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between gap-3 pt-2">
               <button
                 type="button"
@@ -768,7 +831,11 @@ export const AdminManagement: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setSelectedCredAdmin(null)}
+                onClick={() => {
+                  setSelectedCredAdmin(null);
+                  setEditPasswordInput('');
+                  setPasswordToast(null);
+                }}
                 className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
               >
                 Close
