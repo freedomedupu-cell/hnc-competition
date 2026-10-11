@@ -161,7 +161,6 @@ export const AuthView: React.FC = () => {
     } catch {}
   }, []);
 
-  const [isCustomGrade, setIsCustomGrade] = useState(false);
   const [isCustomDistrict, setIsCustomDistrict] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
@@ -843,7 +842,7 @@ export const AuthView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 2. Grade */}
+                {/* 2. Grade (Type Only) */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-bold text-slate-700">
@@ -853,66 +852,33 @@ export const AuthView: React.FC = () => {
                         ? 'ශ්‍රේණිය (Grade) *'
                         : 'Grade *'}
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomGrade(!isCustomGrade)}
-                      className="text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200 transition-colors flex items-center gap-1"
-                    >
-                      {isCustomGrade ? (
-                        <>
-                          <ListFilter className="w-3 h-3" />
-                          <span>{language === 'ta' ? 'பட்டியல்' : language === 'si' ? 'ලැයිස්තුව' : 'List'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <PenLine className="w-3 h-3" />
-                          <span>{language === 'ta' ? 'தட்டச்சு' : language === 'si' ? 'ටයිප් කරන්න' : 'Type'}</span>
-                        </>
-                      )}
-                    </button>
+                    <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded">
+                      {language === 'ta' ? 'தட்டச்சு செய்யவும்' : language === 'si' ? 'ටයිප් කරන්න' : 'Type freely'}
+                    </span>
                   </div>
 
-                  {!isCustomGrade ? (
-                    <div className="relative">
-                      <select
-                        id="input-reg-grade"
-                        value={AVAILABLE_GRADES.includes(studentForm.grade) ? studentForm.grade : '__custom__'}
-                        onChange={(e) => {
-                          if (e.target.value === '__custom__') {
-                            setIsCustomGrade(true);
-                          } else {
-                            setStudentForm({ ...studentForm, grade: e.target.value });
-                          }
-                        }}
-                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white font-medium"
-                      >
-                        {AVAILABLE_GRADES.map((g) => (
-                          <option key={g} value={g}>
-                            {g}
-                          </option>
-                        ))}
-                        <option value="__custom__">
-                          ✍️ {language === 'ta'
-                            ? 'வேறு தரம் தட்டச்சு செய்க...'
-                            : language === 'si'
-                            ? 'වෙනත් ශ්‍රේණියක් ටයිප් කරන්න...'
-                            : 'Type Custom Grade / Level...'}
-                        </option>
-                      </select>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      <input
-                        id="input-reg-grade-custom"
-                        type="text"
-                        required
-                        placeholder="e.g. Grade 11 (O/L), Grade 12 (A/L), Primary..."
-                        value={studentForm.grade}
-                        onChange={(e) => setStudentForm({ ...studentForm, grade: e.target.value })}
-                        className="w-full px-3 py-1.5 text-xs bg-white border border-blue-400 ring-2 ring-blue-100 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 font-medium"
-                      />
-                    </div>
-                  )}
+                  <div className="relative">
+                    <input
+                      id="input-reg-grade"
+                      type="text"
+                      list="registration-grade-suggestions"
+                      required
+                      placeholder={language === 'ta' ? 'எ.கா: Grade 11 (O/L), Grade 10, Grade 6...' : 'e.g. Grade 11 (O/L), Grade 10, Grade 6...'}
+                      value={studentForm.grade}
+                      onChange={(e) => setStudentForm({ ...studentForm, grade: e.target.value })}
+                      className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 font-medium shadow-2xs"
+                    />
+                    <datalist id="registration-grade-suggestions">
+                      {AVAILABLE_GRADES.filter(
+                        (g) =>
+                          !g.toLowerCase().includes('open') &&
+                          !g.toLowerCase().includes('all grades') &&
+                          !g.toLowerCase().includes('அனைத்து')
+                      ).map((g) => (
+                        <option key={g} value={g} />
+                      ))}
+                    </datalist>
+                  </div>
                 </div>
 
                 {/* 3. Date of birth */}

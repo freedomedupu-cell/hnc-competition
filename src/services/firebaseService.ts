@@ -42,6 +42,7 @@ import {
   DbLiveProctorSession,
   ProctorWarning,
   DbAdvertisement,
+  DbStudentFeedback,
 } from '../types';
 import {
   storeMediaInIndexedDB,
@@ -652,6 +653,10 @@ export async function createAdminAccountBySuperAdmin(data: {
   phone?: string;
   department?: string;
   staffId?: string;
+  adminType?: 'general' | 'subject_admin';
+  assignedSubject?: string;
+  assignedSubjects?: string[];
+  assignedGrades?: string[];
 }): Promise<DbAdmin> {
   const normalizedEmail = data.email.trim().toLowerCase();
   const normalizedUsername = (data.username || data.staffId || normalizedEmail.split('@')[0]).trim();
@@ -700,6 +705,12 @@ export async function createAdminAccountBySuperAdmin(data: {
     createdAt: now,
     passwordHash: computedHash,
     initialPassword: data.password,
+    department: data.department?.trim() || 'General Academics',
+    staffId: data.staffId?.trim() || `ADM-${Math.floor(1000 + Math.random() * 9000)}`,
+    adminType: data.adminType || 'general',
+    assignedSubject: data.assignedSubject?.trim() || '',
+    assignedSubjects: data.assignedSubjects || (data.assignedSubject ? [data.assignedSubject.trim()] : []),
+    assignedGrades: data.assignedGrades || [],
   };
   await setDoc(doc(db, 'users', newUid), userDoc);
 
@@ -713,6 +724,10 @@ export async function createAdminAccountBySuperAdmin(data: {
     phone: data.phone?.trim() || '',
     department: data.department?.trim() || 'General Academics',
     staffId: data.staffId?.trim() || `ADM-${Math.floor(1000 + Math.random() * 9000)}`,
+    adminType: data.adminType || 'general',
+    assignedSubject: data.assignedSubject?.trim() || '',
+    assignedSubjects: data.assignedSubjects || (data.assignedSubject ? [data.assignedSubject.trim()] : []),
+    assignedGrades: data.assignedGrades || [],
     status: 'active',
     createdAt: now,
   };
@@ -816,11 +831,20 @@ export async function updateAdminDetailsInFirestore(
   data: Partial<DbAdmin>
 ): Promise<void> {
   await updateDoc(doc(db, 'admins', adminUid), data);
-  if (data.fullName || data.phone) {
-    const userUpdates: Partial<DbUser> = {};
-    if (data.fullName) userUpdates.fullName = data.fullName;
-    if (data.phone) userUpdates.phone = data.phone;
-    await updateDoc(doc(db, 'users', adminUid), userUpdates);
+  const userUpdates: Partial<DbUser> = {};
+  if (data.fullName) userUpdates.fullName = data.fullName;
+  if (data.phone !== undefined) userUpdates.phone = data.phone;
+  if (data.department) userUpdates.department = data.department;
+  if (data.adminType) userUpdates.adminType = data.adminType;
+  if (data.assignedSubject !== undefined) userUpdates.assignedSubject = data.assignedSubject;
+  if (data.assignedSubjects !== undefined) userUpdates.assignedSubjects = data.assignedSubjects;
+  if (data.assignedGrades !== undefined) userUpdates.assignedGrades = data.assignedGrades;
+  if (Object.keys(userUpdates).length > 0) {
+    try {
+      await updateDoc(doc(db, 'users', adminUid), userUpdates);
+    } catch (e) {
+      console.warn('Update user doc notice:', e);
+    }
   }
 }
 
@@ -1374,6 +1398,13 @@ export async function seedInitialDataIfEmpty(): Promise<void> {
  * so that students only see authentic competitions created by real administrators.
  */
 export async function purgeLegacyDemoFirestoreData(): Promise<{ competitionsDeleted: number }> {
+  if (typeof window !== 'undefined') {
+    if (sessionStorage.getItem('hnc_legacy_demo_purged_done')) {
+      return { competitionsDeleted: 0 };
+    }
+    sessionStorage.setItem('hnc_legacy_demo_purged_done', 'true');
+  }
+
   // Always perform direct purge of student_kavitha_selvam, demo admins, and legacy demo records
   try {
     const kRef = doc(db, 'users', 'student_kavitha_selvam');
@@ -1409,15 +1440,12 @@ export async function purgeLegacyDemoFirestoreData(): Promise<{ competitionsDele
   let competitionsDeleted = 0;
   try {
     const knownDemoCompIds = [
-      'comp-nat-math-olympiad-2026',
-      'comp-sci-national-challenge-2026',
-      'comp-gr6-math-challenge-2026',
-      'comp-gr7-science-quiz-2026',
       'comp-101',
       'comp-102',
       'comp-103',
       'comp-104',
       'comp-105',
+      'comp_demo_1',
       'feat-math-2026',
       'feat-sci-2026',
       'feat-eng-2026',
@@ -1425,10 +1453,9 @@ export async function purgeLegacyDemoFirestoreData(): Promise<{ competitionsDele
     ];
 
     const knownDemoCodes = new Set([
-      'HNC-MATH-2026',
-      'HNC-STEM-2026',
-      'HNC-GR6-MATH-2026',
-      'HNC-GR7-SCI-2026',
+      'HNC-DEMO-01',
+      'HNC-DEMO-02',
+      'HNC-SAMPLE-01',
     ]);
 
     // 1. Direct document deletion for known demo IDs
@@ -1454,10 +1481,6 @@ export async function purgeLegacyDemoFirestoreData(): Promise<{ competitionsDele
         const isDemoDoc =
           knownDemoCompIds.includes(d.id) ||
           knownDemoCodes.has(code) ||
-          title.includes('national academic mathematics & logic olympiad 2026') ||
-          title.includes('all-island science & stem olympiad 2026') ||
-          title.includes('junior mathematics challenge 2026 (grade 6)') ||
-          title.includes('junior science & environment quiz 2026 (grade 7)') ||
           title.includes('demo competition') ||
           title.includes('sample competition') ||
           title.includes('test competition');
@@ -1566,24 +1589,33 @@ export async function purgeLegacyDemoFirestoreData(): Promise<{ competitionsDele
       }
     } catch (_) {}
 
-    // 6. Purge simulated live proctoring feeds
+    // 6. Purge simulated and mock live proctoring feeds
     try {
-      const proctorColRef = collection(db, 'live_proctor_sessions');
-      const proctorSnap = await getDocs(proctorColRef);
-      for (const d of proctorSnap.docs) {
-        const data = d.data();
-        const sId = (data.sessionId || '').toLowerCase();
-        const candId = (data.studentId || '').toLowerCase();
-        const sName = (data.studentName || '').toLowerCase();
-        if (
-          d.id.startsWith('sim-') ||
-          sId.startsWith('sim-') ||
-          candId.startsWith('sim-') ||
-          sName.includes('simulated') ||
-          sName.includes('கவிநிலா') ||
-          candId.includes('sim-cand')
-        ) {
-          await deleteDoc(d.ref);
+      const collectionsToCheck = ['live_proctor_sessions', 'liveProctorSessions'];
+      for (const colName of collectionsToCheck) {
+        const proctorColRef = collection(db, colName);
+        const proctorSnap = await getDocs(proctorColRef);
+        for (const d of proctorSnap.docs) {
+          const data = d.data();
+          const sId = (data.sessionId || d.id || '').toLowerCase();
+          const candId = (data.studentId || '').toLowerCase();
+          const sName = (data.studentName || '').toLowerCase();
+          if (
+            d.id.startsWith('sim-') ||
+            d.id.startsWith('mock_') ||
+            sId.startsWith('sim-') ||
+            sId.startsWith('mock_') ||
+            candId.startsWith('sim-') ||
+            sName.includes('simulated') ||
+            sName.includes('kavishka silva') ||
+            sName.includes('tharindu perera') ||
+            sName.includes('priya ramanathan') ||
+            sName.includes('ahmad rizwan') ||
+            sName.includes('கவிநிலா') ||
+            candId.includes('sim-cand')
+          ) {
+            await deleteDoc(d.ref);
+          }
         }
       }
     } catch (_) {}
@@ -2577,6 +2609,83 @@ export async function resetUserPasswordByLookup(
     assignedPassword,
   };
 }
+
+// -------------------------------------------------------------
+// Student Feedback Operations
+// -------------------------------------------------------------
+
+export async function submitStudentFeedbackToFirestore(
+  feedbackData: Omit<DbStudentFeedback, 'id' | 'createdAt' | 'status'>
+): Promise<string> {
+  const feedbackId = `fb_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const feedbackRecord: DbStudentFeedback = {
+    ...feedbackData,
+    id: feedbackId,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  };
+
+  const docRef = doc(db, 'student_feedbacks', feedbackId);
+  await setDoc(docRef, feedbackRecord);
+  return feedbackId;
+}
+
+export function subscribeToAllFeedbacks(
+  callback: (feedbacks: DbStudentFeedback[]) => void
+): Unsubscribe {
+  const feedbacksCol = collection(db, 'student_feedbacks');
+  return onSnapshot(
+    feedbacksCol,
+    (snapshot) => {
+      const items: DbStudentFeedback[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push(docSnap.data() as DbStudentFeedback);
+      });
+      // Sort newest first
+      items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      callback(items);
+    },
+    (err) => {
+      console.warn('Feedback subscription notice:', err);
+    }
+  );
+}
+
+export function subscribeToStudentFeedbacks(
+  studentId: string,
+  callback: (feedbacks: DbStudentFeedback[]) => void
+): Unsubscribe {
+  const feedbacksCol = collection(db, 'student_feedbacks');
+  const q = query(feedbacksCol, where('studentId', '==', studentId));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const items: DbStudentFeedback[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push(docSnap.data() as DbStudentFeedback);
+      });
+      items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      callback(items);
+    },
+    (err) => {
+      console.warn('Student feedbacks subscription notice:', err);
+    }
+  );
+}
+
+export async function updateFeedbackInFirestore(
+  feedbackId: string,
+  updates: Partial<DbStudentFeedback>
+): Promise<void> {
+  const docRef = doc(db, 'student_feedbacks', feedbackId);
+  await updateDoc(docRef, updates);
+}
+
+export async function deleteFeedbackFromFirestore(feedbackId: string): Promise<void> {
+  const docRef = doc(db, 'student_feedbacks', feedbackId);
+  await deleteDoc(docRef);
+}
+
 
 
 

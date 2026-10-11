@@ -24,11 +24,15 @@ import {
   Video,
   Activity,
   MessageCircle,
+  MessageSquare,
   Phone,
   Mail,
   Share2,
   ExternalLink,
   Gamepad2,
+  HelpCircle,
+  FileText,
+  BookOpen,
 } from 'lucide-react';
 import { SuperAdminNav, AdminNav, StudentNav } from '../../context/AppContext';
 
@@ -47,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
     studentNav,
     setStudentNav,
     currentStudent,
+    currentAdmin,
     currentAuthUser,
     admins,
     students,
@@ -56,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
     advertisements,
     liveProctorSessions,
     auditLogs,
+    feedbacks,
     t,
     language,
     openDistrictsStudio,
@@ -131,6 +137,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
       badge: advertisements.length || undefined,
     },
     {
+      id: 'Live Proctoring',
+      label:
+        language === 'ta'
+          ? 'நேரலை கண்காணிப்பு'
+          : language === 'si'
+          ? 'සජීවී නිරීක්ෂණය'
+          : 'Live Proctoring',
+      icon: <Video className="w-4 h-4 text-red-500" />,
+      badge: activeProctorCount > 0 ? `${activeProctorCount} LIVE` : undefined,
+    },
+    {
+      id: 'Feedback',
+      label:
+        language === 'ta'
+          ? 'மாணவர் கருத்துகள்'
+          : language === 'si'
+          ? 'ශිෂ්‍ය ප්‍රතිපෝෂණ'
+          : 'Student Feedback',
+      icon: <MessageCircle className="w-4 h-4 text-pink-500" />,
+      badge: feedbacks.filter((f) => f.status === 'pending').length || undefined,
+    },
+    {
       id: 'Settings',
       label: t('navSettings'),
       icon: <Settings className="w-4 h-4" />,
@@ -189,9 +217,102 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
       badge: advertisements.length || undefined,
     },
     {
+      id: 'Live Proctoring',
+      label:
+        language === 'ta'
+          ? 'நேரலை கண்காணிப்பு'
+          : language === 'si'
+          ? 'සජීවී නිරීක්ෂණය'
+          : 'Live Proctoring',
+      icon: <Video className="w-4 h-4 text-red-500" />,
+      badge: activeProctorCount > 0 ? `${activeProctorCount} LIVE` : undefined,
+    },
+    {
+      id: 'Feedback',
+      label:
+        language === 'ta'
+          ? 'மாணவர் கருத்துகள்'
+          : language === 'si'
+          ? 'ශිෂ්‍ය ප්‍රතිපෝෂණ'
+          : 'Student Feedback',
+      icon: <MessageCircle className="w-4 h-4 text-pink-500" />,
+      badge: feedbacks.filter((f) => f.status === 'pending').length || undefined,
+    },
+    {
       id: 'Profile',
       label: t('navProfile'),
       icon: <User className="w-4 h-4" />,
+    },
+  ];
+
+  const isSubjectAdmin =
+    effectivePortal === 'admin' &&
+    (currentAdmin.adminType === 'subject_admin' || Boolean(currentAdmin.assignedSubject));
+
+  const assignedSubjectLabel = currentAdmin.assignedSubject || currentAdmin.department || 'Subject';
+
+  // Filter competitions specifically for this subject admin
+  const subjectCompetitions = competitions.filter((comp) => {
+    if (comp.leadAdminId === currentAdmin.id || comp.leadAdminName === currentAdmin.name) {
+      return true;
+    }
+    if (!currentAdmin.assignedSubject) return true;
+    const adminSubj = currentAdmin.assignedSubject.toLowerCase().trim();
+    const compCat = (comp.category || '').toLowerCase().trim();
+    return compCat === adminSubj || compCat.includes(adminSubj) || adminSubj.includes(compCat);
+  });
+
+  const subjectQuizzesCount = subjectCompetitions.filter(
+    (c) => (c.competitionType || 'quiz').toLowerCase() === 'quiz'
+  ).length;
+
+  const subjectExamsCount = subjectCompetitions.filter(
+    (c) => (c.competitionType || '').toLowerCase() === 'exam'
+  ).length;
+
+  const subjectCompsCount = subjectCompetitions.filter((c) => {
+    const t = (c.competitionType || '').toLowerCase();
+    return t === 'competition' || (t !== 'quiz' && t !== 'exam');
+  }).length;
+
+  const subjectAdminNavItems: {
+    id: AdminNav;
+    label: string;
+    icon: React.ReactNode;
+    badge?: number | string;
+  }[] = [
+    {
+      id: 'Quiz',
+      label:
+        language === 'ta'
+          ? 'வினாடி வினா (Quiz)'
+          : language === 'si'
+          ? 'Quiz තරඟ'
+          : 'Quizzes (வினாடி வினா)',
+      icon: <HelpCircle className="w-4 h-4 text-purple-600" />,
+      badge: subjectQuizzesCount,
+    },
+    {
+      id: 'Exam',
+      label:
+        language === 'ta'
+          ? 'பரீட்சை (Exam)'
+          : language === 'si'
+          ? 'විභාග (Exam)'
+          : 'Exams (பரீட்சை)',
+      icon: <FileText className="w-4 h-4 text-indigo-600" />,
+      badge: subjectExamsCount,
+    },
+    {
+      id: 'Competition',
+      label:
+        language === 'ta'
+          ? 'போட்டிகள் (Competition)'
+          : language === 'si'
+          ? 'තරඟ (Competition)'
+          : 'Competitions (போட்டி)',
+      icon: <Trophy className="w-4 h-4 text-blue-600" />,
+      badge: subjectCompsCount,
     },
   ];
 
@@ -260,6 +381,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
           : 'Announcements',
       icon: <Bell className="w-5 h-5 text-indigo-500" />,
       badge: announcements.filter(a => a.targetAudience === 'all' || a.targetAudience === 'students').length || undefined,
+    },
+    {
+      id: 'Feedback',
+      label:
+        language === 'ta'
+          ? 'மாணவர் கருத்துப் படிவம்'
+          : language === 'si'
+          ? 'ශිෂ්‍ය ප්‍රතිපෝෂණ'
+          : 'Feedback Form',
+      icon: <MessageSquare className="w-5 h-5 text-rose-500" />,
+      badge: '💬 New',
     },
     {
       id: 'My Profile',
@@ -339,6 +471,60 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
         );
 
       case 'admin':
+        if (isSubjectAdmin) {
+          return (
+            <div className="space-y-1">
+              <div className="px-3 pb-2 pt-1 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-extrabold text-purple-700 uppercase tracking-wider block">
+                    {language === 'ta' ? 'பாட நிர்வாக மையம்' : language === 'si' ? 'විෂය කළමනාකරණය' : 'Subject Operations'}
+                  </span>
+                  <span className="text-xs font-bold text-slate-800 truncate block">
+                    {assignedSubjectLabel}
+                  </span>
+                </div>
+                <BookOpen className="w-3.5 h-3.5 text-purple-700" />
+              </div>
+              {subjectAdminNavItems.map((item) => {
+                const active = adminNav === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    id={`nav-adm-${item.id.toLowerCase().replace(/\s+/g, '-')}`}
+                    onClick={() => {
+                      setAdminNav(item.id);
+                      onCloseMobile();
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${
+                      active
+                        ? 'bg-purple-100/80 text-purple-950 font-bold border border-purple-300 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className={active ? 'text-purple-700' : 'text-slate-500'}>
+                        {item.icon}
+                      </span>
+                      <span>{item.label}</span>
+                    </div>
+                    {item.badge !== undefined && (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                          active
+                            ? 'bg-purple-200 text-purple-950'
+                            : 'bg-slate-200/80 text-slate-600'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        }
+
         return (
           <div className="space-y-1">
             <div className="px-3 pb-2 pt-1 flex items-center justify-between">

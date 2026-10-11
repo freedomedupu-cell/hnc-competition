@@ -2,12 +2,23 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DIST_DIR = path.join(__dirname, 'dist');
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
+
+// Ensure dist directory exists
+if (!fs.existsSync(path.join(DIST_DIR, 'index.html'))) {
+  console.log('dist/index.html not found. Building project before starting server...');
+  try {
+    execSync('npm run build', { stdio: 'inherit' });
+  } catch (err) {
+    console.error('Failed to build project:', err);
+  }
+}
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -31,17 +42,27 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
-  // Health check endpoint for Cloud Run
-  if (req.url === '/healthz' || req.url === '/_health') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
+  // Health check endpoints for Cloud Run & load balancers
+  const urlPath = (req.url || '/').split('?')[0];
+  if (
+    urlPath === '/healthz' ||
+    urlPath === '/_health' ||
+    urlPath === '/health' ||
+    urlPath === '/ping' ||
+    urlPath === '/api/health'
+  ) {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('OK');
     return;
   }
 
-  // Parse path
-  let reqPath = decodeURIComponent(req.url.split('?')[0]);
-  if (reqPath === '/') {
-    reqPath = '/index.html';
+  // Safe path parsing
+  let reqPath = '/index.html';
+  try {
+    const rawPath = decodeURIComponent(urlPath);
+    reqPath = rawPath === '/' ? '/index.html' : rawPath;
+  } catch (e) {
+    reqPath = urlPath === '/' ? '/index.html' : urlPath;
   }
 
   const filePath = path.join(DIST_DIR, reqPath);
@@ -78,8 +99,8 @@ const server = http.createServer((req, res) => {
           });
           fs.createReadStream(indexPath).pipe(res);
         } else {
-          res.writeHead(404, { 'Content-Type': 'text/plain' });
-          res.end('Application built dist directory not found. Please build the app first.');
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end('<!DOCTYPE html><html><body><h1>HNC Competition App</h1></body></html>');
         }
       });
     }
@@ -88,6 +109,15 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`Server listening on http://${HOST}:${PORT}`);
+});
+
+// Global error handling
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 // Handle graceful shutdown for Cloud Run

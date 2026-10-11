@@ -793,6 +793,42 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
       {/* 4.4 STUDENT ACHIEVEMENTS & MILESTONES */}
       <StudentAchievements compact={true} />
 
+      {/* 4.45 STUDENT FEEDBACK & QUERY CALLOUT */}
+      <div className="bg-gradient-to-r from-rose-50 via-pink-50 to-amber-50 rounded-3xl p-5 sm:p-6 border border-rose-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-sm text-2xl">
+            💬
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-rose-200 text-rose-800">
+                {language === 'ta' ? 'கருத்து & ஆலோசனை' : 'Student Voice'}
+              </span>
+              <span className="text-xs text-rose-600 font-bold">★ Community Feedback</span>
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900 mt-1">
+              {language === 'ta'
+                ? 'உங்கள் அனுபவம் & கருத்துக்களைப் பகிருங்கள் (Feedback Form)'
+                : 'Have Feedback or Questions on Competitions?'}
+            </h3>
+            <p className="text-xs text-slate-600 mt-0.5 max-w-xl">
+              {language === 'ta'
+                ? 'போட்டிகள், வினாக்களின் தரம், Edu-Arena தீவுப் பயணம் பற்றிய உங்கள் கருத்துக்கள் மற்றும் ஆலோசனைகளை நேரடியாகச் சமர்ப்பியுங்கள்.'
+                : 'Share your thoughts, report question doubts, or suggest new features directly to our academic jury.'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setStudentNav('Feedback')}
+          className="self-start md:self-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold text-xs sm:text-sm shadow-sm transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+        >
+          <span>{language === 'ta' ? 'கருத்துப் படிவம் திறக்க' : 'Open Feedback Form'}</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
       {/* 4.5 OFFICIAL COMMUNITY & SUPPORT BANNER */}
       <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-md space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">

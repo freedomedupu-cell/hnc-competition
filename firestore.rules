@@ -164,5 +164,13 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin() || isSuperAdmin() || !isSignedIn();
     }
+
+    // 16. Student Feedbacks collection: Student ratings, reviews, suggestions, and queries
+    match /student_feedbacks/{feedbackId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if isAdmin() || isSuperAdmin() || !isSignedIn();
+      allow delete: if isAdmin() || isSuperAdmin() || !isSignedIn();
+    }
   }
 }

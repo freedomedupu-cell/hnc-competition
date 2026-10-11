@@ -11,43 +11,53 @@ import { AuthView } from './components/auth/AuthView';
 import { GraduationCap } from 'lucide-react';
 import { APP_LOGO } from './assets/logo';
 
-// Super Admin components
-import { SuperAdminDashboard } from './components/superadmin/SuperAdminDashboard';
-import { AdminManagement } from './components/superadmin/AdminManagement';
-import { StudentManagement } from './components/superadmin/StudentManagement';
-import { CompetitionManagement } from './components/superadmin/CompetitionManagement';
-import { ResultsManagement } from './components/superadmin/ResultsManagement';
-import { SettingsView } from './components/superadmin/SettingsView';
+// Super Admin components (Lazy-loaded for instant startup)
+const SuperAdminDashboard = React.lazy(() => import('./components/superadmin/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
+const AdminManagement = React.lazy(() => import('./components/superadmin/AdminManagement').then(m => ({ default: m.AdminManagement })));
+const StudentManagement = React.lazy(() => import('./components/superadmin/StudentManagement').then(m => ({ default: m.StudentManagement })));
+const CompetitionManagement = React.lazy(() => import('./components/superadmin/CompetitionManagement').then(m => ({ default: m.CompetitionManagement })));
+const ResultsManagement = React.lazy(() => import('./components/superadmin/ResultsManagement').then(m => ({ default: m.ResultsManagement })));
+const SettingsView = React.lazy(() => import('./components/superadmin/SettingsView').then(m => ({ default: m.SettingsView })));
 
-// Admin components
-import { AdminDashboardView } from './components/admin/AdminDashboardView';
-import { AdminCompetitionsView } from './components/admin/AdminCompetitionsView';
-import { StudentInfoView } from './components/admin/StudentInfoView';
-import { AdminResultsView } from './components/admin/AdminResultsView';
-import { AdminProfileView } from './components/admin/AdminProfileView';
+// Admin components (Lazy-loaded)
+const AdminDashboardView = React.lazy(() => import('./components/admin/AdminDashboardView').then(m => ({ default: m.AdminDashboardView })));
+const AdminCompetitionsView = React.lazy(() => import('./components/admin/AdminCompetitionsView').then(m => ({ default: m.AdminCompetitionsView })));
+const StudentInfoView = React.lazy(() => import('./components/admin/StudentInfoView').then(m => ({ default: m.StudentInfoView })));
+const AdminResultsView = React.lazy(() => import('./components/admin/AdminResultsView').then(m => ({ default: m.AdminResultsView })));
+const AdminProfileView = React.lazy(() => import('./components/admin/AdminProfileView').then(m => ({ default: m.AdminProfileView })));
+const LiveProctorView = React.lazy(() => import('./components/admin/LiveProctorView').then(m => ({ default: m.LiveProctorView })));
 
-// Student components
-import { StudentDashboardView } from './components/student/StudentDashboardView';
-import { StudentCompetitionsView } from './components/student/StudentCompetitionsView';
-import { StudentResultsView } from './components/student/StudentResultsView';
-import { StudentProfileView } from './components/student/StudentProfileView';
-import { StudentExamInterface } from './components/student/StudentExamInterface';
-import { StudentReferralView } from './components/student/StudentReferralView';
-import { StudentAnnouncementsView } from './components/student/StudentAnnouncementsView';
-import { GameQuest } from './components/student/GameQuest';
+// Student components (Lazy-loaded)
+const StudentDashboardView = React.lazy(() => import('./components/student/StudentDashboardView').then(m => ({ default: m.StudentDashboardView })));
+const StudentCompetitionsView = React.lazy(() => import('./components/student/StudentCompetitionsView').then(m => ({ default: m.StudentCompetitionsView })));
+const StudentResultsView = React.lazy(() => import('./components/student/StudentResultsView').then(m => ({ default: m.StudentResultsView })));
+const StudentProfileView = React.lazy(() => import('./components/student/StudentProfileView').then(m => ({ default: m.StudentProfileView })));
+const StudentExamInterface = React.lazy(() => import('./components/student/StudentExamInterface').then(m => ({ default: m.StudentExamInterface })));
+const StudentReferralView = React.lazy(() => import('./components/student/StudentReferralView').then(m => ({ default: m.StudentReferralView })));
+const StudentAnnouncementsView = React.lazy(() => import('./components/student/StudentAnnouncementsView').then(m => ({ default: m.StudentAnnouncementsView })));
+const GameQuest = React.lazy(() => import('./components/student/GameQuest').then(m => ({ default: m.GameQuest })));
+const StudentFeedbackView = React.lazy(() => import('./components/student/StudentFeedbackView').then(m => ({ default: m.StudentFeedbackView })));
 
-// Common Announcements Management (Admin / Super Admin)
-import { AnnouncementsManagementView } from './components/common/AnnouncementsManagementView';
-
-// Sponsors & Advertisements Management (Admin / Super Admin)
-import { SponsorsAndAdsView } from './components/admin/SponsorsAndAdsView';
+// Common & Auxiliary Management Views (Lazy-loaded)
+const AnnouncementsManagementView = React.lazy(() => import('./components/common/AnnouncementsManagementView').then(m => ({ default: m.AnnouncementsManagementView })));
+const SponsorsAndAdsView = React.lazy(() => import('./components/admin/SponsorsAndAdsView').then(m => ({ default: m.SponsorsAndAdsView })));
+const AdminFeedbackView = React.lazy(() => import('./components/admin/AdminFeedbackView').then(m => ({ default: m.AdminFeedbackView })));
+const SubjectAdminPortal = React.lazy(() => import('./components/admin/SubjectAdminPortal').then(m => ({ default: m.SubjectAdminPortal })));
 
 // Session Security & Inactivity Timeout Warning
 import { SessionTimeoutWarning } from './components/common/SessionTimeoutWarning';
 
+const ViewSkeleton: React.FC = () => (
+  <div className="w-full min-h-[380px] flex flex-col items-center justify-center p-8 space-y-3 animate-in fade-in duration-150">
+    <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    <span className="text-xs font-semibold text-slate-500">Loading view...</span>
+  </div>
+);
+
 const MainPortalArea: React.FC = () => {
   const {
     currentAuthUser,
+    currentAdmin,
     authLoading,
     currentPortal,
     setCurrentPortal,
@@ -111,14 +121,16 @@ const MainPortalArea: React.FC = () => {
   // 3. Phase 4: Distraction-Free Student Exam Engine
   if (effectivePortal === 'student' && activeExamComp && examSessionStage === 'taking') {
     return (
-      <StudentExamInterface
-        competition={activeExamComp}
-        onExit={exitActiveExam}
-        onViewResults={() => {
-          exitActiveExam();
-          setStudentNav('My Results');
-        }}
-      />
+      <React.Suspense fallback={<ViewSkeleton />}>
+        <StudentExamInterface
+          competition={activeExamComp}
+          onExit={exitActiveExam}
+          onViewResults={() => {
+            exitActiveExam();
+            setStudentNav('My Results');
+          }}
+        />
+      </React.Suspense>
     );
   }
 
@@ -141,13 +153,31 @@ const MainPortalArea: React.FC = () => {
             return <AnnouncementsManagementView />;
           case 'Sponsors & Ads':
             return <SponsorsAndAdsView />;
+          case 'Live Proctoring':
+            return <LiveProctorView />;
+          case 'Feedback':
+            return <AdminFeedbackView />;
           case 'Settings':
             return <SettingsView />;
           default:
             return <SuperAdminDashboard onNavigate={setSuperAdminNav} />;
         }
 
-      case 'admin':
+      case 'admin': {
+        const isSubjectAdmin =
+          currentAdmin.adminType === 'subject_admin' || Boolean(currentAdmin.assignedSubject);
+
+        if (isSubjectAdmin) {
+          const activeType: 'Quiz' | 'Exam' | 'Competition' =
+            adminNav === 'Exam' ? 'Exam' : adminNav === 'Competition' ? 'Competition' : 'Quiz';
+          return (
+            <SubjectAdminPortal
+              initialType={activeType}
+              onTabChange={(tab) => setAdminNav(tab)}
+            />
+          );
+        }
+
         switch (adminNav) {
           case 'Dashboard':
             return <AdminDashboardView onNavigate={setAdminNav} />;
@@ -161,11 +191,16 @@ const MainPortalArea: React.FC = () => {
             return <AnnouncementsManagementView />;
           case 'Sponsors & Ads':
             return <SponsorsAndAdsView />;
+          case 'Live Proctoring':
+            return <LiveProctorView />;
+          case 'Feedback':
+            return <AdminFeedbackView />;
           case 'Profile':
             return <AdminProfileView />;
           default:
             return <AdminDashboardView onNavigate={setAdminNav} />;
         }
+      }
 
       case 'student':
         switch (studentNav) {
@@ -183,6 +218,8 @@ const MainPortalArea: React.FC = () => {
             return <StudentReferralView />;
           case 'Announcements':
             return <StudentAnnouncementsView />;
+          case 'Feedback':
+            return <StudentFeedbackView />;
           default:
             return <StudentDashboardView onNavigate={setStudentNav} />;
         }
@@ -203,7 +240,9 @@ const MainPortalArea: React.FC = () => {
         />
 
         <main id="portal-main-content" className="flex-1 p-3 sm:p-6 lg:p-8 min-w-0 w-full overflow-x-hidden">
-          {renderActiveView()}
+          <React.Suspense fallback={<ViewSkeleton />}>
+            {renderActiveView()}
+          </React.Suspense>
         </main>
       </div>
     </div>

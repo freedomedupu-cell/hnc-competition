@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 export const StudentResultsView: React.FC = () => {
-  const { currentStudent, currentAuthUser, results, competitions, language } = useApp();
+  const { currentStudent, currentAuthUser, results, competitions, language, setStudentNav } = useApp();
   const [selectedCertificate, setSelectedCertificate] = useState<CompetitionResult | null>(null);
   const [leaderboardComp, setLeaderboardComp] = useState<Competition | null>(null);
   const [exportedCert, setExportedCert] = useState<string | null>(null);
@@ -335,6 +335,18 @@ export const StudentResultsView: React.FC = () => {
                     <p className="text-slate-700 italic">"{res.feedback}"</p>
                   </div>
                 )}
+
+                {/* Direct Feedback Button */}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <span className="text-[11px] text-slate-400">HNC Central Jury</span>
+                  <button
+                    type="button"
+                    onClick={() => setStudentNav('Feedback')}
+                    className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-bold hover:underline"
+                  >
+                    <span>💬 {language === 'ta' ? 'தேர்வு பற்றிய கருத்து தெரிவிக்க' : 'Share Feedback / Query'}</span>
+                  </button>
+                </div>
               </div>
             );
           })

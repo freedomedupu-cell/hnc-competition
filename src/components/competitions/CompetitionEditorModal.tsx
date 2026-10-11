@@ -341,7 +341,7 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
   initialTab,
   onSave,
 }) => {
-  const { language: currentAppLanguage } = useApp();
+  const { language: currentAppLanguage, currentAdmin } = useApp();
 
   const [activeTab, setActiveTab] = useState<'details' | 'schedule' | 'prizes' | 'questions'>(initialTab || 'details');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -540,7 +540,8 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
 
       const fmt = (d: Date) => d.toISOString().split('T')[0];
 
-      setCategory('Mathematics');
+      const defaultSubject = (currentAdmin?.assignedSubject as any) || 'Mathematics';
+      setCategory(defaultSubject);
       setGrade('Grade 10');
       setLanguage('English');
       setDistrict('All Island');
@@ -1288,9 +1289,16 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-800 mb-1">
-                    Category (பாடப்பிரிவு / வகை) <span className="text-red-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-800">
+                      Category (பாடப்பிரிவு / வகை) <span className="text-red-500">*</span>
+                    </label>
+                    {currentAdmin?.assignedSubject && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-purple-100 text-purple-900 border border-purple-200">
+                        Assigned: {currentAdmin.assignedSubject}
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     required
@@ -1310,14 +1318,14 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                       Grade / Level (வகுப்பு / நிலை) <span className="text-red-500">*</span>
                     </label>
                     <span className="text-[10px] text-blue-700 font-bold">
-                      {grade.toLowerCase().includes('open') ? '🌐 Open to All' : `🎯 Only ${grade}`}
+                      {`🎯 ${grade}`}
                     </span>
                   </div>
                   <input
                     type="text"
                     list="grade-presets-list"
                     required
-                    placeholder="e.g. Grade 11 (O/L), Grade 6, Open (All Grades)..."
+                    placeholder="e.g. Grade 11 (O/L), Grade 10, Grade 6..."
                     value={grade}
                     onChange={(e) => setGrade(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-semibold text-slate-900"
@@ -1342,10 +1350,9 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                     <option value="After School - SLEAS (SL Education Admin Service)" />
                     <option value="After School - SLAS (SL Administrative Service)" />
                     <option value="After School - General Competitive Exam (பொது போட்டிப் பரீட்சை)" />
-                    <option value="Open (All Grades / அனைத்து பிரிவுகளும்)" />
                   </datalist>
                   <p className="text-[10px] text-slate-500 mt-1">
-                    குறிப்பிட்ட வகுப்புக்கு மட்டும் தெரிய வேண்டுமெனில் (எ.கா: Grade 11 (O/L)) தெரிவு செய்யவும். அனைத்து மாணவர்களுக்கும் தெரிய வேண்டுமெனில் <strong>Open (All Grades)</strong> என வைக்கவும்.
+                    குறிப்பிட்ட வகுப்புக்கு மட்டும் தெரிய வேண்டுமெனில் தட்டச்சு செய்யவும் (எ.கா: Grade 11 (O/L), Grade 10).
                   </p>
                 </div>
 
@@ -2239,32 +2246,40 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                   <div className="flex flex-wrap items-center gap-2">
                     <div>
                       <label className="text-[10px] font-semibold text-slate-600 block">
-                        {currentAppLanguage === 'ta' ? 'பாடம் (Subject):' : 'Subject:'}
+                        {currentAppLanguage === 'ta' ? 'பாடம் (Subject - Type):' : 'Subject (Type):'}
                       </label>
-                      <select
+                      <input
+                        type="text"
+                        list="quick-paper-subject-suggestions"
+                        placeholder="e.g. Mathematics..."
                         value={category}
-                        onChange={(e) => setCategory(e.target.value as any)}
-                        className="mt-0.5 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800"
-                      >
-                        {['Mathematics', 'Science', 'English', 'Environmental Studies', 'Logic & Aptitude', 'History'].map((c) => (
-                          <option key={c} value={c}>{c}</option>
+                        onChange={(e) => setCategory(e.target.value)}
+                        className="mt-0.5 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 w-36 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                      />
+                      <datalist id="quick-paper-subject-suggestions">
+                        {['Mathematics', 'Science', 'English', 'Tamil', 'ICT', 'Commerce', 'History'].map((c) => (
+                          <option key={c} value={c} />
                         ))}
-                      </select>
+                      </datalist>
                     </div>
 
                     <div>
                       <label className="text-[10px] font-semibold text-slate-600 block">
-                        {currentAppLanguage === 'ta' ? 'தரம் (Grade):' : 'Grade:'}
+                        {currentAppLanguage === 'ta' ? 'தரம் (Grade - Type):' : 'Grade (Type):'}
                       </label>
-                      <select
+                      <input
+                        type="text"
+                        list="quick-paper-grade-suggestions"
+                        placeholder="e.g. Grade 10..."
                         value={grade}
                         onChange={(e) => setGrade(e.target.value)}
-                        className="mt-0.5 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800"
-                      >
-                        {['Grade 1-5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11 (O/L)', 'Grade 12 (A/L)', 'Grade 13 (A/L)', 'Teaching Exam', 'GS Exam', 'MA Exam', 'SLEAS Exam', 'SLAS Exam', 'General Competitive', 'Open'].map((g) => (
-                          <option key={g} value={g}>{g}</option>
+                        className="mt-0.5 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 w-36 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                      />
+                      <datalist id="quick-paper-grade-suggestions">
+                        {['Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11 (O/L)', 'Grade 12 (A/L)', 'Grade 13 (A/L)'].map((g) => (
+                          <option key={g} value={g} />
                         ))}
-                      </select>
+                      </datalist>
                     </div>
 
                     <div>

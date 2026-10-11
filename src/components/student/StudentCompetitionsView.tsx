@@ -84,7 +84,7 @@ export const StudentCompetitionsView: React.FC = () => {
       const urlCompId = params.get('comp') || sessionStorage.getItem('hnc_target_competition');
       if (urlCompId && competitions.length > 0) {
         const target = competitions.find(
-          (c) => c.id === urlCompId || c.code.toLowerCase() === urlCompId.toLowerCase()
+          (c) => c.id === urlCompId || (c.code || '').toLowerCase() === urlCompId.toLowerCase()
         );
         if (target) {
           setDetailsComp(target);
@@ -121,7 +121,7 @@ export const StudentCompetitionsView: React.FC = () => {
     // 1. Search Term (searches title, code, category, and grade level)
     const matchesSearch =
       comp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      comp.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (comp.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       comp.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (comp.grade && comp.grade.toLowerCase().includes(searchTerm.toLowerCase()));
 

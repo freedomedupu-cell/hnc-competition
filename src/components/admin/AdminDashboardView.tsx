@@ -18,6 +18,7 @@ import {
   Video,
   Download,
   MapPin,
+  BookOpen,
 } from 'lucide-react';
 import { CompetitionEditorModal } from '../competitions/CompetitionEditorModal';
 import { Competition, CompetitionType } from '../../types';
@@ -89,6 +90,12 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200">
                 {t('deptAdminDeck')}
               </span>
+              {(currentAdmin.adminType === 'subject_admin' || currentAdmin.assignedSubject) && (
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-900 border border-purple-300 flex items-center gap-1 shadow-2xs">
+                  <BookOpen className="w-3 h-3 text-purple-700" />
+                  <span>{language === 'ta' ? 'பாடம்' : 'Subject'}: {currentAdmin.assignedSubject}</span>
+                </span>
+              )}
               <span className="text-xs text-slate-400">•</span>
               <span className="text-xs text-slate-500 font-medium">
                 {t('staffIdLabel')}: {currentAdmin.staffId}

@@ -24,6 +24,10 @@ export interface DbUser {
   dateOfBirth?: string;
   department?: string;
   staffId?: string;
+  adminType?: 'general' | 'subject_admin' | string;
+  assignedSubject?: string;
+  assignedSubjects?: string[];
+  assignedGrades?: string[];
   avatarUrl?: string;
   referralCode?: string;
   referredBy?: string;
@@ -68,6 +72,10 @@ export interface DbAdmin {
   phone?: string;
   department?: string;
   staffId?: string;
+  adminType?: 'general' | 'subject_admin' | string;
+  assignedSubject?: string;
+  assignedSubjects?: string[];
+  assignedGrades?: string[];
   status: 'active' | 'inactive';
   createdAt: string;
 }
@@ -303,6 +311,10 @@ export interface AdminUser extends BaseUser {
   initialPassword?: string;
   assignedCompetitionsCount: number;
   phone?: string;
+  adminType?: 'general' | 'subject_admin';
+  assignedSubject?: string;
+  assignedSubjects?: string[];
+  assignedGrades?: string[];
 }
 
 export interface StudentUser extends BaseUser {
@@ -592,5 +604,31 @@ export interface DbAdvertisement {
     role: string;
   };
   clicksCount?: number;
+}
+
+export type FeedbackCategory =
+  | 'competition'
+  | 'island_quest'
+  | 'platform'
+  | 'questions'
+  | 'suggestion';
+
+export interface DbStudentFeedback {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentEmail?: string;
+  studentSchool?: string;
+  studentGrade?: string;
+  district?: string;
+  category: FeedbackCategory;
+  rating: number; // 1 to 5
+  subject: string;
+  message: string;
+  status: 'pending' | 'reviewed' | 'resolved';
+  adminResponse?: string;
+  adminRepliedBy?: string;
+  createdAt: string;
+  repliedAt?: string;
 }
 

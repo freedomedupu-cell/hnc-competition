@@ -170,5 +170,4 @@ export const AVAILABLE_GRADES = [
   'After School - SLEAS (SL Education Admin Service)',
   'After School - SLAS (SL Administrative Service)',
   'After School - General Competitive Exam (பொது போட்டிப் பரீட்சை)',
-  'Open (All Grades / அனைத்து பிரிவுகளும்)',
 ];

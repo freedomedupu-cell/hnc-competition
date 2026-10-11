@@ -22,6 +22,10 @@
         "referralPoints": { "type": "number", "description": "Accumulated share and referral points" },
         "totalReferrals": { "type": "number", "description": "Count of successfully referred candidates" },
         "sharesCount": { "type": "number", "description": "Count of social/messaging platform shares" },
+        "adminType": { "type": "string", "enum": ["general", "subject_admin"], "description": "Administrator scope: general or subject specialist" },
+        "assignedSubject": { "type": "string", "description": "Primary academic subject specialty (e.g. Mathematics, Science, etc.)" },
+        "assignedSubjects": { "type": "array", "description": "List of assigned specialized subjects" },
+        "assignedGrades": { "type": "array", "description": "Assigned grade scopes" },
         "createdAt": { "type": "string", "description": "ISO timestamp of account creation" }
       }
     },
@@ -59,6 +63,12 @@
         "fullName": { "type": "string", "description": "Full name" },
         "email": { "type": "string", "description": "Email address" },
         "phone": { "type": "string", "description": "Phone number" },
+        "department": { "type": "string", "description": "Academic department or division" },
+        "staffId": { "type": "string", "description": "Staff accreditation ID" },
+        "adminType": { "type": "string", "enum": ["general", "subject_admin"], "description": "Administrator type: general or subject specialist" },
+        "assignedSubject": { "type": "string", "description": "Primary academic subject specialty (e.g. Mathematics, Science, etc.)" },
+        "assignedSubjects": { "type": "array", "description": "List of assigned subjects" },
+        "assignedGrades": { "type": "array", "description": "Assigned grade scopes" },
         "status": { "type": "string", "enum": ["active", "inactive"], "description": "Account status" },
         "createdAt": { "type": "string", "description": "ISO timestamp of creation" }
       }
@@ -192,6 +202,28 @@
         "createdAt": { "type": "string", "description": "ISO timestamp of creation" },
         "updatedAt": { "type": "string", "description": "ISO timestamp of last update" },
         "clicksCount": { "type": "number", "description": "Student interaction count" }
+      }
+    },
+    "student_feedbacks": {
+      "title": "Student Feedback",
+      "description": "Student competition feedback, platform ratings, question clarifications, and feature ideas",
+      "fields": {
+        "id": { "type": "string", "description": "Unique feedback ID" },
+        "studentId": { "type": "string", "description": "Submitting student UID or student ID" },
+        "studentName": { "type": "string", "description": "Name of the student" },
+        "studentEmail": { "type": "string", "description": "Student contact email" },
+        "studentSchool": { "type": "string", "description": "School or educational institute" },
+        "studentGrade": { "type": "string", "description": "Academic grade level" },
+        "district": { "type": "string", "description": "District" },
+        "category": { "type": "string", "enum": ["competition", "island_quest", "platform", "questions", "suggestion"], "description": "Feedback category" },
+        "rating": { "type": "number", "description": "Rating score between 1 and 5" },
+        "subject": { "type": "string", "description": "Feedback headline or topic" },
+        "message": { "type": "string", "description": "Detailed feedback or query message" },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "resolved"], "description": "Review status" },
+        "adminResponse": { "type": "string", "description": "Administrative reply or resolution note" },
+        "adminRepliedBy": { "type": "string", "description": "Name of reviewing administrator" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of submission" },
+        "repliedAt": { "type": "string", "description": "ISO timestamp of administrative response" }
       }
     }
   }

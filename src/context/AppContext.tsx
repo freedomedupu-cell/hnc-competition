@@ -25,6 +25,8 @@ import {
   DbLiveProctorSession,
   ProctorWarning,
   DbAdvertisement,
+  DbStudentFeedback,
+  FeedbackCategory,
 } from '../types';
 import {
   initialSuperAdmin,
@@ -102,6 +104,11 @@ import {
   deleteAdvertisementInFirestore,
   toggleAdvertisementStatusInFirestore,
   incrementAdClicksInFirestore,
+  submitStudentFeedbackToFirestore,
+  subscribeToAllFeedbacks,
+  subscribeToStudentFeedbacks,
+  updateFeedbackInFirestore,
+  deleteFeedbackFromFirestore,
 } from '../services/firebaseService';
 
 export type SuperAdminNav = 
@@ -113,17 +120,22 @@ export type SuperAdminNav =
   | 'Announcements'
   | 'Sponsors & Ads'
   | 'Live Proctoring'
+  | 'Feedback'
   | 'Audit Trail'
   | 'Settings';
 
 export type AdminNav = 
   | 'Dashboard' 
   | 'Competition Management' 
+  | 'Quiz'
+  | 'Exam'
+  | 'Competition'
   | 'Student Information' 
   | 'Results' 
   | 'Announcements'
   | 'Sponsors & Ads'
   | 'Live Proctoring'
+  | 'Feedback'
   | 'Audit Trail'
   | 'Profile';
 
@@ -134,7 +146,8 @@ export type StudentNav =
   | 'My Results' 
   | 'My Profile'
   | 'Referral & Points'
-  | 'Announcements';
+  | 'Announcements'
+  | 'Feedback';
 
 interface AppContextType {
   // Localization
@@ -191,6 +204,10 @@ interface AppContextType {
     department: string;
     phone?: string;
     status: 'active' | 'inactive';
+    adminType?: 'general' | 'subject_admin';
+    assignedSubject?: string;
+    assignedSubjects?: string[];
+    assignedGrades?: string[];
   }) => Promise<void>;
   toggleAdminStatus: (adminId: string) => Promise<void>;
   deleteAdmin: (adminId: string) => Promise<void>;
@@ -307,6 +324,23 @@ interface AppContextType {
   recordAdClick: (adId: string) => Promise<void>;
   isAdManagerOpen: boolean;
   setIsAdManagerOpen: (open: boolean) => void;
+
+  // Student Feedback & Suggestions
+  feedbacks: DbStudentFeedback[];
+  submitFeedback: (data: {
+    category: FeedbackCategory;
+    rating: number;
+    subject: string;
+    message: string;
+  }) => Promise<string>;
+  updateFeedbackStatus: (
+    feedbackId: string,
+    status: 'pending' | 'reviewed' | 'resolved',
+    adminResponse?: string
+  ) => Promise<void>;
+  deleteFeedback: (feedbackId: string) => Promise<void>;
+  isFeedbackModalOpen: boolean;
+  setIsFeedbackModalOpen: (open: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -332,7 +366,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   // Real Firebase Auth user & loading status
   const [currentAuthUser, setCurrentAuthUserState] = useState<DbUser | null>(() => getSavedActiveUser());
-  const [authLoading, setAuthLoading] = useState<boolean>(() => !getSavedActiveUser());
+  const [authLoading, setAuthLoading] = useState<boolean>(false);
 
   // Portal role (strictly synchronized with currentAuthUser.role, default 'student' for safety)
   const [currentPortal, setInternalPortal] = useState<PortalRole>(() => getSavedActiveUser()?.role || 'student');
@@ -353,7 +387,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (nextUser.role === 'student') {
             setStudentNav('Dashboard');
           } else if (nextUser.role === 'admin') {
-            setAdminNav('Dashboard');
+            const isSubj = nextUser.adminType === 'subject_admin' || Boolean(nextUser.assignedSubject);
+            setAdminNav(isSubj ? 'Quiz' : 'Dashboard');
           } else if (nextUser.role === 'super_admin') {
             setSuperAdminNav('Dashboard');
           }
@@ -375,13 +410,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setStudentNav('Dashboard');
       } else if (currentAuthUser.role === 'admin' && currentPortal !== 'admin' && currentPortal !== 'student') {
         setInternalPortal('admin');
-        setAdminNav('Dashboard');
+        const isSubj = currentAuthUser.adminType === 'subject_admin' || Boolean(currentAuthUser.assignedSubject);
+        setAdminNav(isSubj ? 'Quiz' : 'Dashboard');
       }
     }
   }, [currentAuthUser?.uid, currentAuthUser?.role, currentPortal]);
 
   const t = (key: keyof typeof translations['en']): string => {
-    return translations[language][key] || translations['en'][key] || key;
+    return (translations[language] as Record<string, string>)[key] || translations['en'][key] || key;
   };
 
   // Base state collections
@@ -419,6 +455,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Phase 08: Advertisements & Sponsor Billboard State
   const [advertisements, setAdvertisements] = useState<DbAdvertisement[]>([]);
   const [isAdManagerOpen, setIsAdManagerOpen] = useState<boolean>(false);
+
+  // Student Feedback & Suggestions State
+  const [feedbacks, setFeedbacks] = useState<DbStudentFeedback[]>([]);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState<boolean>(false);
 
   // Districts Quest & Study Gaming Studio State
   const [isDistrictsStudioOpen, setIsDistrictsStudioOpen] = useState<boolean>(false);
@@ -462,11 +502,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Listen to Firebase Auth state on mount
   useEffect(() => {
-    // Run database hygiene in background without blocking initial auth / UI render
-    const hygieneTimer = setTimeout(() => {
-      seedInitialDataIfEmpty().catch(() => {});
-      purgeLegacyDemoFirestoreData().catch(() => {});
-    }, 400);
+    // Run database hygiene once in background without blocking initial auth / UI render
+    let hygieneTimer: any;
+    if (typeof window !== 'undefined' && !localStorage.getItem('hnc_seed_initialized_v2')) {
+      hygieneTimer = setTimeout(() => {
+        seedInitialDataIfEmpty().then(() => {
+          localStorage.setItem('hnc_seed_initialized_v2', 'true');
+        }).catch(() => {});
+      }, 2000);
+    }
 
     // Safety timeout to prevent permanent loading freeze if network or Auth is delayed
     const authSafetyTimer = setTimeout(() => {
@@ -676,16 +720,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         'HNC-GR7-SCI-2026',
       ]);
 
-      // Strictly exclude any demo/sample competitions so students will never see dummy records
+      // Strictly exclude test/dummy sample competitions so students will never see test dummy records
       const realComps = dbComps.filter((c) => {
-        if (knownDemoIds.has(c.competitionId)) return false;
-        if (knownDemoCodes.has((c.code || '').toUpperCase())) return false;
         const title = (c.title || '').toLowerCase();
         if (
-          title.includes('national academic mathematics & logic olympiad 2026') ||
-          title.includes('all-island science & stem olympiad 2026') ||
-          title.includes('junior mathematics challenge 2026 (grade 6)') ||
-          title.includes('junior science & environment quiz 2026 (grade 7)') ||
           title.includes('demo competition') ||
           title.includes('sample competition') ||
           title.includes('test competition')
@@ -744,7 +782,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           createdAt: c.createdAt,
         };
       });
-      setCompetitions(mapped);
+
+      // Merge Firestore competitions with initial default competitions (deduping by ID)
+      const mergedCompsMap = new Map<string, Competition>();
+      initialCompetitions.forEach((c) => mergedCompsMap.set(c.id, c));
+      mapped.forEach((c) => mergedCompsMap.set(c.id, c));
+
+      setCompetitions(Array.from(mergedCompsMap.values()));
     });
 
     // 2. Results subscription (Students only receive their own results as per rules)
@@ -827,6 +871,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           createdAt: a.createdAt ? a.createdAt.split('T')[0] : '2026-01-01',
           department: a.department || 'Academic Affairs',
           staffId: a.staffId || `ADM-${a.uid.slice(0, 5)}`,
+          adminType: (a.adminType as any) || 'general',
+          assignedSubject: a.assignedSubject || '',
+          assignedSubjects: a.assignedSubjects || (a.assignedSubject ? [a.assignedSubject] : []),
+          assignedGrades: a.assignedGrades || [],
           assignedCompetitionsCount: 0,
           phone: a.phone,
         }));
@@ -914,11 +962,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (currentAuthUser && (currentAuthUser.role === 'admin' || currentAuthUser.role === 'super_admin')) {
       unsubProctor = subscribeToLiveProctorSessions((sessions) => {
         const realSessions = sessions.filter((s) => {
+          const sName = (s.studentName || '').toLowerCase();
+          const sId = (s.sessionId || '').toLowerCase();
           if (
-            s.sessionId?.startsWith('sim-') ||
+            sId.startsWith('sim-') ||
+            sId.startsWith('mock_') ||
             s.studentId?.startsWith('sim-') ||
-            s.studentName?.includes('Simulated') ||
-            s.studentName?.includes('கவிநிலா')
+            sName.includes('simulated') ||
+            sName.includes('kavishka silva') ||
+            sName.includes('tharindu perera') ||
+            sName.includes('priya ramanathan') ||
+            sName.includes('ahmad rizwan') ||
+            sName.includes('கவிநிலா')
           ) {
             return false;
           }
@@ -933,6 +988,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setAdvertisements(adsList);
     });
 
+    // 12. Real-time Student Feedback subscription
+    let unsubFeedbacks: (() => void) | undefined;
+    const activeStudentId = currentAuthUser?.uid || currentStudent?.id;
+    if (currentAuthUser && (currentAuthUser.role === 'admin' || currentAuthUser.role === 'super_admin')) {
+      unsubFeedbacks = subscribeToAllFeedbacks((allList) => {
+        setFeedbacks(allList);
+      });
+    } else if (activeStudentId) {
+      unsubFeedbacks = subscribeToStudentFeedbacks(activeStudentId, (myList) => {
+        setFeedbacks(myList);
+      });
+    }
+
     return () => {
       unsubComp();
       unsubResults();
@@ -945,6 +1013,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (unsubStudentProfile) unsubStudentProfile();
       if (unsubProctor) unsubProctor();
       unsubAds();
+      if (unsubFeedbacks) unsubFeedbacks();
     };
   }, [currentAuthUser?.uid, currentAuthUser?.role]);
 
@@ -963,8 +1032,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     role: 'admin',
     department: currentAuthUser?.department || 'Academic Affairs',
     staffId: currentAuthUser?.staffId || 'HNC-ADM',
+    adminType: (currentAuthUser?.adminType as any) || 'general',
+    assignedSubject: currentAuthUser?.assignedSubject || '',
+    assignedSubjects: currentAuthUser?.assignedSubjects || (currentAuthUser?.assignedSubject ? [currentAuthUser.assignedSubject] : []),
+    assignedGrades: currentAuthUser?.assignedGrades || [],
     assignedCompetitionsCount: competitions.filter(
-      (c) => c.leadAdminId === currentAuthUser?.uid || c.leadAdminName === currentAuthUser?.fullName
+      (c) =>
+        c.leadAdminId === currentAuthUser?.uid ||
+        c.leadAdminName === currentAuthUser?.fullName ||
+        (currentAuthUser?.assignedSubject && c.category?.toLowerCase() === currentAuthUser.assignedSubject.toLowerCase())
     ).length,
     phone: currentAuthUser?.phone || '',
     createdAt: currentAuthUser?.createdAt ? currentAuthUser.createdAt.split('T')[0] : '2026-01-01',
@@ -978,6 +1054,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     currentAuthUser?.phone,
     currentAuthUser?.createdAt,
     currentAuthUser?.status,
+    currentAuthUser?.adminType,
+    currentAuthUser?.assignedSubject,
+    currentAuthUser?.assignedSubjects,
+    currentAuthUser?.assignedGrades,
     competitions,
   ]);
 
@@ -1062,6 +1142,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     department: string;
     phone?: string;
     status: 'active' | 'inactive';
+    adminType?: 'general' | 'subject_admin';
+    assignedSubject?: string;
+    assignedSubjects?: string[];
+    assignedGrades?: string[];
   }) => {
     try {
       const securePassword = adminData.password || `Admin@${Math.floor(100000 + Math.random() * 900000)}`;
@@ -1074,6 +1158,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         phone: adminData.phone,
         department: adminData.department,
         staffId: adminData.staffId,
+        adminType: adminData.adminType || 'general',
+        assignedSubject: adminData.assignedSubject?.trim() || '',
+        assignedSubjects: adminData.assignedSubjects || (adminData.assignedSubject ? [adminData.assignedSubject.trim()] : []),
+        assignedGrades: adminData.assignedGrades || [],
       });
 
       const newAdmin: AdminUser = {
@@ -1085,6 +1173,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         role: 'admin',
         department: createdAdmin.department || adminData.department,
         staffId: createdAdmin.staffId || adminData.staffId,
+        adminType: createdAdmin.adminType as any || adminData.adminType || 'general',
+        assignedSubject: createdAdmin.assignedSubject || adminData.assignedSubject || '',
+        assignedSubjects: createdAdmin.assignedSubjects || adminData.assignedSubjects || [],
+        assignedGrades: createdAdmin.assignedGrades || adminData.assignedGrades || [],
         assignedCompetitionsCount: 0,
         createdAt: new Date().toISOString().split('T')[0],
         status: createdAdmin.status,
@@ -1162,6 +1254,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         phone: data.phone,
         department: data.department,
         status: data.status as any,
+        adminType: data.adminType as any,
+        assignedSubject: data.assignedSubject,
+        assignedSubjects: data.assignedSubjects,
+        assignedGrades: data.assignedGrades,
       });
       setAdmins((prev) =>
         prev.map((adm) => (adm.id === adminId ? { ...adm, ...data } : adm))
@@ -1727,12 +1823,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const current = studentAttempts.find((a) => a.attemptId === attemptId) || activeExamAttempt;
     const updatedAttempt: DbAttempt = {
-      startedAt: current?.startedAt || new Date().toISOString(),
       ...(current || {
         attemptId,
         competitionId,
         studentId: currentAuthUser?.uid || currentStudent.id,
       }),
+      startedAt: current?.startedAt || new Date().toISOString(),
       answers,
       submittedAt: submissionTime,
       status: finalStatus,
@@ -1843,10 +1939,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const converted: CompetitionResult = {
         id: newResult.resultId,
         competitionId: newResult.competitionId,
-        competitionTitle: newResult.competitionTitle,
+        competitionTitle: newResult.competitionTitle || 'Academic Competition',
         studentId: newResult.studentId,
-        studentName: newResult.studentName,
-        studentInstitution: newResult.studentInstitution,
+        studentName: newResult.studentName || 'Candidate',
+        studentInstitution: newResult.studentInstitution || 'Participating Institution',
         score: newResult.score,
         maxScore: newResult.totalMarks,
         totalMarks: newResult.totalMarks,
@@ -1854,10 +1950,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         percentile: newResult.percentage,
         rank: newResult.rank,
         submittedAt: newResult.submittedAt,
-        publishStatus: newResult.publishStatus,
-        award: newResult.award,
+        publishStatus: (newResult.publishStatus as any) || 'published',
+        award: (newResult.award as any) || 'Participation',
         prizeStatus: newResult.prizeStatus,
-        certificateId: newResult.certificateId,
+        certificateId: newResult.certificateId || `CERT-${newResult.resultId}`,
       };
       const exists = prev.some((r) => r.id === newResult.resultId);
       if (exists) {
@@ -2388,6 +2484,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await incrementAdClicksInFirestore(adId);
   };
 
+  // Student Feedback & Suggestions helpers
+  const submitFeedback = async (data: {
+    category: FeedbackCategory;
+    rating: number;
+    subject: string;
+    message: string;
+  }): Promise<string> => {
+    const studentId = currentAuthUser?.uid || currentStudent.id || 'anonymous_student';
+    const studentName = currentAuthUser?.fullName || currentStudent.name || 'Student Candidate';
+    const studentEmail = currentAuthUser?.email || currentStudent.email || '';
+    const studentSchool = currentStudent.institution || currentAuthUser?.school || '';
+    const studentGrade = currentStudent.gradeLevel || currentAuthUser?.grade || '';
+    const district = currentAuthUser?.district || currentStudent.district || '';
+
+    return await submitStudentFeedbackToFirestore({
+      studentId,
+      studentName,
+      studentEmail,
+      studentSchool,
+      studentGrade,
+      district,
+      category: data.category,
+      rating: data.rating,
+      subject: data.subject,
+      message: data.message,
+    });
+  };
+
+  const updateFeedbackStatus = async (
+    feedbackId: string,
+    status: 'pending' | 'reviewed' | 'resolved',
+    adminResponse?: string
+  ): Promise<void> => {
+    await updateFeedbackInFirestore(feedbackId, {
+      status,
+      adminResponse: adminResponse !== undefined ? adminResponse : undefined,
+      adminRepliedBy: currentAuthUser?.fullName || 'Exam Admin',
+      repliedAt: new Date().toISOString(),
+    });
+  };
+
+  const deleteFeedback = async (feedbackId: string): Promise<void> => {
+    await deleteFeedbackFromFirestore(feedbackId);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -2490,6 +2631,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         districtsStudioInitialAction,
         setDistrictsStudioInitialAction,
         openDistrictsStudio,
+        feedbacks,
+        submitFeedback,
+        updateFeedbackStatus,
+        deleteFeedback,
+        isFeedbackModalOpen,
+        setIsFeedbackModalOpen,
         purgeDemoCompetitions: async () => {
           return await purgeAllDemoCompetitions();
         },

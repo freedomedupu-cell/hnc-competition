@@ -58,15 +58,24 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
           icon: <ShieldCheck className="w-4 h-4 text-blue-600" />,
           portalName: t('superAdminPanel'),
         };
-      case 'admin':
+      case 'admin': {
+        const isSubjectAdmin =
+          currentAdmin.adminType === 'subject_admin' || Boolean(currentAdmin.assignedSubject);
         return {
           name: currentAuthUser?.fullName || currentAdmin.name,
-          subtitle: currentAuthUser?.email || currentAdmin.email,
-          badge: t('adminLevel'),
-          badgeColor: 'bg-blue-700 text-white',
+          subtitle: isSubjectAdmin && currentAdmin.assignedSubject
+            ? `${currentAdmin.assignedSubject} Specialist • ${currentAuthUser?.email || currentAdmin.email}`
+            : currentAuthUser?.email || currentAdmin.email,
+          badge: isSubjectAdmin
+            ? (currentAdmin.assignedSubject ? `Subject: ${currentAdmin.assignedSubject}` : 'Subject Admin')
+            : t('adminLevel'),
+          badgeColor: isSubjectAdmin ? 'bg-purple-700 text-white' : 'bg-blue-700 text-white',
           icon: <UserCheck className="w-4 h-4 text-emerald-600" />,
-          portalName: t('adminDashboard'),
+          portalName: isSubjectAdmin
+            ? (language === 'ta' ? `${currentAdmin.assignedSubject || 'பாடம்'} நிர்வாக மையம்` : `${currentAdmin.assignedSubject || 'Subject'} Admin Hub`)
+            : t('adminDashboard'),
         };
+      }
       case 'student':
         return {
           name: currentAuthUser?.fullName || currentStudent.name,

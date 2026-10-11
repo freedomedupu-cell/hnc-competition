@@ -48,6 +48,7 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
     deleteCompetition,
     updateCompetitionStatus,
     language,
+    currentAdmin,
     isDistrictsStudioOpen,
     setIsDistrictsStudioOpen,
     districtsStudioInitialAction,
@@ -93,12 +94,18 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
   const filteredCompetitions = competitions.filter((comp) => {
     const matchesSearch =
       comp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      comp.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (comp.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       comp.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (comp.grade && comp.grade.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesCategory = categoryFilter === 'all' ? true : comp.category.toLowerCase() === categoryFilter.toLowerCase();
-    const matchesGrade = gradeFilter === 'all' ? true : (comp.grade || '').toLowerCase() === gradeFilter.toLowerCase();
+    const matchesCategory =
+      categoryFilter === 'all' || !categoryFilter.trim()
+        ? true
+        : comp.category.toLowerCase().includes(categoryFilter.toLowerCase().trim());
+    const matchesGrade =
+      gradeFilter === 'all' || !gradeFilter.trim()
+        ? true
+        : (comp.grade || '').toLowerCase().includes(gradeFilter.toLowerCase().trim());
     const matchesStatus =
       statusFilter === 'all'
         ? true
@@ -335,6 +342,55 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
         </div>
       </div>
 
+      {/* Subject Specialist Coordinator Banner */}
+      {role === 'admin' && (currentAdmin.adminType === 'subject_admin' || currentAdmin.assignedSubject) && (
+        <div className="bg-gradient-to-r from-purple-50 via-indigo-50/60 to-purple-50 border border-purple-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-purple-700 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-bold text-purple-950">
+                  {language === 'ta' ? 'பாடம் சார்ந்த ஒருங்கிணைப்பாளர் பார்வை' : 'Subject Specialist Coordinator Portal'}
+                </p>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900 border border-purple-300">
+                  {currentAdmin.assignedSubject}
+                </span>
+              </div>
+              <p className="text-[11px] text-purple-700 mt-0.5">
+                {language === 'ta'
+                  ? `நீங்கள் "${currentAdmin.assignedSubject}" பாடத்திற்கான அங்கீகாரம் பெற்ற பொறுப்பாளர்.`
+                  : `You are accredited for "${currentAdmin.assignedSubject}". Filter and manage your specialized challenges.`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setCategoryFilter(currentAdmin.assignedSubject || 'all')}
+              className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                categoryFilter.toLowerCase() === (currentAdmin.assignedSubject || '').toLowerCase()
+                  ? 'bg-purple-700 text-white shadow-2xs ring-2 ring-purple-300'
+                  : 'bg-white text-purple-700 border border-purple-200 hover:bg-purple-50'
+              }`}
+            >
+              {language === 'ta' ? `🎯 என் பாடம் (${currentAdmin.assignedSubject})` : `🎯 My Subject (${currentAdmin.assignedSubject})`}
+            </button>
+            {categoryFilter.toLowerCase() === (currentAdmin.assignedSubject || '').toLowerCase() && (
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('all')}
+                className="text-xs px-2.5 py-1.5 rounded-lg font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 cursor-pointer"
+              >
+                {language === 'ta' ? 'அனைத்தும்' : 'Show All'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Metrics Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
@@ -397,36 +453,40 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
             />
           </div>
 
-          {/* Category */}
-          <div>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Categories ({availableCategories.length})</option>
+          {/* Category / Subject (Type Only) */}
+          <div className="relative">
+            <input
+              id="filter-competition-category"
+              type="text"
+              list="cm-category-suggestions"
+              placeholder={language === 'ta' ? 'பாடம் (Type Subject)...' : 'Subject (Type)...'}
+              value={categoryFilter === 'all' ? '' : categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : 'all')}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+            />
+            <datalist id="cm-category-suggestions">
               {availableCategories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
+                <option key={cat} value={cat} />
               ))}
-            </select>
+            </datalist>
           </div>
 
-          {/* Grade / Level Filter */}
-          <div>
-            <select
-              value={gradeFilter}
-              onChange={(e) => setGradeFilter(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Grades / Levels</option>
+          {/* Grade / Level Filter (Type Only) */}
+          <div className="relative">
+            <input
+              id="filter-competition-grade"
+              type="text"
+              list="cm-grade-suggestions"
+              placeholder={language === 'ta' ? 'வகுப்பு (Type Grade)...' : 'Grade (Type)...'}
+              value={gradeFilter === 'all' ? '' : gradeFilter}
+              onChange={(e) => setGradeFilter(e.target.value ? e.target.value : 'all')}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+            />
+            <datalist id="cm-grade-suggestions">
               {availableGrades.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
+                <option key={g} value={g} />
               ))}
-            </select>
+            </datalist>
           </div>
 
           {/* Type Filter */}
@@ -816,7 +876,7 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
                 : 'General Knowledge',
               description: district.descriptionTa,
               competitionType: 'Competition',
-              grade: district.gradeSubject.split('•')[0]?.trim() || 'Open (All Grades)',
+              grade: district.gradeSubject.split('•')[0]?.trim() || 'Grade 10',
               language: 'Tamil',
               duration: 45,
               entryType: 'Free',

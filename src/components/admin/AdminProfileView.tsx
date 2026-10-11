@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Calendar,
   Award,
+  BookOpen,
 } from 'lucide-react';
 
 export const AdminProfileView: React.FC = () => {
@@ -62,7 +63,14 @@ export const AdminProfileView: React.FC = () => {
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-900">{currentAdmin.name}</h2>
-            <p className="text-xs text-blue-700 font-semibold mt-0.5">Academic Lead</p>
+            {currentAdmin.adminType === 'subject_admin' || currentAdmin.assignedSubject ? (
+              <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-300 text-[11px] font-bold">
+                <BookOpen className="w-3.5 h-3.5 text-purple-700" />
+                <span>Subject Specialist: {currentAdmin.assignedSubject}</span>
+              </div>
+            ) : (
+              <p className="text-xs text-blue-700 font-semibold mt-0.5">Academic Lead (General)</p>
+            )}
             <p className="text-xs text-slate-500 mt-1 max-w-xs">{currentAdmin.department}</p>
           </div>
 
@@ -71,6 +79,12 @@ export const AdminProfileView: React.FC = () => {
               <span className="text-slate-400">Staff Accreditation:</span>
               <span className="font-mono font-bold text-slate-800">{currentAdmin.staffId}</span>
             </div>
+            {currentAdmin.assignedSubject && (
+              <div className="flex justify-between">
+                <span className="text-slate-400">Assigned Subject:</span>
+                <span className="font-bold text-purple-700">{currentAdmin.assignedSubject}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-slate-400">Accredited Since:</span>
               <span className="text-slate-700 font-medium">{currentAdmin.createdAt}</span>

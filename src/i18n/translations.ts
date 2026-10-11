@@ -36,6 +36,7 @@ export const translations = {
     navCompetitions: 'Competitions',
     navMyResults: 'My Results',
     navMyProfile: 'My Profile',
+    navFeedback: 'Student Feedback',
 
     // Super Admin Dashboard
     welcomeGovernance: 'Institutional Governance',
@@ -171,6 +172,7 @@ export const translations = {
     navCompetitions: 'போட்டிகள்',
     navMyResults: 'எனது முடிவுகள்',
     navMyProfile: 'எனது சுயவிவரம்',
+    navFeedback: 'மாணவர் கருத்துகள்',
 
     // Super Admin Dashboard
     welcomeGovernance: 'கல்வி நிறுவன ஆளுகை',
@@ -302,6 +304,7 @@ export const translations = {
     navCompetitions: 'තරඟ',
     navMyResults: 'මගේ ප්‍රතිඵල',
     navMyProfile: 'මගේ පැතිකඩ',
+    navFeedback: 'ශිෂ්‍ය ප්‍රතිපෝෂණ',
 
     // Super Admin Dashboard
     welcomeGovernance: 'ආයතනික පාලනය',

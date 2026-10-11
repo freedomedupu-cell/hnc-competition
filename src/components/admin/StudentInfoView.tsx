@@ -123,7 +123,22 @@ export const StudentInfoView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredStudents.map((std) => {
+              {filteredStudents.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-5 py-10 text-center text-slate-400 text-xs">
+                    <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                    <p className="font-semibold text-slate-600">
+                      {language === 'ta' ? 'பதிவு செய்யப்பட்ட மாணவர்கள் எவருமில்லை' : 'No students found'}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {language === 'ta'
+                        ? 'மாணவர்கள் கணக்கு தொடங்கி பதிவு செய்யும்போது அவர்களின் விபரங்கள் இங்கே தோன்றும்.'
+                        : 'Registered students will appear in this roster once they sign up or enroll.'}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                filteredStudents.map((std) => {
                 const pts = std.referralPoints !== undefined ? std.referralPoints : 25;
 
                 return (
@@ -213,7 +228,7 @@ export const StudentInfoView: React.FC = () => {
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

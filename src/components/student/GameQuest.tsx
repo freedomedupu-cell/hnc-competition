@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import {
   SRI_LANKA_25_DISTRICTS,
@@ -589,6 +590,55 @@ export const GameQuest: React.FC = () => {
     }
   };
 
+  // Celebrate level completion with high-energy confetti burst
+  const triggerConfettiAnimation = () => {
+    try {
+      // Main central confetti explosion
+      confetti({
+        particleCount: 110,
+        spread: 80,
+        origin: { y: 0.55 },
+        colors: ['#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6', '#ef4444', '#eab308'],
+        zIndex: 9999,
+      });
+
+      // Staggered side blasts for extra triumph
+      setTimeout(() => {
+        confetti({
+          particleCount: 65,
+          angle: 60,
+          spread: 60,
+          origin: { x: 0, y: 0.65 },
+          colors: ['#f59e0b', '#10b981', '#3b82f6', '#fbbf24'],
+          zIndex: 9999,
+        });
+        confetti({
+          particleCount: 65,
+          angle: 120,
+          spread: 60,
+          origin: { x: 1, y: 0.65 },
+          colors: ['#ec4899', '#8b5cf6', '#f59e0b', '#06b6d4'],
+          zIndex: 9999,
+        });
+      }, 250);
+
+      // Final celebratory starburst
+      setTimeout(() => {
+        confetti({
+          particleCount: 40,
+          spread: 100,
+          origin: { y: 0.4 },
+          scalar: 1.2,
+          shapes: ['star'],
+          colors: ['#fbbf24', '#f59e0b', '#38bdf8'],
+          zIndex: 9999,
+        });
+      }, 500);
+    } catch (err) {
+      console.error('Confetti animation error:', err);
+    }
+  };
+
   // Finish Level & Unlock next ONLY if 100% perfect score achieved
   const handleFinishLevel = () => {
     if (!selectedLevel) return;
@@ -603,6 +653,7 @@ export const GameQuest: React.FC = () => {
 
     if (isPerfect100) {
       triggerSound('victory');
+      triggerConfettiAnimation();
       setLevels((prev) => {
         return prev.map((lvl) => {
           if (lvl.id === currentId) {
@@ -1595,7 +1646,29 @@ export const GameQuest: React.FC = () => {
             ) : null}
 
             <div className="flex flex-col gap-2.5">
-              {!completedLevelData.isPerfect100 ? (
+              {completedLevelData.isPerfect100 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLevelSummary(false);
+                    const nextLvl = levels.find((l) => l.id === completedLevelData.level.id + 1);
+                    if (nextLvl && !nextLvl.locked && nextLvl.isPublished) {
+                      handleStartLevel(nextLvl);
+                    }
+                  }}
+                  className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 text-white font-black text-sm shadow-lg shadow-emerald-500/25 transition cursor-pointer flex items-center justify-center gap-2 active:scale-95 animate-pulse"
+                >
+                  <Sparkles className="w-4 h-4 text-yellow-300" />
+                  <span>
+                    {questLang === 'ta'
+                      ? '🚀 அடுத்த நிலைக்குச் செல்க (Play Next District)'
+                      : questLang === 'si'
+                      ? '🚀 මීළඟ දිස්ත්‍රික්කයට යන්න'
+                      : '🚀 Play Next District Level'}
+                  </span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : (
                 <button
                   type="button"
                   onClick={() => {
@@ -1607,7 +1680,7 @@ export const GameQuest: React.FC = () => {
                   <RotateCcw className="w-4 h-4 text-slate-950" />
                   <span>🔄 மீண்டும் விளையாடி 100% பெறுக (Retry District)</span>
                 </button>
-              ) : null}
+              )}
 
               <button
                 type="button"
