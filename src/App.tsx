@@ -36,7 +36,9 @@ const StudentExamInterface = React.lazy(() => import('./components/student/Stude
 const StudentReferralView = React.lazy(() => import('./components/student/StudentReferralView').then(m => ({ default: m.StudentReferralView })));
 const StudentAnnouncementsView = React.lazy(() => import('./components/student/StudentAnnouncementsView').then(m => ({ default: m.StudentAnnouncementsView })));
 const GameQuest = React.lazy(() => import('./components/student/GameQuest').then(m => ({ default: m.GameQuest })));
+const StudyGamesHub = React.lazy(() => import('./components/student/StudyGamesHub').then(m => ({ default: m.StudyGamesHub })));
 const StudentFeedbackView = React.lazy(() => import('./components/student/StudentFeedbackView').then(m => ({ default: m.StudentFeedbackView })));
+const LeaderboardsHubView = React.lazy(() => import('./components/leaderboard/LeaderboardsHubView').then(m => ({ default: m.LeaderboardsHubView })));
 
 // Common & Auxiliary Management Views (Lazy-loaded)
 const AnnouncementsManagementView = React.lazy(() => import('./components/common/AnnouncementsManagementView').then(m => ({ default: m.AnnouncementsManagementView })));
@@ -87,8 +89,8 @@ const MainPortalArea: React.FC = () => {
     } catch {}
   }, [currentAuthUser?.uid]);
 
-  // 1. Loading State
-  if (authLoading) {
+  // 1. Loading State (Only shown for fresh visits, with instant skip action)
+  if (authLoading && !currentAuthUser) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
         <img
@@ -101,6 +103,17 @@ const MainPortalArea: React.FC = () => {
           HNC Competition • Initializing Secure Session...
         </p>
         <p className="text-slate-400 text-xs mt-1">Connecting to Firebase & Cloud Firestore</p>
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new Event('hnc_force_ready'));
+            }
+          }}
+          className="mt-4 px-3 py-1.5 text-xs text-blue-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 rounded-lg border border-slate-700 transition cursor-pointer"
+        >
+          {language === 'ta' ? 'உடனடியாக திறக்கவும் (Skip Wait)' : 'Open Directly'}
+        </button>
       </div>
     );
   }
@@ -157,6 +170,8 @@ const MainPortalArea: React.FC = () => {
             return <LiveProctorView />;
           case 'Feedback':
             return <AdminFeedbackView />;
+          case 'Leaderboards':
+            return <LeaderboardsHubView />;
           case 'Settings':
             return <SettingsView />;
           default:
@@ -195,6 +210,8 @@ const MainPortalArea: React.FC = () => {
             return <LiveProctorView />;
           case 'Feedback':
             return <AdminFeedbackView />;
+          case 'Leaderboards':
+            return <LeaderboardsHubView />;
           case 'Profile':
             return <AdminProfileView />;
           default:
@@ -210,6 +227,10 @@ const MainPortalArea: React.FC = () => {
             return <StudentCompetitionsView />;
           case 'Edu-Arena Quest':
             return <GameQuest />;
+          case 'Study Games Hub':
+            return <StudyGamesHub onNavigate={setStudentNav} />;
+          case 'Leaderboards':
+            return <LeaderboardsHubView />;
           case 'My Results':
             return <StudentResultsView />;
           case 'My Profile':

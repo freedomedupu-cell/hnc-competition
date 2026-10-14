@@ -29,6 +29,10 @@ import {
   Mail,
   ExternalLink,
   Gamepad2,
+  Flame,
+  Zap,
+  Headphones,
+  Coffee,
 } from 'lucide-react';
 import {
   Math3DIcon,
@@ -47,6 +51,7 @@ import { StudentAchievements } from './StudentAchievements';
 import { ExamCameraVerificationModal } from './ExamCameraVerificationModal';
 import { StudentMembershipModal } from './StudentMembershipModal';
 import { DynamicAdBillboard } from '../common/DynamicAdBillboard';
+import { AnimatedHeroLeaderboard } from '../leaderboard/AnimatedHeroLeaderboard';
 
 interface StudentDashboardViewProps {
   onNavigate: (tab: any) => void;
@@ -274,36 +279,39 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
       {/* 0. DYNAMIC SUPER ADMIN OFFICIAL ADVERTISING BILLBOARD */}
       <DynamicAdBillboard />
 
-      {/* 1. HERO BANNER: "Challenge Yourself and Win!" */}
+      {/* TOP BAR கீழ், WELCOME CARD மேலேயும்: ANIMATED NATIONAL LEADERBOARD */}
+      <AnimatedHeroLeaderboard onNavigate={onNavigate} />
+
+      {/* 1. HERO BANNER: "Challenge Yourself and Win!" (COMPACT) */}
       <div
         id="student-hero-banner"
-        className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#183EA8] via-[#2152D4] to-[#1A3D9E] text-white p-4 sm:p-8 lg:p-10 shadow-lg shadow-blue-900/15"
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#183EA8] via-[#2152D4] to-[#1A3D9E] text-white p-3.5 sm:p-5 lg:p-6 shadow-md shadow-blue-900/10"
       >
         {/* Subtle glowing ambient circles */}
-        <div className="absolute -top-8 -left-8 w-40 sm:w-64 h-40 sm:h-64 bg-blue-400/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-1/2 -right-8 w-48 sm:w-80 h-48 sm:h-80 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-6 -left-6 w-32 sm:w-48 h-32 sm:h-48 bg-blue-400/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute top-1/2 -right-6 w-36 sm:w-56 h-36 sm:h-56 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-6">
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
           {/* Left Hero Content */}
           <div className="flex-1 text-center md:text-left">
             {/* Small uppercase tag */}
-            <span className="inline-block text-[10px] sm:text-xs font-extrabold uppercase tracking-widest text-blue-200 mb-1 sm:mb-2">
+            <span className="inline-block text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest text-blue-200 mb-0.5 sm:mb-1">
               {language === 'ta' ? 'போட்டிகள்' : language === 'si' ? 'තරඟාවලි' : 'COMPETITIONS'}
             </span>
 
             {/* Display Heading */}
-            <h1 className="text-lg min-[360px]:text-xl sm:text-3xl lg:text-[40px] font-extrabold tracking-tight leading-tight sm:leading-snug">
+            <h1 className="text-sm min-[360px]:text-base sm:text-xl lg:text-2xl font-extrabold tracking-tight leading-tight sm:leading-snug">
               {language === 'ta' ? (
                 <>
                   உங்களை நீங்களே சோதித்து <br className="hidden sm:inline" />
-                  <span className="text-[#FFD233] italic font-serif text-xl min-[360px]:text-2xl sm:text-4xl lg:text-5xl font-black drop-shadow-[0_2px_8px_rgba(255,210,51,0.4)] inline-block transform -rotate-1">
+                  <span className="text-[#FFD233] italic font-serif text-base min-[360px]:text-lg sm:text-2xl lg:text-3xl font-black drop-shadow-[0_2px_6px_rgba(255,210,51,0.35)] inline-block transform -rotate-1">
                     வெற்றி பெறுங்கள்!
                   </span>
                 </>
               ) : language === 'si' ? (
                 <>
                   ඔබේ හැකියාවන් අභියෝගයට ලක් කර <br className="hidden sm:inline" />
-                  <span className="text-[#FFD233] italic font-serif text-xl min-[360px]:text-2xl sm:text-4xl lg:text-5xl font-black drop-shadow-[0_2px_8px_rgba(255,210,51,0.4)] inline-block transform -rotate-1">
+                  <span className="text-[#FFD233] italic font-serif text-base min-[360px]:text-lg sm:text-2xl lg:text-3xl font-black drop-shadow-[0_2px_6px_rgba(255,210,51,0.35)] inline-block transform -rotate-1">
                     ජයග්‍රහණය කරන්න!
                   </span>
                 </>
@@ -311,7 +319,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
                 <>
                   Challenge Yourself <br className="hidden sm:inline" />
                   and{' '}
-                  <span className="text-[#FFD233] italic font-serif text-xl min-[360px]:text-2xl sm:text-4xl lg:text-5xl font-black drop-shadow-[0_2px_8px_rgba(255,210,51,0.4)] inline-block transform -rotate-1">
+                  <span className="text-[#FFD233] italic font-serif text-base min-[360px]:text-lg sm:text-2xl lg:text-3xl font-black drop-shadow-[0_2px_6px_rgba(255,210,51,0.35)] inline-block transform -rotate-1">
                     Win!
                   </span>
                 </>
@@ -319,7 +327,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
             </h1>
 
             {/* Subtext */}
-            <p className="text-blue-100/90 text-[11px] sm:text-sm font-normal max-w-md mt-1.5 sm:mt-3 leading-snug sm:leading-relaxed line-clamp-2">
+            <p className="text-blue-100/90 text-[10px] sm:text-xs font-normal max-w-md mt-1 leading-snug line-clamp-2">
               {language === 'ta'
                 ? 'விறுவிறுப்பான வினாடி வினாக்களில் பங்கேற்று, உங்கள் அறிவை வெளிப்படுத்தி பரிசுகளை வெல்லுங்கள்!'
                 : language === 'si'
@@ -328,7 +336,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
             </p>
 
             {/* CTA Button */}
-            <div className="mt-3 sm:mt-6 flex justify-center md:justify-start">
+            <div className="mt-2.5 sm:mt-3.5 flex justify-center md:justify-start">
               <button
                 id="btn-hero-explore-competitions"
                 onClick={() => {
@@ -336,7 +344,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
                   if (el) el.scrollIntoView({ behavior: 'smooth' });
                   setSelectedFormat('all');
                 }}
-                className="bg-[#FFCA28] hover:bg-[#FFC107] active:scale-95 text-slate-900 font-extrabold text-xs sm:text-sm px-4 sm:px-6 py-2 sm:py-3 rounded-full shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 sm:gap-2"
+                className="bg-[#FFCA28] hover:bg-[#FFC107] active:scale-95 text-slate-900 font-extrabold text-[11px] sm:text-xs px-3.5 sm:px-4.5 py-1.5 sm:py-2 rounded-full shadow-xs hover:shadow-md transition-all flex items-center gap-1.5"
               >
                 <span>
                   {language === 'ta'
@@ -345,37 +353,162 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
                     ? 'තරඟ ගවේෂණය කරන්න'
                     : 'Explore Competitions'}
                 </span>
-                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </button>
             </div>
           </div>
 
           {/* Right 3D Vector Graphic Composition */}
           <div className="shrink-0 flex items-center justify-center">
-            <HeroGraphicComposition className="max-w-[150px] min-[380px]:max-w-[180px] md:max-w-[340px] h-[75px] min-[380px]:h-[85px] md:h-[220px]" />
+            <HeroGraphicComposition className="max-w-[100px] sm:max-w-[130px] md:max-w-[160px] h-[55px] sm:h-[70px] md:h-[90px]" />
           </div>
         </div>
       </div>
 
-      {/* 2. FORMAT / CATEGORY CARDS (4 in a Row) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      {/* 4-IN-1 STUDY GAMES, DAILY STREAK & FOCUS CAM QUICK DECK */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-800 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 flex items-center justify-center font-black shadow-md shrink-0">
+              <Gamepad2 className="w-5 h-5 text-slate-950" />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-black text-white flex items-center gap-2 flex-wrap">
+                <span>
+                  {language === 'ta'
+                    ? '🎮 மாணவர் கல்வி கேம்கள் & தினசரி சவால்கள்'
+                    : language === 'si'
+                    ? '🎮 දෛනික අධ්‍යාපනික ක්‍රීඩා & අභියෝග'
+                    : '🎮 Daily Study Games & Focus Lounge'}
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 shadow-xs">
+                  4-in-1 Interactive
+                </span>
+              </h3>
+              <p className="text-[10px] sm:text-[11px] text-slate-300">
+                {language === 'ta'
+                  ? 'தினமும் லாகின் செய்து பாயிண்ட்ஸ், அதிர்ஷ்ட ஸ்பின், வேகக் கணிதம் மற்றும் இசையுடன் படியுங்கள்!'
+                  : 'Daily lucky spin, 60s brain challenge, speed math rush & Lo-Fi Pomodoro study cam!'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setStudentNav('Study Games Hub')}
+            className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs active:scale-95"
+          >
+            <span>{language === 'ta' ? 'கேம்கள் பகுதிக்குச் செல்க' : 'Launch Games Arena'}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* 4 Quick Game Mode Launchers */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+          {/* 1. Lucky Spin Wheel */}
+          <div
+            onClick={() => setStudentNav('Study Games Hub')}
+            className="cursor-pointer p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition-all hover:-translate-y-0.5 group flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xl">🎡</span>
+              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-400/95 text-slate-950">
+                Free Spin
+              </span>
+            </div>
+            <div className="mt-2">
+              <div className="text-xs font-extrabold text-white group-hover:text-amber-300 transition">
+                Lucky Spin Wheel
+              </div>
+              <div className="text-[10px] text-slate-300">
+                {language === 'ta' ? 'அதிர்ஷ்ட சுழல் சக்கரம்' : 'Daily Coin Rewards'}
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Daily Streak & 1-Min Challenge */}
+          <div
+            onClick={() => setStudentNav('Study Games Hub')}
+            className="cursor-pointer p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition-all hover:-translate-y-0.5 group flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xl">🔥</span>
+              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-orange-500 text-white animate-pulse">
+                Daily Streak
+              </span>
+            </div>
+            <div className="mt-2">
+              <div className="text-xs font-extrabold text-white group-hover:text-orange-300 transition">
+                1-Min Brain Workout
+              </div>
+              <div className="text-[10px] text-slate-300">
+                {language === 'ta' ? '3 விரைவு வினாக்கள்' : 'Daily 3 Questions'}
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Speed Math Rush */}
+          <div
+            onClick={() => setStudentNav('Study Games Hub')}
+            className="cursor-pointer p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition-all hover:-translate-y-0.5 group flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xl">⚡</span>
+              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-500 text-white">
+                60s Race
+              </span>
+            </div>
+            <div className="mt-2">
+              <div className="text-xs font-extrabold text-white group-hover:text-blue-300 transition">
+                Speed Math Rush
+              </div>
+              <div className="text-[10px] text-slate-300">
+                {language === 'ta' ? 'வேகக் கணித மின்னல்' : 'Combo Multiplier'}
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Focus Study Room & Lo-Fi */}
+          <div
+            onClick={() => setStudentNav('Study Games Hub')}
+            className="cursor-pointer p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition-all hover:-translate-y-0.5 group flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xl">🎧</span>
+              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-400 text-slate-950 font-bold">
+                Lo-Fi Cam
+              </span>
+            </div>
+            <div className="mt-2">
+              <div className="text-xs font-extrabold text-white group-hover:text-emerald-300 transition">
+                Focus Study Room
+              </div>
+              <div className="text-[10px] text-slate-300">
+                {language === 'ta' ? 'பொமோடோரோ & இசை' : 'Pomodoro 25m Timer'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. FORMAT / CATEGORY CARDS (4 in a Row) (COMPACT) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
         {/* Card 1: Quiz ( MCQ ) */}
         <div
           id="cat-card-mcq"
           onClick={() => setSelectedFormat(selectedFormat === 'Quiz ( MCQ )' ? 'all' : 'Quiz ( MCQ )')}
-          className={`cursor-pointer rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center transition-all shadow-2xs hover:shadow-md hover:-translate-y-0.5 border ${
+          className={`cursor-pointer rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center text-center transition-all shadow-2xs hover:shadow-xs hover:-translate-y-0.5 border ${
             selectedFormat === 'Quiz ( MCQ )'
               ? 'bg-[#F3E8FF] border-purple-400 ring-2 ring-purple-300'
               : 'bg-[#F7EEFF]/80 hover:bg-[#F3E8FF] border-purple-100'
           }`}
         >
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 text-white flex items-center justify-center shadow-md shadow-purple-500/30 mb-2.5">
-            <Trophy className="w-6 h-6" />
+          <div className="w-8 sm:w-9 h-8 sm:h-9 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 text-white flex items-center justify-center shadow-xs shadow-purple-500/20 mb-1.5">
+            <Trophy className="w-4 sm:w-4.5 h-4 sm:h-4.5" />
           </div>
-          <span className="text-xs sm:text-sm font-extrabold text-slate-800">
+          <span className="text-[11px] sm:text-xs font-bold text-slate-800 leading-tight">
             {language === 'ta' ? 'வினாடி வினா' : language === 'si' ? 'ප්‍රශ්නාවලිය' : 'Quiz'}
           </span>
-          <span className="text-[11px] font-bold text-purple-700">
+          <span className="text-[10px] font-bold text-purple-700 mt-0.5">
             ( MCQ )
           </span>
         </div>
@@ -384,19 +517,19 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
         <div
           id="cat-card-tf"
           onClick={() => setSelectedFormat(selectedFormat === 'True / False' ? 'all' : 'True / False')}
-          className={`cursor-pointer rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center transition-all shadow-2xs hover:shadow-md hover:-translate-y-0.5 border ${
+          className={`cursor-pointer rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center text-center transition-all shadow-2xs hover:shadow-xs hover:-translate-y-0.5 border ${
             selectedFormat === 'True / False'
               ? 'bg-[#E8F8F0] border-emerald-400 ring-2 ring-emerald-300'
               : 'bg-[#E8F8F0]/80 hover:bg-[#E8F8F0] border-emerald-100'
           }`}
         >
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white flex items-center justify-center shadow-md shadow-emerald-500/30 mb-2.5">
-            <CheckSquare className="w-6 h-6" />
+          <div className="w-8 sm:w-9 h-8 sm:h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white flex items-center justify-center shadow-xs shadow-emerald-500/20 mb-1.5">
+            <CheckSquare className="w-4 sm:w-4.5 h-4 sm:h-4.5" />
           </div>
-          <span className="text-xs sm:text-sm font-extrabold text-slate-800">
+          <span className="text-[11px] sm:text-xs font-bold text-slate-800 leading-tight">
             {language === 'ta' ? 'சரி / பிழை' : language === 'si' ? 'හරි / වැරදි' : 'True / False'}
           </span>
-          <span className="text-[11px] font-bold text-emerald-700">
+          <span className="text-[10px] font-bold text-emerald-700 mt-0.5">
             {language === 'ta' ? 'கருத்து சோதனை' : language === 'si' ? 'සංකල්ප පරීක්ෂාව' : 'Concept Check'}
           </span>
         </div>
@@ -405,19 +538,19 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
         <div
           id="cat-card-short-answer"
           onClick={() => setSelectedFormat(selectedFormat === 'Short Answer' ? 'all' : 'Short Answer')}
-          className={`cursor-pointer rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center transition-all shadow-2xs hover:shadow-md hover:-translate-y-0.5 border ${
+          className={`cursor-pointer rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center text-center transition-all shadow-2xs hover:shadow-xs hover:-translate-y-0.5 border ${
             selectedFormat === 'Short Answer'
               ? 'bg-[#FFF3E0] border-amber-400 ring-2 ring-amber-300'
               : 'bg-[#FFF3E0]/80 hover:bg-[#FFF3E0] border-amber-100'
           }`}
         >
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-md shadow-amber-500/30 mb-2.5">
-            <FileText className="w-6 h-6" />
+          <div className="w-8 sm:w-9 h-8 sm:h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-xs shadow-amber-500/20 mb-1.5">
+            <FileText className="w-4 sm:w-4.5 h-4 sm:h-4.5" />
           </div>
-          <span className="text-xs sm:text-sm font-extrabold text-slate-800">
+          <span className="text-[11px] sm:text-xs font-bold text-slate-800 leading-tight">
             {language === 'ta' ? 'குறுகிய விடை' : language === 'si' ? 'කෙටි පිළිතුරු' : 'Short Answer'}
           </span>
-          <span className="text-[11px] font-bold text-amber-700">
+          <span className="text-[10px] font-bold text-amber-700 mt-0.5">
             {language === 'ta' ? 'நேரடி எழுத்து' : language === 'si' ? 'සෘජු ලිවීම' : 'Direct Writing'}
           </span>
         </div>
@@ -426,19 +559,19 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
         <div
           id="cat-card-picture-questions"
           onClick={() => setSelectedFormat(selectedFormat === 'Picture Questions' ? 'all' : 'Picture Questions')}
-          className={`cursor-pointer rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center transition-all shadow-2xs hover:shadow-md hover:-translate-y-0.5 border ${
+          className={`cursor-pointer rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center text-center transition-all shadow-2xs hover:shadow-xs hover:-translate-y-0.5 border ${
             selectedFormat === 'Picture Questions'
               ? 'bg-[#FFE4E8] border-rose-400 ring-2 ring-rose-300'
               : 'bg-[#FFE4E8]/80 hover:bg-[#FFE4E8] border-rose-100'
           }`}
         >
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 text-white flex items-center justify-center shadow-md shadow-rose-500/30 mb-2.5">
-            <ImageIcon className="w-6 h-6" />
+          <div className="w-8 sm:w-9 h-8 sm:h-9 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 text-white flex items-center justify-center shadow-xs shadow-rose-500/20 mb-1.5">
+            <ImageIcon className="w-4 sm:w-4.5 h-4 sm:h-4.5" />
           </div>
-          <span className="text-xs sm:text-sm font-extrabold text-slate-800">
+          <span className="text-[11px] sm:text-xs font-bold text-slate-800 leading-tight">
             {language === 'ta' ? 'பட வினாக்கள்' : language === 'si' ? 'පින්තූර ප්‍රශ්න' : 'Picture Questions'}
           </span>
-          <span className="text-[11px] font-bold text-rose-700">
+          <span className="text-[10px] font-bold text-rose-700 mt-0.5">
             {language === 'ta' ? 'காட்சி பகுப்பாய்வு' : language === 'si' ? 'දෘශ්‍ය විශ්ලේෂණය' : 'Visual Analysis'}
           </span>
         </div>
@@ -548,6 +681,46 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* 2.6 ALL LEADERBOARDS HUB PROMO CARD */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-indigo-500/10 border-2 border-amber-300/80 p-5 sm:p-6 shadow-sm">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 text-slate-950 flex items-center justify-center font-black text-2xl shadow-lg shadow-amber-500/25 shrink-0">
+              🏆
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 bg-amber-200/80 px-2.5 py-0.5 rounded-full border border-amber-300">
+                  {language === 'ta' ? 'அனைத்து தரவரிசைகள்' : 'Official Leaderboards Hub'}
+                </span>
+                <span className="text-[11px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                  4 Active Rankings 🇱🇰
+                </span>
+              </div>
+              <h3 className="text-sm sm:text-base font-black text-slate-900 mt-1">
+                {language === 'ta'
+                  ? 'தேர்வு, வினாடி-வினா, பரிந்துரை, 25 மாவட்ட தீவுப் பயணம் & Edu-Arena தரவரிசை மையம்'
+                  : 'Exams, Quizzes, Referral Points, Island Quest & Edu-Arena Leaderboards Hub'}
+              </h3>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {language === 'ta'
+                  ? 'உங்கள் தேசிய நிலை, விருதுகள், மற்றும் சக மாணவர்களின் மதிப்பெண்களை நேரடியாகப் பாருங்கள்.'
+                  : 'Explore real-time All-Island podium rankings, ambassador scores, and district honors.'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setStudentNav('Leaderboards')}
+            className="w-full md:w-auto px-5 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 transition active:scale-95 shrink-0"
+          >
+            <Trophy className="w-4 h-4 text-slate-950" />
+            <span>{language === 'ta' ? 'தரவரிசையைப் பார்க்க 🏆' : 'View Leaderboards 🏆'}</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -761,22 +934,22 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
         </div>
       </div>
 
-      {/* 4. BOTTOM MOTIVATIONAL BANNER */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#DDEEFF] via-[#E8F2FF] to-[#E3EDFD] border border-blue-200/80 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+      {/* 4. BOTTOM MOTIVATIONAL BANNER (COMPACT) */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#DDEEFF] via-[#E8F2FF] to-[#E3EDFD] border border-blue-200/80 px-3 py-2 sm:px-4 sm:py-2.5 shadow-2xs flex items-center justify-between gap-2.5">
         {/* Left: Target Icon and Text */}
-        <div className="flex items-center gap-4 text-center sm:text-left flex-col sm:flex-row">
-          <div className="w-12 sm:w-14 h-12 sm:h-14 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20 ring-4 ring-blue-100">
-            <Target className="w-6 sm:w-7 h-6 sm:h-7" />
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs ring-1 ring-blue-200">
+            <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </div>
-          <div>
-            <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+          <div className="min-w-0">
+            <h3 className="text-[11px] sm:text-xs font-extrabold text-slate-900 leading-tight truncate">
               {language === 'ta'
                 ? 'ஒவ்வொரு வினாடி வினாவும் உங்கள் இலக்கை நோக்கி உங்களை வழிநடத்துகிறது!'
                 : language === 'si'
                 ? 'සෑම ප්‍රශ්නාවලියක්ම ඔබව ඔබේ ඉලක්ක වෙත සමීප කරයි!'
                 : 'Every Quiz Brings You Closer to Your Goals!'}
             </h3>
-            <p className="text-xs sm:text-sm font-medium text-slate-600 mt-0.5">
+            <p className="text-[9px] sm:text-[10px] font-semibold text-slate-600 leading-tight">
               {language === 'ta'
                 ? 'பங்கேற்கவும் • முன்னேறவும் • பரிசுகளை வெல்லவும்'
                 : language === 'si'
@@ -786,8 +959,8 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
           </div>
         </div>
 
-        {/* Right: Vector Celebration Graphic */}
-        <CelebratingStudentGraphic />
+        {/* Right: Vector Celebration Graphic (Ultra Compact) */}
+        <CelebratingStudentGraphic className="relative w-12 sm:w-14 h-7 sm:h-8 shrink-0 flex items-center justify-center select-none" />
       </div>
 
       {/* 4.4 STUDENT ACHIEVEMENTS & MILESTONES */}

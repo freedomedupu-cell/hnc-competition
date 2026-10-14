@@ -83,62 +83,69 @@ export const DistrictLeaderboardModal: React.FC<DistrictLeaderboardModalProps> =
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          baseList = parsed.filter((p: any) => !p.id?.startsWith('lead-'));
+          baseList = parsed.filter(
+            (p: any) => !p.id?.startsWith('lead-') && !p.id?.startsWith('bm-') && !p.id?.includes('demo')
+          );
         }
       }
     } catch {}
 
-    // Integrate current user live stats dynamically
-    const studentName = currentStudent?.fullName || currentAuthUser?.fullName || 'நீங்கள் (Your Profile)';
-    const studentSchool = currentStudent?.school || 'HNC Edu-Hub Arena Student';
-    const rawDistKey = (currentStudent?.district || currentAuthUser?.district || currentUserDistrictKey || 'jaffna').toLowerCase().replace(/\s+/g, '_');
-    const matchedDistInfo = SRI_LANKA_25_DISTRICTS.find((d) => d.id === rawDistKey || d.nameEn.toLowerCase() === rawDistKey) || SRI_LANKA_25_DISTRICTS[0];
-
-    const currentGrade = currentStudent?.grade || currentAuthUser?.grade || 'Grade 10';
-    let userGradeCategory: 'primary' | 'junior' | 'senior' | 'advanced' | 'after_school' = 'senior';
-    const cGNorm = currentGrade.toLowerCase();
-    if (
-      cGNorm.includes('after school') ||
-      cGNorm.includes('teaching') ||
-      cGNorm.includes('gs') ||
-      cGNorm.includes('gramasewaka') ||
-      cGNorm.includes('ma') ||
-      cGNorm.includes('management assistant') ||
-      cGNorm.includes('sleas') ||
-      cGNorm.includes('slas') ||
-      cGNorm.includes('competitive')
-    ) {
-      userGradeCategory = 'after_school';
-    } else if (cGNorm.includes('1') || cGNorm.includes('2') || cGNorm.includes('3') || cGNorm.includes('4') || cGNorm.includes('5')) {
-      userGradeCategory = 'primary';
-    } else if (cGNorm.includes('6') || cGNorm.includes('7') || cGNorm.includes('8') || cGNorm.includes('9')) {
-      userGradeCategory = 'junior';
-    } else if (cGNorm.includes('12') || cGNorm.includes('13') || cGNorm.includes('advanced')) {
-      userGradeCategory = 'advanced';
-    }
-
-    const userEntry: LeaderboardEntry = {
-      id: 'current-user-live-entry',
-      rank: 0,
-      name: studentName,
-      school: `${studentSchool} (${matchedDistInfo.nameTa})`,
-      districtKey: matchedDistInfo.id,
-      districtNameTa: matchedDistInfo.nameTa,
-      districtNameEn: matchedDistInfo.nameEn,
-      districtNameSi: matchedDistInfo.nameSi,
-      gradeCategory: userGradeCategory,
-      gradeText: currentGrade,
-      totalXp: currentUserXp,
-      completedDistrictsCount: currentUserCompletedCount,
-      crownsCount: Math.min(currentUserCompletedCount, 25),
-      accuracyPercent: currentUserCompletedCount > 0 ? 92 : 0,
-      isCurrentUser: true,
-      avatarUrl: currentStudent?.avatarUrl || currentAuthUser?.avatarUrl,
-    };
-
-    // Filter out previous duplicate current-user entry if present
+    const isAdmin = currentAuthUser?.role === 'super_admin' || currentAuthUser?.role === 'admin';
     const filteredBase = baseList.filter((e) => e.id !== 'current-user-live-entry' && !e.isCurrentUser);
-    const combined = [...filteredBase, userEntry];
+
+    let combined = [...filteredBase];
+
+    // Only integrate current user if they are a student and have actual activity
+    if (!isAdmin && (currentUserXp > 0 || currentUserCompletedCount > 0)) {
+      const studentName = currentStudent?.fullName || currentAuthUser?.fullName || 'நீங்கள் (Your Profile)';
+      const studentSchool = currentStudent?.school || 'HNC Edu-Hub Arena Student';
+      const rawDistKey = (currentStudent?.district || currentAuthUser?.district || currentUserDistrictKey || 'jaffna').toLowerCase().replace(/\s+/g, '_');
+      const matchedDistInfo = SRI_LANKA_25_DISTRICTS.find((d) => d.id === rawDistKey || d.nameEn.toLowerCase() === rawDistKey) || SRI_LANKA_25_DISTRICTS[0];
+
+      const currentGrade = currentStudent?.grade || currentAuthUser?.grade || 'Grade 10';
+      let userGradeCategory: 'primary' | 'junior' | 'senior' | 'advanced' | 'after_school' = 'senior';
+      const cGNorm = currentGrade.toLowerCase();
+      if (
+        cGNorm.includes('after school') ||
+        cGNorm.includes('teaching') ||
+        cGNorm.includes('gs') ||
+        cGNorm.includes('gramasewaka') ||
+        cGNorm.includes('ma') ||
+        cGNorm.includes('management assistant') ||
+        cGNorm.includes('sleas') ||
+        cGNorm.includes('slas') ||
+        cGNorm.includes('competitive')
+      ) {
+        userGradeCategory = 'after_school';
+      } else if (cGNorm.includes('1') || cGNorm.includes('2') || cGNorm.includes('3') || cGNorm.includes('4') || cGNorm.includes('5')) {
+        userGradeCategory = 'primary';
+      } else if (cGNorm.includes('6') || cGNorm.includes('7') || cGNorm.includes('8') || cGNorm.includes('9')) {
+        userGradeCategory = 'junior';
+      } else if (cGNorm.includes('12') || cGNorm.includes('13') || cGNorm.includes('advanced')) {
+        userGradeCategory = 'advanced';
+      }
+
+      const userEntry: LeaderboardEntry = {
+        id: 'current-user-live-entry',
+        rank: 0,
+        name: studentName,
+        school: `${studentSchool} (${matchedDistInfo.nameTa})`,
+        districtKey: matchedDistInfo.id,
+        districtNameTa: matchedDistInfo.nameTa,
+        districtNameEn: matchedDistInfo.nameEn,
+        districtNameSi: matchedDistInfo.nameSi,
+        gradeCategory: userGradeCategory,
+        gradeText: currentGrade,
+        totalXp: currentUserXp,
+        completedDistrictsCount: currentUserCompletedCount,
+        crownsCount: Math.min(currentUserCompletedCount, 25),
+        accuracyPercent: currentUserCompletedCount > 0 ? 92 : 0,
+        isCurrentUser: true,
+        avatarUrl: currentStudent?.avatarUrl || currentAuthUser?.avatarUrl,
+      };
+
+      combined.push(userEntry);
+    }
 
     // Sort descending by totalXP, completedDistrictsCount, and crowns
     combined.sort((a, b) => {

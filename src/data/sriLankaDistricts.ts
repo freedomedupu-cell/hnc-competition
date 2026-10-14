@@ -1,5 +1,33 @@
 export type StudyGamingMode = 'kahoot' | 'quizizz' | 'trivia_crack' | 'brain_out';
 
+export const SRI_LANKA_DISTRICTS = [
+  'Jaffna',
+  'Kilinochchi',
+  'Mullaitivu',
+  'Vavuniya',
+  'Mannar',
+  'Batticaloa',
+  'Trincomalee',
+  'Ampara',
+  'Colombo',
+  'Gampaha',
+  'Kalutara',
+  'Kandy',
+  'Matale',
+  'Nuwara Eliya',
+  'Galle',
+  'Matara',
+  'Hambantota',
+  'Kurunegala',
+  'Puttalam',
+  'Anuradhapura',
+  'Polonnaruwa',
+  'Badulla',
+  'Monaragala',
+  'Ratnapura',
+  'Kegalle',
+];
+
 export interface GamingMethodDef {
   id: StudyGamingMode;
   nameEn: string;

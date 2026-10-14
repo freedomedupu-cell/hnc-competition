@@ -372,9 +372,9 @@ export const HeroGraphicComposition: React.FC<{ className?: string }> = ({ class
 /**
  * Bottom Banner Student Celebration Graphic
  */
-export const CelebratingStudentGraphic: React.FC = () => {
+export const CelebratingStudentGraphic: React.FC<{ className?: string }> = ({ className }) => {
   return (
-    <div className="relative w-28 sm:w-36 h-20 sm:h-24 shrink-0 flex items-center justify-center select-none">
+    <div className={className || "relative w-28 sm:w-36 h-20 sm:h-24 shrink-0 flex items-center justify-center select-none"}>
       <svg viewBox="0 0 160 110" className="w-full h-full overflow-visible" fill="none">
         {/* Floating Confetti */}
         <circle cx="25" cy="20" r="3" fill="#F59E0B" />

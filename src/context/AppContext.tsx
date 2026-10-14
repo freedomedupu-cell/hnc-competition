@@ -73,6 +73,7 @@ import {
   purgeAllDemoCompetitions,
   deleteStudentAccountFromFirestore,
   updateStudentPasswordInFirestore,
+  updateStudentDetailsInFirestore,
   deleteResultFromFirestore,
   getSavedActiveUser,
   saveActiveUser,
@@ -121,6 +122,7 @@ export type SuperAdminNav =
   | 'Sponsors & Ads'
   | 'Live Proctoring'
   | 'Feedback'
+  | 'Leaderboards'
   | 'Audit Trail'
   | 'Settings';
 
@@ -136,6 +138,7 @@ export type AdminNav =
   | 'Sponsors & Ads'
   | 'Live Proctoring'
   | 'Feedback'
+  | 'Leaderboards'
   | 'Audit Trail'
   | 'Profile';
 
@@ -143,6 +146,8 @@ export type StudentNav =
   | 'Dashboard' 
   | 'Competitions' 
   | 'Edu-Arena Quest'
+  | 'Study Games Hub'
+  | 'Leaderboards'
   | 'My Results' 
   | 'My Profile'
   | 'Referral & Points'
@@ -225,6 +230,27 @@ interface AppContextType {
   updateStudentProfile: (profile: Partial<StudentUser>) => void;
   deleteStudentAccount: (studentUid: string) => Promise<void>;
   updateStudentPassword: (studentUid: string, newPassword: string) => Promise<void>;
+  updateStudentByAdmin: (
+    studentUid: string,
+    updatedData: {
+      fullName?: string;
+      studentId?: string;
+      username?: string;
+      email?: string;
+      phone?: string;
+      grade?: string;
+      school?: string;
+      district?: string;
+      address?: string;
+      dateOfBirth?: string;
+      guardianName?: string;
+      status?: 'active' | 'inactive' | 'suspended';
+      referralPoints?: number;
+      referralCode?: string;
+      newPassword?: string;
+      oldStudentId?: string;
+    }
+  ) => Promise<void>;
   updateAdminProfile: (profile: Partial<AdminUser>) => void;
 
   // Phase 07: Monthly Membership & Payment System
@@ -503,38 +529,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Listen to Firebase Auth state on mount
   useEffect(() => {
     // Run database hygiene once in background without blocking initial auth / UI render
-    let hygieneTimer: any;
     if (typeof window !== 'undefined' && !localStorage.getItem('hnc_seed_initialized_v2')) {
-      hygieneTimer = setTimeout(() => {
-        seedInitialDataIfEmpty().then(() => {
-          localStorage.setItem('hnc_seed_initialized_v2', 'true');
-        }).catch(() => {});
-      }, 2000);
+      seedInitialDataIfEmpty().then(() => {
+        localStorage.setItem('hnc_seed_initialized_v2', 'true');
+      }).catch(() => {});
     }
 
-    // Safety timeout to prevent permanent loading freeze if network or Auth is delayed
-    const authSafetyTimer = setTimeout(() => {
-      setAuthLoading((prev) => {
-        if (prev) {
-          console.warn('Auth loading safety timeout fired: Unfreezing loading UI.');
-          return false;
-        }
-        return false;
-      });
-    }, 2800);
+    // Immediately release loading screen if not already
+    setAuthLoading(false);
+
+    const handleForceReady = () => {
+      setAuthLoading(false);
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('hnc_force_ready', handleForceReady);
+    }
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
-      clearTimeout(authSafetyTimer);
+      setAuthLoading(false);
       try {
         const saved = getSavedActiveUser();
+
+        // If a valid saved user exists, immediately end loading and present the portal UI
+        if (saved && saved.role && saved.status !== 'inactive') {
+          setAuthLoading(false);
+        }
 
         if (fbUser) {
           let resolvedUser: DbUser | null = null;
 
-          // 1. Direct fetch by fbUser.uid in 'users' collection
+          // 1. Direct fetch by fbUser.uid in 'users' collection (with 2.5s network timeout protection)
           try {
-            const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
-            if (userDoc.exists()) {
+            const fetchPromise = getDoc(doc(db, 'users', fbUser.uid));
+            const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+            const userDoc: any = await Promise.race([fetchPromise, timeoutPromise]);
+            if (userDoc && typeof userDoc.exists === 'function' && userDoc.exists()) {
               resolvedUser = userDoc.data() as DbUser;
             }
           } catch (fetchErr) {
@@ -607,25 +636,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             } else {
               if (!resolvedUser.status) resolvedUser.status = 'active';
 
-              // If student, enrich with latest data from 'students' collection if available
+              // If student, enrich in background without delaying portal readiness
               if (resolvedUser.role === 'student') {
-                try {
-                  const stuDoc = await getDoc(doc(db, 'students', resolvedUser.uid));
-                  if (stuDoc.exists()) {
-                    const stuData = stuDoc.data();
-                    resolvedUser = {
-                      ...resolvedUser,
-                      grade: stuData.grade || resolvedUser.grade || 'Grade 6',
-                      school: stuData.school || resolvedUser.school,
-                      referralPoints: stuData.referralPoints !== undefined ? stuData.referralPoints : (resolvedUser.referralPoints ?? 0),
-                      totalReferrals: stuData.totalReferrals !== undefined ? stuData.totalReferrals : (resolvedUser.totalReferrals ?? 0),
-                      sharesCount: stuData.sharesCount !== undefined ? stuData.sharesCount : (resolvedUser.sharesCount ?? 0),
-                      redeemedPerks: stuData.redeemedPerks || resolvedUser.redeemedPerks || [],
-                      referralCode: stuData.referralCode || resolvedUser.referralCode,
-                      avatarUrl: stuData.avatarUrl || resolvedUser.avatarUrl || '',
-                    };
-                  }
-                } catch {}
+                getDoc(doc(db, 'students', resolvedUser.uid))
+                  .then((stuDoc) => {
+                    if (stuDoc.exists()) {
+                      const stuData = stuDoc.data();
+                      setCurrentAuthUser((prev) => {
+                        if (!prev) return prev;
+                        const merged: DbUser = {
+                          ...prev,
+                          grade: stuData.grade || prev.grade || 'Grade 6',
+                          school: stuData.school || prev.school,
+                          referralPoints: stuData.referralPoints !== undefined ? stuData.referralPoints : (prev.referralPoints ?? 0),
+                          totalReferrals: stuData.totalReferrals !== undefined ? stuData.totalReferrals : (prev.totalReferrals ?? 0),
+                          sharesCount: stuData.sharesCount !== undefined ? stuData.sharesCount : (prev.sharesCount ?? 0),
+                          redeemedPerks: stuData.redeemedPerks || prev.redeemedPerks || [],
+                          referralCode: stuData.referralCode || prev.referralCode,
+                          avatarUrl: stuData.avatarUrl || prev.avatarUrl || '',
+                        };
+                        saveActiveUser(merged);
+                        return merged;
+                      });
+                    }
+                  })
+                  .catch(() => {});
               }
 
               // Update session and persist to storage
@@ -635,7 +670,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           } else {
             // Neither Firestore nor query resolved this fbUser.
-            // DO NOT immediately log out if a valid saved session exists!
             if (saved && saved.role && saved.status !== 'inactive') {
               setCurrentAuthUser(saved);
               setInternalPortal(saved.role);
@@ -648,25 +682,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (saved && saved.role && saved.status !== 'inactive') {
             setCurrentAuthUser(saved);
             setInternalPortal(saved.role);
-
-            // Optional background check: verify account was not deactivated in Firestore
-            if (saved.uid) {
-              getDoc(doc(db, 'users', saved.uid))
-                .then((docSnap) => {
-                  if (docSnap.exists()) {
-                    const latest = docSnap.data() as DbUser;
-                    if (latest.status === 'inactive') {
-                      logoutUserSession();
-                      setCurrentAuthUser(null);
-                    } else {
-                      const merged = { ...saved, ...latest };
-                      saveActiveUser(merged);
-                      setCurrentAuthUser(merged);
-                    }
-                  }
-                })
-                .catch(() => {});
-            }
           } else {
             setCurrentAuthUser(null);
           }
@@ -686,8 +701,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     return () => {
-      clearTimeout(hygieneTimer);
-      clearTimeout(authSafetyTimer);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('hnc_force_ready', handleForceReady);
+      }
       unsubscribeAuth();
     };
   }, []);
@@ -722,11 +738,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Strictly exclude test/dummy sample competitions so students will never see test dummy records
       const realComps = dbComps.filter((c) => {
+        const validId = c.competitionId || (c as any).id;
+        const code = (c.code || '').toUpperCase();
         const title = (c.title || '').toLowerCase();
         if (
+          knownDemoIds.has(validId) ||
+          knownDemoCodes.has(code) ||
           title.includes('demo competition') ||
           title.includes('sample competition') ||
-          title.includes('test competition')
+          title.includes('test competition') ||
+          title.includes('demo')
         ) {
           return false;
         }
@@ -783,12 +804,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       });
 
-      // Merge Firestore competitions with initial default competitions (deduping by ID)
-      const mergedCompsMap = new Map<string, Competition>();
-      initialCompetitions.forEach((c) => mergedCompsMap.set(c.id, c));
-      mapped.forEach((c) => mergedCompsMap.set(c.id, c));
-
-      setCompetitions(Array.from(mergedCompsMap.values()));
+      setCompetitions(mapped);
     });
 
     // 2. Results subscription (Students only receive their own results as per rules)
@@ -1657,6 +1673,112 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
     } catch (err) {
       console.error('Failed to update student password:', err);
+      throw err;
+    }
+  };
+
+  const updateStudentByAdmin = async (
+    studentUid: string,
+    updatedData: {
+      fullName?: string;
+      studentId?: string;
+      username?: string;
+      email?: string;
+      phone?: string;
+      grade?: string;
+      school?: string;
+      district?: string;
+      address?: string;
+      dateOfBirth?: string;
+      guardianName?: string;
+      status?: 'active' | 'inactive' | 'suspended';
+      referralPoints?: number;
+      referralCode?: string;
+      newPassword?: string;
+      oldStudentId?: string;
+    }
+  ) => {
+    try {
+      await updateStudentDetailsInFirestore(studentUid, updatedData);
+
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (
+            s.id === studentUid ||
+            s.studentId === studentUid ||
+            (updatedData.oldStudentId && s.studentId === updatedData.oldStudentId)
+          ) {
+            const nextName = updatedData.fullName?.trim() || s.name;
+            const nextSchool = updatedData.school?.trim() || s.institution;
+            const nextGrade = updatedData.grade?.trim() || s.gradeLevel;
+            return {
+              ...s,
+              name: nextName,
+              fullName: nextName,
+              studentId: updatedData.studentId?.trim() || s.studentId,
+              username: updatedData.username !== undefined ? updatedData.username.trim().toLowerCase() : s.username,
+              email: updatedData.email !== undefined ? updatedData.email.trim().toLowerCase() : s.email,
+              phone: updatedData.phone !== undefined ? updatedData.phone.trim() : s.phone,
+              institution: nextSchool,
+              school: nextSchool,
+              gradeLevel: nextGrade,
+              grade: nextGrade,
+              district: updatedData.district !== undefined ? updatedData.district.trim() : s.district,
+              address: updatedData.address !== undefined ? updatedData.address.trim() : s.address,
+              dateOfBirth: updatedData.dateOfBirth !== undefined ? updatedData.dateOfBirth.trim() : s.dateOfBirth,
+              guardianName: updatedData.guardianName !== undefined ? updatedData.guardianName.trim() : s.guardianName,
+              status: (updatedData.status as any) || s.status,
+              referralPoints: updatedData.referralPoints !== undefined ? updatedData.referralPoints : s.referralPoints,
+              referralCode: updatedData.referralCode !== undefined ? updatedData.referralCode.trim().toUpperCase() : s.referralCode,
+              initialPassword: updatedData.newPassword?.trim() || s.initialPassword,
+            };
+          }
+          return s;
+        })
+      );
+
+      if (updatedData.fullName || updatedData.school) {
+        setResults((prev) =>
+          prev.map((r) => {
+            if (
+              r.studentId === studentUid ||
+              (updatedData.oldStudentId && r.studentId === updatedData.oldStudentId) ||
+              (updatedData.studentId && r.studentId === updatedData.studentId)
+            ) {
+              return {
+                ...r,
+                studentName: updatedData.fullName?.trim() || r.studentName,
+                studentInstitution: updatedData.school?.trim() || r.studentInstitution,
+                studentId: updatedData.studentId?.trim() || r.studentId,
+              };
+            }
+            return r;
+          })
+        );
+      }
+
+      if (currentAuthUser && currentAuthUser.uid === studentUid) {
+        const updatedAuth: DbUser = {
+          ...currentAuthUser,
+          fullName: updatedData.fullName?.trim() || currentAuthUser.fullName,
+          studentId: updatedData.studentId?.trim() || currentAuthUser.studentId,
+          username: updatedData.username !== undefined ? updatedData.username.trim().toLowerCase() : currentAuthUser.username,
+          email: updatedData.email !== undefined ? updatedData.email.trim().toLowerCase() : currentAuthUser.email,
+          phone: updatedData.phone !== undefined ? updatedData.phone.trim() : currentAuthUser.phone,
+          school: updatedData.school?.trim() || currentAuthUser.school,
+          grade: updatedData.grade?.trim() || currentAuthUser.grade,
+          district: updatedData.district !== undefined ? updatedData.district.trim() : currentAuthUser.district,
+          address: updatedData.address !== undefined ? updatedData.address.trim() : currentAuthUser.address,
+          dateOfBirth: updatedData.dateOfBirth !== undefined ? updatedData.dateOfBirth.trim() : currentAuthUser.dateOfBirth,
+          referralPoints: updatedData.referralPoints !== undefined ? updatedData.referralPoints : currentAuthUser.referralPoints,
+          referralCode: updatedData.referralCode !== undefined ? updatedData.referralCode.trim().toUpperCase() : currentAuthUser.referralCode,
+          status: (updatedData.status as any) || currentAuthUser.status,
+        };
+        setCurrentAuthUser(updatedAuth);
+        saveActiveUser(updatedAuth);
+      }
+    } catch (err) {
+      console.error('Failed to update student by admin:', err);
       throw err;
     }
   };
@@ -2574,6 +2696,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateStudentProfile,
         deleteStudentAccount,
         updateStudentPassword,
+        updateStudentByAdmin,
         updateAdminProfile,
         memberships,
         currentMembership,

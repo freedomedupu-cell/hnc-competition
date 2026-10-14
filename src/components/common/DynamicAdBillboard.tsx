@@ -64,33 +64,6 @@ export const DynamicAdBillboard: React.FC = () => {
   useEffect(() => {
     const timestamp = new Date().toISOString();
     setDiagnosticTimestamp(timestamp);
-
-    const logPayload = {
-      operation: 'FETCH_ADVERTISEMENTS',
-      component: 'DynamicAdBillboard (Student Dashboard)',
-      firestoreDb: 'ai-studio-hnceduhub-87cf124f-0cc7-41e5-bd50-84681e12383b',
-      collection: 'advertisements',
-      syncStatus: (advertisements || []).length > 0 ? 'REALTIME_FIRESTORE_SYNCED' : 'NO_ADS_IN_DATABASE',
-      totalLoadedInState: (advertisements || []).length,
-      activeFilteredForStudent: activeAds.length,
-      renderingCount: displayAds.length,
-      timestamp,
-      documents: (advertisements || []).map((ad) => ({
-        id: ad?.id || 'unknown',
-        brandName: ad?.brandName || 'Sponsor',
-        title: ad?.title || '',
-        status: ad?.status || 'active',
-        mediaType: ad?.mediaType || (ad?.videoUrl ? 'video' : 'image'),
-        hasVideoUrl: Boolean(ad?.videoUrl),
-        hasImageUrl: Boolean(ad?.imageUrl),
-        clicksCount: ad?.clicksCount || 0,
-      })),
-    };
-
-    console.group(`🔍 [STUDENT_DASHBOARD_DIAGNOSTIC] Advertisement Sync Status (${timestamp})`);
-    console.log('Sync Summary:', logPayload);
-    console.table(logPayload.documents);
-    console.groupEnd();
   }, [(advertisements || []).length, activeAds.length, displayAds.length]);
 
   // Auto slide every 8 seconds if multiple ads exist

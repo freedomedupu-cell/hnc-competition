@@ -568,9 +568,17 @@ export const StudentReferralView: React.FC = () => {
                 : 'Top ranking student advocates encouraging academic contest participation across Sri Lanka'}
             </p>
           </div>
-          <span className="text-xs text-indigo-600 font-semibold bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
-            Top Advocates 🇱🇰
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-indigo-600 font-semibold bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 hidden sm:inline-block">
+              Top Advocates 🇱🇰
+            </span>
+            <button
+              onClick={() => setStudentNav('Leaderboards')}
+              className="text-xs text-white font-bold bg-amber-600 hover:bg-amber-700 px-3 py-1 rounded-full shadow-xs transition flex items-center gap-1 active:scale-95"
+            >
+              <span>🏆 {language === 'ta' ? 'அனைத்து தரவரிசைகள்' : 'All Leaderboards'}</span>
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

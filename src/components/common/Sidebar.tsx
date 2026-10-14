@@ -159,6 +159,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
       badge: feedbacks.filter((f) => f.status === 'pending').length || undefined,
     },
     {
+      id: 'Leaderboards',
+      label:
+        language === 'ta'
+          ? '🏆 அனைத்து தரவரிசைகள்'
+          : language === 'si'
+          ? '🏆 නායකත්ව පුවරුව'
+          : '🏆 Leaderboards Hub',
+      icon: <Medal className="w-4 h-4 text-amber-500" />,
+      badge: '🔥 Live',
+    },
+    {
       id: 'Settings',
       label: t('navSettings'),
       icon: <Settings className="w-4 h-4" />,
@@ -193,6 +204,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
       label: t('navResultsScoring'),
       icon: <FileCheck className="w-4 h-4" />,
       badge: results.filter(r => r.publishStatus === 'under_review').length || undefined,
+    },
+    {
+      id: 'Leaderboards',
+      label:
+        language === 'ta'
+          ? '🏆 அனைத்து தரவரிசைகள்'
+          : language === 'si'
+          ? '🏆 නායකත්ව පුවරුව'
+          : '🏆 Leaderboards Hub',
+      icon: <Medal className="w-4 h-4 text-amber-500" />,
+      badge: '🔥 Live',
     },
     {
       id: 'Announcements',
@@ -347,6 +369,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
           : '🎯 HNC Edu-Arena (Study Gaming)',
       icon: <Gamepad2 className="w-5 h-5 text-emerald-500" />,
       badge: '⚡ New',
+    },
+    {
+      id: 'Study Games Hub',
+      label:
+        language === 'ta'
+          ? '🎮 கல்வி விளையாட்டுகள் (4-in-1 Games)'
+          : language === 'si'
+          ? '🎮 අධ්‍යාපනික ක්‍රීඩා (4-in-1 Games)'
+          : '🎮 Study Games & Focus Arena',
+      icon: <Sparkles className="w-5 h-5 text-amber-500" />,
+      badge: '🔥 Hot',
+    },
+    {
+      id: 'Leaderboards',
+      label:
+        language === 'ta'
+          ? '🏆 அனைத்து தரவரிசைகள்'
+          : language === 'si'
+          ? '🏆 නායකත්ව පුවරුව'
+          : '🏆 Leaderboards Hub',
+      icon: <Medal className="w-5 h-5 text-amber-500" />,
+      badge: '🔥 Live',
     },
     {
       id: 'My Results',

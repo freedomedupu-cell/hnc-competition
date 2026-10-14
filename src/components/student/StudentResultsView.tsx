@@ -161,16 +161,25 @@ export const StudentResultsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1.5">
-          <Award className="w-4 h-4 text-amber-600" />
-          <span>
-            {studentResults.length}{' '}
-            {language === 'ta'
-              ? 'உத்தியோகபூர்வ முடிவுகள்'
-              : language === 'si'
-              ? 'නිල ප්‍රතිඵල'
-              : 'Official Results'}
-          </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setStudentNav('Leaderboards')}
+            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 flex items-center gap-1.5 shadow-xs hover:from-amber-600 hover:to-amber-700 transition active:scale-95"
+          >
+            <Trophy className="w-3.5 h-3.5 text-slate-950" />
+            <span>{language === 'ta' ? 'அனைத்து தரவரிசைகள்' : 'All Leaderboards'}</span>
+          </button>
+          <div className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1.5">
+            <Award className="w-4 h-4 text-amber-600" />
+            <span>
+              {studentResults.length}{' '}
+              {language === 'ta'
+                ? 'உத்தியோகபூர்வ முடிவுகள்'
+                : language === 'si'
+                ? 'නිල ප්‍රතිඵල'
+                : 'Official Results'}
+            </span>
+          </div>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { StudentUser } from '../../types';
 import { Badge } from '../common/Badge';
@@ -27,18 +27,38 @@ import {
   Key,
   Lock,
   RotateCcw,
+  Pencil,
+  Filter,
+  CheckCircle,
+  Award,
+  FileText,
+  Calendar,
+  Medal,
 } from 'lucide-react';
+import { EditStudentModal } from './EditStudentModal';
 
 export const StudentManagement: React.FC = () => {
-  const { students, competitions, results, deleteStudentAccount, updateStudentPassword, adjustStudentPoints, language } = useApp();
+  const {
+    students,
+    competitions,
+    results,
+    deleteStudentAccount,
+    updateStudentPassword,
+    updateStudentByAdmin,
+    adjustStudentPoints,
+    language,
+  } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [gradeFilter, setGradeFilter] = useState('all');
+  const [duplicateFilter, setDuplicateFilter] = useState<'all' | 'any_dup' | 'email_dup' | 'phone_dup'>('all');
   const [sortBy, setSortBy] = useState<'default' | 'points_desc' | 'referrals_desc' | 'awards_desc' | 'name'>('default');
   const [selectedStudent, setSelectedStudent] = useState<StudentUser | null>(null);
+  const [studentToEdit, setStudentToEdit] = useState<StudentUser | null>(null);
   const [studentToDelete, setStudentToDelete] = useState<StudentUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [editSuccessToast, setEditSuccessToast] = useState<string | null>(null);
 
   // Password change state in modal
   const [newPasswordInput, setNewPasswordInput] = useState('');
@@ -55,6 +75,50 @@ export const StudentManagement: React.FC = () => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleSaveStudentEdit = async (
+    studentUid: string,
+    updatedData: any
+  ) => {
+    await updateStudentByAdmin(studentUid, updatedData);
+    setEditSuccessToast(
+      language === 'ta'
+        ? 'மாணவர் விபரங்கள் வெற்றிகரமாகப் புதுப்பிக்கப்பட்டன!'
+        : 'Student details updated successfully!'
+    );
+    setTimeout(() => setEditSuccessToast(null), 4000);
+
+    if (
+      selectedStudent &&
+      (selectedStudent.id === studentUid || selectedStudent.studentId === studentUid)
+    ) {
+      setSelectedStudent((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          name: updatedData.fullName || prev.name,
+          fullName: updatedData.fullName || prev.fullName,
+          studentId: updatedData.studentId || prev.studentId,
+          username: updatedData.username || prev.username,
+          institution: updatedData.school || prev.institution,
+          school: updatedData.school || prev.school,
+          gradeLevel: updatedData.grade || prev.gradeLevel,
+          grade: updatedData.grade || prev.grade,
+          district: updatedData.district || prev.district,
+          address: updatedData.address || prev.address,
+          dateOfBirth: updatedData.dateOfBirth || prev.dateOfBirth,
+          guardianName: updatedData.guardianName || prev.guardianName,
+          phone: updatedData.phone || prev.phone,
+          status: updatedData.status || prev.status,
+          referralPoints:
+            updatedData.referralPoints !== undefined
+              ? updatedData.referralPoints
+              : prev.referralPoints,
+          referralCode: updatedData.referralCode || prev.referralCode,
+        };
+      });
+    }
   };
 
   const handleUpdateStudentPassword = async () => {
@@ -137,8 +201,117 @@ export const StudentManagement: React.FC = () => {
     }
   };
 
+  // Pre-calculate duplicate maps for instant O(1) detection of duplicate emails and phones
+  const { emailMap, phoneMap, duplicateStudentsCount, emailDupCount, phoneDupCount } = useMemo(() => {
+    const eMap = new Map<string, string[]>();
+    const pMap = new Map<string, string[]>();
+
+    students.forEach((s) => {
+      if (s.email && s.email.trim()) {
+        const normEmail = s.email.trim().toLowerCase();
+        const list = eMap.get(normEmail) || [];
+        list.push(s.id);
+        eMap.set(normEmail, list);
+      }
+
+      if (s.phone && s.phone.trim()) {
+        const digits = s.phone.replace(/\D/g, '');
+        if (digits.length >= 7) {
+          const normPhone = digits.length >= 9 ? digits.slice(-9) : digits;
+          const list = pMap.get(normPhone) || [];
+          list.push(s.id);
+          pMap.set(normPhone, list);
+        }
+      }
+    });
+
+    let dupTotal = 0;
+    let eDupTotal = 0;
+    let pDupTotal = 0;
+
+    students.forEach((s) => {
+      let isEmailDup = false;
+      let isPhoneDup = false;
+
+      if (s.email && s.email.trim()) {
+        const normEmail = s.email.trim().toLowerCase();
+        const list = eMap.get(normEmail);
+        if (list && list.length > 1) {
+          isEmailDup = true;
+          eDupTotal++;
+        }
+      }
+
+      if (s.phone && s.phone.trim()) {
+        const digits = s.phone.replace(/\D/g, '');
+        if (digits.length >= 7) {
+          const normPhone = digits.length >= 9 ? digits.slice(-9) : digits;
+          const list = pMap.get(normPhone);
+          if (list && list.length > 1) {
+            isPhoneDup = true;
+            pDupTotal++;
+          }
+        }
+      }
+
+      if (isEmailDup || isPhoneDup) {
+        dupTotal++;
+      }
+    });
+
+    return {
+      emailMap: eMap,
+      phoneMap: pMap,
+      duplicateStudentsCount: dupTotal,
+      emailDupCount: eDupTotal,
+      phoneDupCount: pDupTotal,
+    };
+  }, [students]);
+
+  const getDuplicateStatus = (std: StudentUser) => {
+    let isEmailDup = false;
+    let emailClashCount = 0;
+    if (std.email && std.email.trim()) {
+      const normEmail = std.email.trim().toLowerCase();
+      const list = emailMap.get(normEmail);
+      if (list && list.length > 1) {
+        isEmailDup = true;
+        emailClashCount = list.length;
+      }
+    }
+
+    let isPhoneDup = false;
+    let phoneClashCount = 0;
+    if (std.phone && std.phone.trim()) {
+      const digits = std.phone.replace(/\D/g, '');
+      if (digits.length >= 7) {
+        const normPhone = digits.length >= 9 ? digits.slice(-9) : digits;
+        const list = phoneMap.get(normPhone);
+        if (list && list.length > 1) {
+          isPhoneDup = true;
+          phoneClashCount = list.length;
+        }
+      }
+    }
+
+    return {
+      isEmailDup,
+      emailClashCount,
+      isPhoneDup,
+      phoneClashCount,
+      isAnyDup: isEmailDup || isPhoneDup,
+    };
+  };
+
   const filteredStudents = students
     .filter((std) => {
+      const dup = getDuplicateStatus(std);
+
+      // Apply duplicate filtering
+      if (duplicateFilter === 'any_dup' && !dup.isAnyDup) return false;
+      if (duplicateFilter === 'email_dup' && !dup.isEmailDup) return false;
+      if (duplicateFilter === 'phone_dup' && !dup.isPhoneDup) return false;
+
       const term = searchTerm.toLowerCase();
       const matchesSearch =
         std.name.toLowerCase().includes(term) ||
@@ -147,6 +320,7 @@ export const StudentManagement: React.FC = () => {
         (std.district && std.district.toLowerCase().includes(term)) ||
         std.institution.toLowerCase().includes(term) ||
         std.email.toLowerCase().includes(term) ||
+        (std.phone && std.phone.toLowerCase().includes(term)) ||
         (std.referralCode && std.referralCode.toLowerCase().includes(term));
 
       const matchesGrade =
@@ -155,6 +329,19 @@ export const StudentManagement: React.FC = () => {
       return matchesSearch && matchesGrade;
     })
     .sort((a, b) => {
+      // If filtering by duplicates, group identical emails or phones directly adjacent to each other!
+      if (duplicateFilter !== 'all') {
+        const aVal =
+          duplicateFilter === 'email_dup'
+            ? (a.email || '').toLowerCase()
+            : (a.phone || a.email || '').toLowerCase();
+        const bVal =
+          duplicateFilter === 'email_dup'
+            ? (b.email || '').toLowerCase()
+            : (b.phone || b.email || '').toLowerCase();
+        if (aVal !== bVal) return aVal.localeCompare(bVal);
+      }
+
       if (sortBy === 'points_desc') {
         const ptsA = a.referralPoints !== undefined ? a.referralPoints : 25;
         const ptsB = b.referralPoints !== undefined ? b.referralPoints : 25;
@@ -202,6 +389,26 @@ export const StudentManagement: React.FC = () => {
             <span className="font-bold">{students.length}</span>
           </span>
 
+          {/* Duplicates Alert Quick Toggle */}
+          <button
+            type="button"
+            onClick={() => setDuplicateFilter(duplicateFilter === 'all' ? 'any_dup' : 'all')}
+            className={`text-xs font-bold px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-all shadow-2xs ${
+              duplicateStudentsCount > 0
+                ? duplicateFilter !== 'all'
+                  ? 'bg-rose-600 text-white border-rose-700 shadow-md ring-2 ring-rose-400'
+                  : 'bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-100'
+                : 'bg-slate-50 text-slate-600 border-slate-200'
+            }`}
+            title="Toggle duplicate registrations filter"
+          >
+            <AlertTriangle className={`w-3.5 h-3.5 ${duplicateFilter !== 'all' ? 'text-white' : duplicateStudentsCount > 0 ? 'text-rose-600' : 'text-slate-400'}`} />
+            <span>
+              {language === 'ta' ? 'நகல் பதிவுகள்: ' : 'Duplicates: '}
+              <span className="font-extrabold">{duplicateStudentsCount}</span>
+            </span>
+          </button>
+
           <span className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-300 flex items-center gap-1.5 shadow-2xs">
             <Coins className="w-4 h-4 text-amber-500 fill-amber-400" />
             <span>
@@ -216,6 +423,21 @@ export const StudentManagement: React.FC = () => {
           </span>
         </div>
       </div>
+
+      {editSuccessToast && (
+        <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs font-bold text-emerald-900 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-600" />
+            <span>{editSuccessToast}</span>
+          </div>
+          <button
+            onClick={() => setEditSuccessToast(null)}
+            className="text-emerald-700 hover:text-emerald-900 text-xs font-semibold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs flex flex-col lg:flex-row items-center justify-between gap-3">
@@ -278,6 +500,121 @@ export const StudentManagement: React.FC = () => {
         </div>
       </div>
 
+      {/* Dedicated Duplicate Filtering Segmented Controls */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 shrink-0">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <span>{language === 'ta' ? 'நகல் வடிகட்டி:' : 'Duplicate Filter:'}</span>
+          </span>
+
+          <div className="inline-flex bg-white p-0.5 rounded-lg border border-slate-200 text-xs shadow-2xs flex-wrap">
+            <button
+              type="button"
+              onClick={() => setDuplicateFilter('all')}
+              className={`px-3 py-1 rounded-md font-semibold transition-all ${
+                duplicateFilter === 'all'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {language === 'ta' ? 'அனைத்து மாணவர்கள்' : 'All Students'} ({students.length})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDuplicateFilter('any_dup')}
+              className={`px-2.5 py-1 rounded-md font-bold transition-all flex items-center gap-1.5 ${
+                duplicateFilter === 'any_dup'
+                  ? 'bg-rose-600 text-white shadow-2xs'
+                  : duplicateStudentsCount > 0
+                  ? 'text-rose-700 hover:bg-rose-50'
+                  : 'text-slate-400'
+              }`}
+            >
+              <AlertTriangle className="w-3 h-3" />
+              <span>{language === 'ta' ? 'அனைத்து நகல்கள்' : 'All Duplicates'}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                duplicateFilter === 'any_dup' ? 'bg-white/25 text-white' : 'bg-rose-100 text-rose-800'
+              }`}>
+                {duplicateStudentsCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDuplicateFilter('email_dup')}
+              className={`px-2.5 py-1 rounded-md font-bold transition-all flex items-center gap-1.5 ${
+                duplicateFilter === 'email_dup'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : emailDupCount > 0
+                  ? 'text-amber-800 hover:bg-amber-50'
+                  : 'text-slate-400'
+              }`}
+            >
+              <Mail className="w-3 h-3" />
+              <span>{language === 'ta' ? 'மின்னஞ்சல் நகல்' : 'Duplicate Emails'}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                duplicateFilter === 'email_dup' ? 'bg-white/25 text-white' : 'bg-amber-100 text-amber-900'
+              }`}>
+                {emailDupCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDuplicateFilter('phone_dup')}
+              className={`px-2.5 py-1 rounded-md font-bold transition-all flex items-center gap-1.5 ${
+                duplicateFilter === 'phone_dup'
+                  ? 'bg-purple-600 text-white shadow-2xs'
+                  : phoneDupCount > 0
+                  ? 'text-purple-800 hover:bg-purple-50'
+                  : 'text-slate-400'
+              }`}
+            >
+              <Phone className="w-3 h-3" />
+              <span>{language === 'ta' ? 'தொலைபேசி நகல்' : 'Duplicate Phones'}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                duplicateFilter === 'phone_dup' ? 'bg-white/25 text-white' : 'bg-purple-100 text-purple-900'
+              }`}>
+                {phoneDupCount}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {duplicateFilter !== 'all' && (
+          <button
+            type="button"
+            onClick={() => setDuplicateFilter('all')}
+            className="text-xs font-semibold text-rose-700 hover:text-rose-900 hover:underline flex items-center gap-1 shrink-0"
+          >
+            <span>✕ {language === 'ta' ? 'வடிகட்டியை மீட்டமை' : 'Clear Duplicate Filter'}</span>
+          </button>
+        )}
+      </div>
+
+      {/* Duplicate Filter Guidance Alert Banner */}
+      {duplicateFilter !== 'all' && (
+        <div className="p-3.5 bg-rose-50/90 border-2 border-rose-300 rounded-xl flex items-start justify-between gap-3 text-xs text-rose-950 shadow-2xs animate-in fade-in">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-extrabold text-rose-900 block">
+                {language === 'ta'
+                  ? `நகல் பதிவுகள் வடிகட்டப்பட்டுள்ளன (${filteredStudents.length} மாணவர்கள் கண்டறியப்பட்டனர்)`
+                  : `Duplicate Filter Active (${filteredStudents.length} Candidates Displayed)`}
+              </span>
+              <span className="text-[11px] text-rose-800 mt-0.5 block leading-relaxed">
+                {language === 'ta'
+                  ? 'ஒரே மின்னஞ்சல் அல்லது தொலைபேசி எண்ணைப் பகிர்ந்துகொள்ளும் மாணவர்கள் பக்கத்துப்பக்கமாக தொகுக்கப்பட்டுள்ளனர். தவறான விபரங்களை மாற்ற "திருத்து (Edit)" பொத்தானையோ, தேவையற்ற நகலை அகற்ற "நீக்குக (Trash)" பொத்தானையோ பயன்படுத்தவும்.'
+                  : 'Candidates sharing identical emails or phone numbers are clustered together. Click "Edit" to modify mismatched details or "Delete" to resolve duplicate accounts.'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Students Table with Total Points and Referral metrics */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
         <div className="overflow-x-auto">
@@ -293,8 +630,12 @@ export const StudentManagement: React.FC = () => {
                     <span>{language === 'ta' ? 'மொத்த புள்ளிகள் & பரிந்துரைகள்' : 'Total Points & Referrals'}</span>
                   </div>
                 </th>
-                <th className="px-5 py-3.5 text-center">Enrolled Contests</th>
-                <th className="px-5 py-3.5 text-center">Honors / Awards</th>
+                <th className="px-5 py-3.5 text-center">
+                  {language === 'ta' ? 'பரீட்சைகள் (முடிந்தது/பதிவு)' : 'Exams (Done/Enrolled)'}
+                </th>
+                <th className="px-5 py-3.5 text-center">
+                  {language === 'ta' ? 'கௌரவங்கள் / பதக்கங்கள்' : 'Honors / Medals'}
+                </th>
                 <th className="px-5 py-3.5">Status</th>
                 <th className="px-5 py-3.5 text-right">Actions</th>
               </tr>
@@ -303,27 +644,95 @@ export const StudentManagement: React.FC = () => {
               {filteredStudents.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-5 py-8 text-center text-slate-400">
-                    No student records match your query.
+                    {duplicateFilter !== 'all'
+                      ? (language === 'ta' ? 'தேர்ந்தெடுக்கப்பட்ட வகைக்குரிய நகல் பதிவுகள் எதுவும் இல்லை.' : 'No duplicate records found for the selected filter.')
+                      : 'No student records match your query.'}
                   </td>
                 </tr>
               ) : (
                 filteredStudents.map((std) => {
                   const points = std.referralPoints !== undefined ? std.referralPoints : 25;
+                  const dup = getDuplicateStatus(std);
 
                   return (
-                    <tr key={std.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr
+                      key={std.id}
+                      className={`transition-colors ${
+                        dup.isAnyDup
+                          ? 'bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-500'
+                          : 'hover:bg-slate-50/70'
+                      }`}
+                    >
                       <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-300 text-slate-800 font-bold text-xs flex items-center justify-center shrink-0">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`w-8 h-8 rounded-full border font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 ${
+                              dup.isAnyDup
+                                ? 'bg-rose-100 border-rose-300 text-rose-900 shadow-2xs'
+                                : 'bg-slate-100 border-slate-300 text-slate-800'
+                            }`}
+                          >
                             {std.name.charAt(0)}
                           </div>
                           <div>
-                            <p className="font-bold text-slate-900">{std.name}</p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="font-bold text-slate-900">{std.name}</p>
+                              {dup.isAnyDup && (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-rose-700 bg-rose-100/90 px-1.5 py-0.2 rounded border border-rose-300">
+                                  <AlertTriangle className="w-2.5 h-2.5 text-rose-600" />
+                                  <span>Duplicate Entry</span>
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[11px] font-mono text-slate-500">
                               {std.studentId} {std.username ? `(@${std.username})` : ''}
                             </p>
+
+                            {/* Contact Badges with Instant Duplicate Detection Highlights */}
+                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                              {std.email && (
+                                dup.isEmailDup ? (
+                                  <span
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-800 bg-rose-100/90 px-1.5 py-0.5 rounded border border-rose-300 shadow-2xs"
+                                    title={`Duplicate email detected across ${dup.emailClashCount} candidate registrations`}
+                                  >
+                                    <Mail className="w-3 h-3 text-rose-600 shrink-0" />
+                                    <span className="truncate max-w-[150px]">{std.email}</span>
+                                    <span className="bg-rose-200 text-rose-950 px-1 rounded text-[9px] font-black">
+                                      {dup.emailClashCount}x Email
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-slate-500">
+                                    <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span className="truncate max-w-[150px]">{std.email}</span>
+                                  </span>
+                                )
+                              )}
+
+                              {std.phone && (
+                                dup.isPhoneDup ? (
+                                  <span
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-900 bg-purple-100/90 px-1.5 py-0.5 rounded border border-purple-300 font-mono shadow-2xs"
+                                    title={`Duplicate phone number detected across ${dup.phoneClashCount} candidate registrations`}
+                                  >
+                                    <Phone className="w-3 h-3 text-purple-600 shrink-0" />
+                                    <span>{std.phone}</span>
+                                    <span className="bg-purple-200 text-purple-950 px-1 rounded text-[9px] font-black">
+                                      {dup.phoneClashCount}x Phone
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 font-mono">
+                                    <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span>{std.phone}</span>
+                                  </span>
+                                )
+                              )}
+                            </div>
+
                             {std.referralCode && (
-                              <span className="text-[10px] font-mono text-amber-700 bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-200/50 inline-block mt-0.5">
+                              <span className="text-[10px] font-mono text-amber-700 bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-200/50 inline-block mt-1">
                                 Ref: {std.referralCode}
                               </span>
                             )}
@@ -357,27 +766,97 @@ export const StudentManagement: React.FC = () => {
                         </div>
                       </td>
 
-                      <td className="px-5 py-3.5 text-center">
-                        <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                          {std.competitionsEnrolled}
-                        </span>
-                      </td>
+                      {/* Live Auto-Counted Exam Submissions & Medals */}
+                      {(() => {
+                        const stdCompletedResults = results.filter(
+                          (r) =>
+                            r.studentId === std.id ||
+                            r.studentId === std.studentId ||
+                            (r.studentName && r.studentName.toLowerCase() === std.name?.toLowerCase())
+                        );
+                        const examCount = stdCompletedResults.length;
+                        const medalsWon = stdCompletedResults.filter((r) => r.award && r.award !== 'Participation').length;
+                        const avgPct =
+                          examCount > 0
+                            ? Math.round(
+                                stdCompletedResults.reduce((acc, r) => acc + (r.percentage || 0), 0) / examCount
+                              )
+                            : 0;
 
-                      <td className="px-5 py-3.5 text-center">
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                          <Trophy className="w-3 h-3 text-amber-600" />
-                          {std.awardsCount}
-                        </span>
-                      </td>
+                        return (
+                          <>
+                            <td className="px-5 py-3.5 text-center">
+                              {examCount > 0 ? (
+                                <div className="inline-flex flex-col items-center gap-0.5">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs">
+                                    <CheckCircle className="w-3 h-3 text-emerald-600" />
+                                    <span>{examCount} {language === 'ta' ? 'முடிந்தது' : 'Done'}</span>
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">
+                                    {std.competitionsEnrolled || 0} {language === 'ta' ? 'பதிவு' : 'enrolled'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                                  {std.competitionsEnrolled || 0} {language === 'ta' ? 'பதிவு' : 'enrolled'}
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="px-5 py-3.5 text-center">
+                              <div className="inline-flex flex-col items-center gap-0.5">
+                                <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 px-2.5 py-0.5 rounded-full shadow-2xs">
+                                  <Trophy className="w-3 h-3 text-amber-600 fill-amber-400" />
+                                  <span>{medalsWon > 0 ? medalsWon : std.awardsCount} {language === 'ta' ? 'விருதுகள்' : 'Honors'}</span>
+                                </span>
+                                {examCount > 0 && (
+                                  <span className="text-[10px] font-semibold text-blue-700">
+                                    avg {avgPct}%
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </>
+                        );
+                      })()}
 
                       <td className="px-5 py-3.5">
-                        <Badge variant="emerald" dot>
-                          Verified
-                        </Badge>
+                        {dup.isAnyDup ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-800 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-full shadow-2xs"
+                            title="Action Needed: Duplicate email or phone"
+                          >
+                            <AlertTriangle className="w-3 h-3 text-rose-600" />
+                            <span>Duplicate</span>
+                          </span>
+                        ) : (
+                          <Badge variant="emerald" dot>
+                            Verified
+                          </Badge>
+                        )}
                       </td>
 
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            id={`btn-edit-student-${std.id}`}
+                            onClick={() => setStudentToEdit(std)}
+                            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 border shadow-2xs ${
+                              dup.isAnyDup
+                                ? 'text-rose-900 bg-rose-100 hover:bg-rose-200 border-rose-300 ring-1 ring-rose-400'
+                                : 'text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-300'
+                            }`}
+                            title={
+                              dup.isAnyDup
+                                ? 'Resolve duplicate email/phone registration'
+                                : language === 'ta'
+                                ? 'மாணவர் விபரங்களைத் திருத்து'
+                                : 'Edit Student Details'
+                            }
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-amber-700" />
+                            <span>{dup.isAnyDup ? (language === 'ta' ? 'நகலைத் திருத்து' : 'Resolve') : (language === 'ta' ? 'திருத்து' : 'Edit')}</span>
+                          </button>
                           <button
                             id={`btn-view-student-${std.id}`}
                             onClick={() => {
@@ -424,13 +903,23 @@ export const StudentManagement: React.FC = () => {
                 {selectedStudent.name.charAt(0)}
               </div>
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-bold text-slate-900">
-                    {selectedStudent.name}
-                  </h4>
-                  <Badge variant="emerald" dot>
-                    Active Candidate
-                  </Badge>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-slate-900">
+                      {selectedStudent.name}
+                    </h4>
+                    <Badge variant="emerald" dot>
+                      Active Candidate
+                    </Badge>
+                  </div>
+                  <button
+                    onClick={() => setStudentToEdit(selectedStudent)}
+                    className="px-2.5 py-1 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
+                    title="Edit Student Registration & Info"
+                  >
+                    <Pencil className="w-3.5 h-3.5 text-amber-700" />
+                    <span>{language === 'ta' ? 'விபரங்களைத் திருத்து' : 'Edit Details'}</span>
+                  </button>
                 </div>
                 <p className="text-xs text-slate-600 flex items-center gap-1.5">
                   <School className="w-3.5 h-3.5 text-slate-400" />
@@ -638,32 +1127,192 @@ export const StudentManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-3 border border-slate-200 rounded-lg space-y-2 bg-white flex flex-col justify-between">
-                <div>
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-                    Participation Metrics
-                  </span>
-                  <div className="flex justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500">Active Competitions:</span>
-                    <span className="font-bold text-slate-800">
-                      {selectedStudent.competitionsEnrolled}
-                    </span>
+              {(() => {
+                const dossierResults = results.filter(
+                  (r) =>
+                    r.studentId === selectedStudent.id ||
+                    r.studentId === selectedStudent.studentId ||
+                    (r.studentName && r.studentName.toLowerCase() === selectedStudent.name?.toLowerCase())
+                );
+                const dossierExamsCompleted = dossierResults.length;
+                const dossierMedals = dossierResults.filter((r) => r.award && r.award !== 'Participation').length;
+                const dossierAvgScore =
+                  dossierExamsCompleted > 0
+                    ? Math.round(dossierResults.reduce((acc, r) => acc + (r.percentage || 0), 0) / dossierExamsCompleted)
+                    : 0;
+
+                return (
+                  <div className="p-3 border border-slate-200 rounded-lg space-y-2 bg-white flex flex-col justify-between">
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                        {language === 'ta' ? 'தானியங்கி பரீட்சை புள்ளிவிவரங்கள்' : 'Live Academic & Exam Metrics'}
+                      </span>
+                      <div className="flex justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">
+                          {language === 'ta' ? 'செயலில் உள்ள போட்டிகள்:' : 'Enrolled Competitions:'}
+                        </span>
+                        <span className="font-bold text-slate-800">
+                          {selectedStudent.competitionsEnrolled || 0}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">
+                          {language === 'ta' ? 'முடித்த பரீட்சைகள் (Auto):' : 'Exams Completed (Auto):'}
+                        </span>
+                        <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          ✓ {dossierExamsCompleted} {language === 'ta' ? 'முடிந்தது' : 'Done'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">
+                          {language === 'ta' ? 'பதக்கங்கள் / கௌரவங்கள்:' : 'Olympiad Awards & Medals:'}
+                        </span>
+                        <span className="font-bold text-amber-700">
+                          🏆 {dossierMedals > 0 ? dossierMedals : selectedStudent.awardsCount} Honors
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-slate-500">
+                          {language === 'ta' ? 'சராசரி மதிப்பெண்:' : 'Average Score:'}
+                        </span>
+                        <span className="font-bold text-blue-700">
+                          {dossierAvgScore}%
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500">Olympiad Awards:</span>
-                    <span className="font-bold text-amber-700">
-                      {selectedStudent.awardsCount} Honors
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-slate-500">Enrollment Date:</span>
-                    <span className="font-mono text-slate-700">
-                      {selectedStudent.createdAt}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
+
+            {/* AUTO-COUNTED EXAMS, COMPETITION & QUIZ SUBMISSIONS LIST */}
+            {(() => {
+              const dossierResults = results.filter(
+                (r) =>
+                  r.studentId === selectedStudent.id ||
+                  r.studentId === selectedStudent.studentId ||
+                  (r.studentName && r.studentName.toLowerCase() === selectedStudent.name?.toLowerCase())
+              );
+              const totalExamsCount = dossierResults.length;
+              const totalMedalsCount = dossierResults.filter((r) => r.award && r.award !== 'Participation').length;
+              const avgScore =
+                totalExamsCount > 0
+                  ? Math.round(dossierResults.reduce((acc, r) => acc + (r.percentage || 0), 0) / totalExamsCount)
+                  : 0;
+
+              return (
+                <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-2xs">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                          <span>
+                            {language === 'ta'
+                              ? 'தானியங்கி பரீட்சை & வினாடி வினா விபரங்கள்'
+                              : 'Auto-Counted Exam & Quiz Submissions'}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-extrabold">
+                            {totalExamsCount} {language === 'ta' ? 'முடிந்தது' : 'Submitted'}
+                          </span>
+                        </h4>
+                        <p className="text-[10px] text-slate-500">
+                          {language === 'ta'
+                            ? 'மாணவர் சமர்ப்பித்தவுடன் மதிப்பெண், தரம், சான்றிதழ் மற்றும் தரவரிசை தானாகக் கணக்கிடப்படும்.'
+                            : 'All exams, quiz competitions, marks, rankings, and certificates are automatically logged here.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-center">
+                        <span className="text-[9px] text-slate-400 uppercase font-bold block">Avg Score</span>
+                        <span className="text-xs font-black text-slate-800">{avgScore}%</span>
+                      </div>
+                      <div className="px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-center">
+                        <span className="text-[9px] text-amber-600 uppercase font-bold block">Medals</span>
+                        <span className="text-xs font-black text-amber-900">{totalMedalsCount}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {totalExamsCount === 0 ? (
+                    <div className="p-4 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl space-y-1">
+                      <p className="text-xs font-medium text-slate-600">
+                        {language === 'ta'
+                          ? 'இந்த மாணவர் இன்னும் எந்த பரீட்சையையும் அல்லது வினாடி வினாவையும் முடிக்கவில்லை.'
+                          : 'This candidate has not completed any exams or competition quizzes yet.'}
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        {language === 'ta'
+                          ? 'மாணவர் தனது மாணவர் பக்கத்தில் பரீட்சையை முடித்தவுடன், அனைத்து மதிப்பெண் மற்றும் முடிவுகள் தானாக இங்கே உடனுக்குடன் சேமிக்கப்பட்டு கணக்கிடப்படும்.'
+                          : 'As soon as the student takes an exam or quiz, results are calculated and recorded automatically.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {dossierResults.map((res) => (
+                        <div
+                          key={res.id}
+                          className="p-2.5 bg-slate-50/80 hover:bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs transition"
+                        >
+                          <div className="space-y-0.5 min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-900 truncate max-w-[200px]">
+                                {res.competitionTitle || 'Academic Exam'}
+                              </span>
+                              {res.award && res.award !== 'Participation' && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                                  <Medal className="w-2.5 h-2.5 text-amber-600" />
+                                  {res.award}
+                                </span>
+                              )}
+                              {res.rank && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-900">
+                                  Rank #{res.rank}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                              <span>
+                                Score: <b className="text-slate-800">{res.score} / {res.maxScore || res.totalMarks}</b> ({res.percentage}%)
+                              </span>
+                              {res.submittedAt && (
+                                <>
+                                  <span>•</span>
+                                  <span>{new Date(res.submittedAt).toLocaleDateString()}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span
+                              className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                res.percentage >= 75
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : res.percentage >= 50
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {res.percentage >= 75 ? 'Distinction' : res.percentage >= 50 ? 'Credit' : 'Completed'}
+                            </span>
+                            {res.certificateId && (
+                              <span className="text-[9px] font-mono text-slate-400 block mt-0.5">
+                                {res.certificateId}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* SUPER ADMIN DIRECT PASSWORD MANAGEMENT & RESET BOX */}
             <div className="p-4 bg-slate-900 border border-slate-800 text-white rounded-2xl space-y-3">
@@ -730,7 +1379,7 @@ export const StudentManagement: React.FC = () => {
               </div>
             </div>
 
-            <div className="pt-2 flex items-center justify-between">
+            <div className="pt-2 flex items-center justify-between gap-2">
               <button
                 id="btn-dossier-delete"
                 onClick={() => setStudentToDelete(selectedStudent)}
@@ -739,12 +1388,21 @@ export const StudentManagement: React.FC = () => {
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{language === 'ta' ? 'மாணவரை நீக்குக' : language === 'si' ? 'ශිෂ්‍යයා ඉවත් කරන්න' : 'Remove Student Account'}</span>
               </button>
-              <button
-                onClick={() => setSelectedStudent(null)}
-                className="px-4 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
-              >
-                Close Dossier
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setStudentToEdit(selectedStudent)}
+                  className="px-3 py-2 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-amber-700" />
+                  <span>{language === 'ta' ? 'விபரங்களைத் திருத்து (Edit)' : 'Edit Details'}</span>
+                </button>
+                <button
+                  onClick={() => setSelectedStudent(null)}
+                  className="px-4 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                >
+                  Close Dossier
+                </button>
+              </div>
             </div>
           </div>
         </Modal>
@@ -808,6 +1466,23 @@ export const StudentManagement: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Edit Student Modal */}
+      {studentToEdit && (
+        <EditStudentModal
+          isOpen={!!studentToEdit}
+          onClose={() => setStudentToEdit(null)}
+          student={studentToEdit}
+          duplicateWarning={{
+            isEmailDup: getDuplicateStatus(studentToEdit).isEmailDup,
+            isPhoneDup: getDuplicateStatus(studentToEdit).isPhoneDup,
+            emailCount: getDuplicateStatus(studentToEdit).emailClashCount,
+            phoneCount: getDuplicateStatus(studentToEdit).phoneClashCount,
+          }}
+          onSave={handleSaveStudentEdit}
+          language={language}
+        />
       )}
     </div>
   );

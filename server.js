@@ -2,7 +2,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,14 +10,16 @@ const DIST_DIR = path.join(__dirname, 'dist');
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
 
-// Ensure dist directory exists
+// Trigger non-blocking build if dist directory is missing
 if (!fs.existsSync(path.join(DIST_DIR, 'index.html'))) {
-  console.log('dist/index.html not found. Building project before starting server...');
-  try {
-    execSync('npm run build', { stdio: 'inherit' });
-  } catch (err) {
-    console.error('Failed to build project:', err);
-  }
+  console.log('dist/index.html not found. Triggering background build...');
+  exec('npm run build', (err, stdout, stderr) => {
+    if (err) {
+      console.error('Background build error:', err);
+    } else {
+      console.log('Background build completed successfully.');
+    }
+  });
 }
 
 const MIME_TYPES = {

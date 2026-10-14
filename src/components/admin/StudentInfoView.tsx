@@ -21,13 +21,55 @@ import {
   Shield,
   Clock,
   Key,
+  Pencil,
 } from 'lucide-react';
+import { EditStudentModal } from '../superadmin/EditStudentModal';
 
 export const StudentInfoView: React.FC = () => {
-  const { students, competitions, currentAdmin, language, memberships } = useApp();
+  const {
+    students,
+    competitions,
+    currentAdmin,
+    currentAuthUser,
+    language,
+    memberships,
+    updateStudentByAdmin,
+  } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<StudentUser | null>(null);
+  const [studentToEdit, setStudentToEdit] = useState<StudentUser | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleSaveStudentEdit = async (studentUid: string, updatedData: any) => {
+    await updateStudentByAdmin(studentUid, updatedData);
+    if (selectedStudent && (selectedStudent.id === studentUid || selectedStudent.studentId === studentUid)) {
+      setSelectedStudent((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          name: updatedData.fullName || prev.name,
+          fullName: updatedData.fullName || prev.fullName,
+          studentId: updatedData.studentId || prev.studentId,
+          username: updatedData.username || prev.username,
+          institution: updatedData.school || prev.institution,
+          school: updatedData.school || prev.school,
+          gradeLevel: updatedData.grade || prev.gradeLevel,
+          grade: updatedData.grade || prev.grade,
+          district: updatedData.district || prev.district,
+          address: updatedData.address || prev.address,
+          dateOfBirth: updatedData.dateOfBirth || prev.dateOfBirth,
+          guardianName: updatedData.guardianName || prev.guardianName,
+          phone: updatedData.phone || prev.phone,
+          status: updatedData.status || prev.status,
+          referralPoints:
+            updatedData.referralPoints !== undefined
+              ? updatedData.referralPoints
+              : prev.referralPoints,
+          referralCode: updatedData.referralCode || prev.referralCode,
+        };
+      });
+    }
+  };
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -218,13 +260,24 @@ export const StudentInfoView: React.FC = () => {
                     </td>
 
                     <td className="px-5 py-3.5 text-right">
-                      <button
-                        id={`btn-admin-view-std-${std.id}`}
-                        onClick={() => setSelectedStudent(std)}
-                        className="px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200"
-                      >
-                        {language === 'ta' ? 'விபரம்' : 'Dossier'}
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          id={`btn-admin-edit-std-${std.id}`}
+                          onClick={() => setStudentToEdit(std)}
+                          className="px-2 py-1 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-300 flex items-center gap-1"
+                          title={language === 'ta' ? 'மாணவர் விபரங்களைத் திருத்து' : 'Edit Student Details'}
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-amber-700" />
+                          <span>{language === 'ta' ? 'திருத்து' : 'Edit'}</span>
+                        </button>
+                        <button
+                          id={`btn-admin-view-std-${std.id}`}
+                          onClick={() => setSelectedStudent(std)}
+                          className="px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200"
+                        >
+                          {language === 'ta' ? 'விபரம்' : 'Dossier'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -322,16 +375,34 @@ export const StudentInfoView: React.FC = () => {
               );
             })()}
 
-            <div className="pt-2 flex justify-end">
+            <div className="pt-2 flex items-center justify-between gap-2">
+              <button
+                onClick={() => setStudentToEdit(selectedStudent)}
+                className="px-3 py-2 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                <Pencil className="w-3.5 h-3.5 text-amber-700" />
+                <span>{language === 'ta' ? 'விபரங்களைத் திருத்து (Edit)' : 'Edit Details'}</span>
+              </button>
               <button
                 onClick={() => setSelectedStudent(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold text-xs"
               >
                 Close
               </button>
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Edit Student Modal */}
+      {studentToEdit && (
+        <EditStudentModal
+          isOpen={!!studentToEdit}
+          onClose={() => setStudentToEdit(null)}
+          student={studentToEdit}
+          onSave={handleSaveStudentEdit}
+          language={language}
+        />
       )}
     </div>
   );

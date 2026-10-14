@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { CompetitionEditorModal } from '../competitions/CompetitionEditorModal';
 import { Competition, CompetitionType } from '../../types';
+import { AnimatedHeroLeaderboard } from '../leaderboard/AnimatedHeroLeaderboard';
 
 interface SuperAdminDashboardProps {
   onNavigate: (tab: any) => void;
@@ -82,46 +83,49 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
         </div>
       )}
 
-      {/* Top Welcome Banner */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4">
+      {/* Live Animated Leaderboard Ticker & Champions Podium */}
+      <AnimatedHeroLeaderboard onNavigate={onNavigate} />
+
+      {/* Top Welcome Banner (COMPACT & SLIM) */}
+      <div className="bg-white border border-slate-200 rounded-xl p-2.5 sm:p-3 shadow-xs space-y-2">
         {/* Top Title & Info Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-slate-100 pb-2">
           <div className="min-w-0 flex-1">
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-200">
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-200">
               Super Admin Operations Control
             </span>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
+            <h1 className="text-sm sm:text-base font-black text-slate-900 mt-0.5">
               {t('welcomeBack')}, {superAdminUser.name}
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-              National Platform Command — Overall management of competitions, admin staff accreditations, student records, and sponsor billboards.
+            <p className="text-[10px] text-slate-500 mt-0.5 leading-tight truncate">
+              National Platform Command — Overall management of competitions, students & leaderboards.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-            <span className="px-3 py-1 bg-blue-50 text-blue-900 border border-blue-200 text-xs font-bold rounded-full flex items-center gap-1.5 shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+          <div className="flex items-center gap-1.5 self-start sm:self-auto shrink-0">
+            <span className="px-2 py-0.5 bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-bold rounded-full flex items-center gap-1 shadow-2xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
               Super Admin Level
             </span>
           </div>
         </div>
 
-        {/* Quick Action Studio Toolbar */}
-        <div className="space-y-2.5 pt-1">
+        {/* Quick Action Studio Toolbar (COMPACT & SLIM) */}
+        <div className="space-y-1 pt-0.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-              <span>⚡ Quick Action Studio & Operations Toolbar</span>
+            <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <span>⚡ Quick Action Studio Toolbar</span>
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-1">
             <button
               id="sa-quick-create-island-quest"
               onClick={() => openDistrictsStudio('create')}
-              className="px-3 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700 transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer text-center"
+              className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700 transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer text-center"
               title="Create Gamified HNC Arena Island Quest (தீவுப் போட்டி உருவாக்கு)"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-200 shrink-0" />
+              <Sparkles className="w-3 h-3 text-amber-200 shrink-0" />
               <span className="truncate">
                 {language === 'ta'
                   ? '+ தீவுப் போட்டி'
@@ -134,10 +138,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
             <button
               id="sa-quick-edu-arena-studio"
               onClick={() => openDistrictsStudio('list')}
-              className="px-3 py-2 text-xs font-bold rounded-xl bg-indigo-50 text-indigo-900 border border-indigo-200/80 hover:bg-indigo-100 transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer text-center"
+              className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-200/80 hover:bg-indigo-100 transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer text-center"
               title="HNC Edu-Arena Study Gaming Studio (25 மாவட்டங்கள்)"
             >
-              <MapPin className="w-3.5 h-3.5 text-indigo-700 shrink-0" />
+              <MapPin className="w-3 h-3 text-indigo-700 shrink-0" />
               <span className="truncate">
                 {language === 'ta'
                   ? '🎯 Edu-Arena'
@@ -150,60 +154,60 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
             <button
               id="sa-quick-sponsors-ads"
               onClick={() => onNavigate('Sponsors & Ads')}
-              className="px-3 py-2 text-xs font-bold rounded-xl bg-amber-50 text-amber-900 border border-amber-300/80 hover:bg-amber-100 transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer text-center"
+              className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-amber-50 text-amber-900 border border-amber-300/80 hover:bg-amber-100 transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer text-center"
               title="Create and Manage Sponsor Advertisements (விளம்பர பலகை)"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <Sparkles className="w-3 h-3 text-amber-600 shrink-0" />
               <span className="truncate">{language === 'ta' ? 'விளம்பரம்' : 'Sponsors & Ads'}</span>
             </button>
 
             <button
               id="sa-quick-add-quiz"
               onClick={() => openEditor('Quiz', 'details')}
-              className="px-3 py-2 text-xs font-bold rounded-xl bg-purple-50 text-purple-800 border border-purple-200/80 hover:bg-purple-100 transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer text-center"
+              className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-purple-50 text-purple-800 border border-purple-200/80 hover:bg-purple-100 transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer text-center"
               title="Create Timed Speed Quiz (வினாடி வினா)"
             >
-              <HelpCircle className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+              <HelpCircle className="w-3 h-3 text-purple-600 shrink-0" />
               <span>+ Quiz</span>
             </button>
 
             <button
               id="sa-quick-add-exam"
               onClick={() => openEditor('Exam', 'details')}
-              className="px-3 py-2 text-xs font-bold rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200/80 hover:bg-indigo-100 transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer text-center"
+              className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200/80 hover:bg-indigo-100 transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer text-center"
               title="Create Official Examination (பரீட்சை)"
             >
-              <FileText className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <FileText className="w-3 h-3 text-indigo-600 shrink-0" />
               <span>+ Exam</span>
             </button>
 
             <button
               id="sa-quick-add-comp"
               onClick={() => openEditor('Competition', 'details')}
-              className="px-3.5 py-2 text-xs font-bold rounded-xl bg-blue-700 hover:bg-blue-800 text-white transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer text-center"
+              className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-blue-700 hover:bg-blue-800 text-white transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer text-center"
               title="Create National Academic Olympiad / Competition (போட்டி)"
             >
-              <Trophy className="w-3.5 h-3.5 shrink-0" />
+              <Trophy className="w-3 h-3 shrink-0" />
               <span>+ Contest</span>
             </button>
 
             <button
               id="sa-quick-paper-studio"
               onClick={() => openEditor('Exam', 'questions')}
-              className="px-3 py-2 text-xs font-bold rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100 transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer text-center"
+              className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100 transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer text-center"
               title="Design and assemble question papers with rubrics (வினாத்தாள் தயாரிப்பு)"
             >
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <Sparkles className="w-3 h-3 text-emerald-600 shrink-0" />
               <span className="truncate">Paper Studio</span>
             </button>
 
             <button
               id="sa-quick-districts-studio"
               onClick={() => onNavigate('Competition Management')}
-              className="px-3.5 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-indigo-700 to-blue-700 text-white hover:from-indigo-800 hover:to-blue-800 transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer text-center"
+              className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-gradient-to-r from-indigo-700 to-blue-700 text-white hover:from-indigo-800 hover:to-blue-800 transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer text-center"
               title="இலங்கையின் 25 மாவட்டப் போட்டிகள் & பிரசுரிக்கும் மையம்"
             >
-              <MapPin className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <MapPin className="w-3 h-3 text-amber-300 shrink-0" />
               <span className="truncate">25 Districts</span>
             </button>
           </div>

@@ -1398,12 +1398,6 @@ export async function seedInitialDataIfEmpty(): Promise<void> {
  * so that students only see authentic competitions created by real administrators.
  */
 export async function purgeLegacyDemoFirestoreData(): Promise<{ competitionsDeleted: number }> {
-  if (typeof window !== 'undefined') {
-    if (sessionStorage.getItem('hnc_legacy_demo_purged_done')) {
-      return { competitionsDeleted: 0 };
-    }
-    sessionStorage.setItem('hnc_legacy_demo_purged_done', 'true');
-  }
 
   // Always perform direct purge of student_kavitha_selvam, demo admins, and legacy demo records
   try {
@@ -1446,6 +1440,10 @@ export async function purgeLegacyDemoFirestoreData(): Promise<{ competitionsDele
       'comp-104',
       'comp-105',
       'comp_demo_1',
+      'comp-nat-math-olympiad-2026',
+      'comp-sci-national-challenge-2026',
+      'comp-gr6-math-challenge-2026',
+      'comp-gr7-science-quiz-2026',
       'feat-math-2026',
       'feat-sci-2026',
       'feat-eng-2026',
@@ -1456,6 +1454,10 @@ export async function purgeLegacyDemoFirestoreData(): Promise<{ competitionsDele
       'HNC-DEMO-01',
       'HNC-DEMO-02',
       'HNC-SAMPLE-01',
+      'HNC-MATH-2026',
+      'HNC-STEM-2026',
+      'HNC-GR6-MATH-2026',
+      'HNC-GR7-SCI-2026',
     ]);
 
     // 1. Direct document deletion for known demo IDs
@@ -2535,6 +2537,171 @@ export async function updateStudentPasswordInFirestore(
     );
   } catch (err) {
     console.warn('Error updating password in students collection:', err);
+  }
+}
+
+/**
+ * Super Admin updates student registration details in Firestore (both 'students' and 'users' collections)
+ */
+export async function updateStudentDetailsInFirestore(
+  studentUid: string,
+  updatedData: {
+    fullName?: string;
+    studentId?: string;
+    username?: string;
+    email?: string;
+    phone?: string;
+    grade?: string;
+    school?: string;
+    district?: string;
+    address?: string;
+    dateOfBirth?: string;
+    guardianName?: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    referralPoints?: number;
+    referralCode?: string;
+    newPassword?: string;
+    oldStudentId?: string;
+  }
+): Promise<void> {
+  const updatedAt = new Date().toISOString();
+
+  const studentPayload: Record<string, any> = { updatedAt };
+  const userPayload: Record<string, any> = { updatedAt };
+
+  if (updatedData.fullName !== undefined) {
+    const trimmed = updatedData.fullName.trim();
+    studentPayload.fullName = trimmed;
+    userPayload.fullName = trimmed;
+    userPayload.name = trimmed;
+  }
+
+  if (updatedData.studentId !== undefined) {
+    const trimmed = updatedData.studentId.trim();
+    studentPayload.studentId = trimmed;
+    userPayload.studentId = trimmed;
+  }
+
+  if (updatedData.username !== undefined) {
+    const trimmed = updatedData.username.trim().toLowerCase();
+    studentPayload.username = trimmed;
+    userPayload.username = trimmed;
+  }
+
+  if (updatedData.email !== undefined) {
+    const trimmed = updatedData.email.trim().toLowerCase();
+    studentPayload.email = trimmed;
+    userPayload.email = trimmed;
+  }
+
+  if (updatedData.phone !== undefined) {
+    const trimmed = updatedData.phone.trim();
+    studentPayload.phone = trimmed;
+    userPayload.phone = trimmed;
+  }
+
+  if (updatedData.grade !== undefined) {
+    const trimmed = updatedData.grade.trim();
+    studentPayload.grade = trimmed;
+    userPayload.grade = trimmed;
+  }
+
+  if (updatedData.school !== undefined) {
+    const trimmed = updatedData.school.trim();
+    studentPayload.school = trimmed;
+    userPayload.school = trimmed;
+  }
+
+  if (updatedData.district !== undefined) {
+    const trimmed = updatedData.district.trim();
+    studentPayload.district = trimmed;
+    userPayload.district = trimmed;
+  }
+
+  if (updatedData.address !== undefined) {
+    const trimmed = updatedData.address.trim();
+    studentPayload.address = trimmed;
+    userPayload.address = trimmed;
+  }
+
+  if (updatedData.dateOfBirth !== undefined) {
+    const trimmed = updatedData.dateOfBirth.trim();
+    studentPayload.dateOfBirth = trimmed;
+    userPayload.dateOfBirth = trimmed;
+  }
+
+  if (updatedData.guardianName !== undefined) {
+    const trimmed = updatedData.guardianName.trim();
+    studentPayload.guardianName = trimmed;
+    userPayload.guardianName = trimmed;
+  }
+
+  if (updatedData.status !== undefined) {
+    studentPayload.status = updatedData.status === 'suspended' ? 'inactive' : updatedData.status;
+    userPayload.status = updatedData.status;
+  }
+
+  if (updatedData.referralPoints !== undefined) {
+    studentPayload.referralPoints = updatedData.referralPoints;
+    userPayload.referralPoints = updatedData.referralPoints;
+  }
+
+  if (updatedData.referralCode !== undefined) {
+    const trimmed = updatedData.referralCode.trim().toUpperCase();
+    studentPayload.referralCode = trimmed;
+    userPayload.referralCode = trimmed;
+  }
+
+  if (updatedData.newPassword && updatedData.newPassword.trim().length >= 4) {
+    const pass = updatedData.newPassword.trim();
+    const hash = await hashCredential(pass);
+    studentPayload.passwordHash = hash;
+    studentPayload.initialPassword = pass;
+    studentPayload.password = pass;
+
+    userPayload.passwordHash = hash;
+    userPayload.initialPassword = pass;
+    userPayload.password = pass;
+  }
+
+  // 1. Update in 'students' collection
+  try {
+    await setDoc(doc(db, 'students', studentUid), studentPayload, { merge: true });
+  } catch (err) {
+    console.warn('Error updating student in students collection:', err);
+  }
+
+  // 2. Update in 'users' collection
+  try {
+    await setDoc(doc(db, 'users', studentUid), userPayload, { merge: true });
+  } catch (err) {
+    console.warn('Error updating student in users collection:', err);
+  }
+
+  // 3. Keep results synchronized if name or school changed
+  if (updatedData.fullName || updatedData.school) {
+    try {
+      const resultsCol = collection(db, 'results');
+      const snap1 = await getDocs(query(resultsCol, where('studentId', '==', studentUid)));
+      for (const d of snap1.docs) {
+        const resUpdates: Record<string, any> = {};
+        if (updatedData.fullName) resUpdates.studentName = updatedData.fullName.trim();
+        if (updatedData.school) resUpdates.studentInstitution = updatedData.school.trim();
+        await updateDoc(d.ref, resUpdates);
+      }
+      if (updatedData.oldStudentId && updatedData.oldStudentId !== studentUid) {
+        const snap2 = await getDocs(query(resultsCol, where('studentId', '==', updatedData.oldStudentId)));
+        for (const d of snap2.docs) {
+          const resUpdates: Record<string, any> = {};
+          if (updatedData.fullName) resUpdates.studentName = updatedData.fullName.trim();
+          if (updatedData.school) resUpdates.studentInstitution = updatedData.school.trim();
+          if (updatedData.studentId) resUpdates.studentId = updatedData.studentId.trim();
+          await updateDoc(d.ref, resUpdates);
+        }
+      }
+    } catch (err) {
+      console.warn('Non-fatal: could not update companion results:', err);
+    }
   }
 }
 

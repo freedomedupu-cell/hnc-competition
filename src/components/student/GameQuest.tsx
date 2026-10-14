@@ -272,7 +272,7 @@ const playChime = (type: 'correct' | 'wrong' | 'victory' | 'click' | 'powerup' |
 const STUDENT_PROGRESS_STORAGE_KEY = 'hnc_edu_arena_student_progress_v2';
 
 export const GameQuest: React.FC = () => {
-  const { currentAuthUser, currentStudent, language: appLanguage, setLanguage: setAppLanguage } = useApp();
+  const { currentAuthUser, currentStudent, language: appLanguage, setLanguage: setAppLanguage, setStudentNav } = useApp();
 
   // Trilingual language state: Tamil (ta), English (en), Sinhala (si)
   const [questLang, setQuestLang] = useState<'ta' | 'en' | 'si'>('ta');
@@ -855,6 +855,21 @@ export const GameQuest: React.FC = () => {
                     : questLang === 'si'
                     ? '🏆 දිස්ත්‍රික් 25 ශ්‍රේණිගත කිරීම්'
                     : '🏆 25 Districts Leaderboard'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStudentNav('Leaderboards')}
+                className="bg-white/10 hover:bg-white/20 text-white font-extrabold text-xs px-3.5 py-2 rounded-2xl shadow-md transition flex items-center gap-1.5 cursor-pointer border border-white/20 active:scale-95"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>
+                  {questLang === 'ta'
+                    ? 'முழு தரவரிசை மையம்'
+                    : questLang === 'si'
+                    ? 'සම්පූර්ණ නායකත්ව පුවරුව'
+                    : 'All Leaderboards Hub'}
                 </span>
               </button>
 
