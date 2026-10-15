@@ -2402,7 +2402,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshMembershipData = useCallback(async () => {
     try {
       const userRole = currentAuthUser?.role;
-      const targetUid = currentAuthUser?.uid || currentStudent.id;
+      const targetUid = currentAuthUser?.uid || currentStudent?.id;
+
+      if (!targetUid) return;
 
       if (userRole === 'student') {
         // Students only load their own membership and the platform settings (Item 13)
@@ -2416,7 +2418,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setMemberships([]);
         }
         setMembershipSettings(sets);
-      } else {
+      } else if (userRole === 'super_admin' || userRole === 'admin') {
         // Super Admin & Admin load all memberships and payments for institutional oversight
         const [mems, pays, sets] = await Promise.all([
           getAllMembershipsInFirestore(),
@@ -2427,10 +2429,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setMembershipPayments(pays);
         setMembershipSettings(sets);
       }
-    } catch (err) {
-      console.error('Error refreshing membership data:', err);
+    } catch (err: any) {
+      const msg = String(err?.message || '').toLowerCase();
+      if (err?.code === 'unavailable' || msg.includes('offline')) {
+        console.warn('Membership data sync deferred: client is offline or reconnecting.');
+      } else {
+        console.warn('Notice refreshing membership data:', err?.message || err);
+      }
     }
-  }, [currentAuthUser?.role, currentAuthUser?.uid, currentStudent.id]);
+  }, [currentAuthUser?.role, currentAuthUser?.uid, currentStudent?.id]);
 
   useEffect(() => {
     if (currentAuthUser) {

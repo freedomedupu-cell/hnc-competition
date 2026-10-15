@@ -15,6 +15,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { ShareModal } from './ShareModal';
+import { getStudentDeadlineAlerts } from '../../utils/deadlineNotificationUtils';
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void;
@@ -30,6 +31,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
     currentAuthUser,
     competitions,
     results,
+    isStudentRegistered,
+    hasStudentSubmitted,
     logout,
     language,
     setLanguage,
@@ -90,7 +93,42 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
 
   const activeUser = getPortalUser();
 
-  const notificationsList: Array<{ id: string; title: string; time: string; read: boolean }> = [];
+  interface HeaderNotificationItem {
+    id: string;
+    title: string;
+    subtitle?: string;
+    time: string;
+    read: boolean;
+    isDeadline?: boolean;
+    urgency?: 'critical' | 'urgent' | 'warning' | 'upcoming';
+    competitionId?: string;
+  }
+
+  const notificationsList: HeaderNotificationItem[] = [];
+
+  // If student portal, prioritize real deadline alerts for their eligible competitions
+  if (effectivePortal === 'student') {
+    const studentGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 6';
+    const deadlineAlerts = getStudentDeadlineAlerts(competitions, studentGrade, {
+      isRegistered: (id) => isStudentRegistered(id),
+      hasSubmitted: (id) => hasStudentSubmitted(id),
+    });
+
+    deadlineAlerts.forEach((da) => {
+      const isCrit = da.urgency === 'critical';
+      const label = language === 'ta' ? da.badgeLabelTa : language === 'si' ? da.badgeLabelSi : da.badgeLabelEn;
+      notificationsList.push({
+        id: `deadline-${da.id}`,
+        title: label,
+        subtitle: da.title,
+        time: da.targetDateString,
+        read: false,
+        isDeadline: true,
+        urgency: da.urgency,
+        competitionId: da.competitionId,
+      });
+    });
+  }
 
   // Dynamic notifications from actual active competitions
   competitions
@@ -110,6 +148,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
             : `Active Contest: ${c.title} is open for registration`,
         time: c.startDate || (language === 'ta' ? 'அண்மையில்' : language === 'si' ? 'මෑතකදී' : 'Recent'),
         read: false,
+        competitionId: c.id,
       });
     });
 
@@ -132,6 +171,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
     });
 
   const unreadCount = notificationsList.filter((n) => !n.read).length;
+  const hasCriticalDeadline = notificationsList.some((n) => n.isDeadline && n.urgency === 'critical');
 
   return (
     <header id="hnc-header" className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-2xs w-full">
@@ -241,9 +281,16 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
                 className="relative p-1.5 sm:p-2 rounded-lg sm:rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                 aria-label="View notifications"
               >
-                <Bell className="w-4 h-4 sm:w-5 h-5 text-slate-700" />
+                <Bell className={`w-4 h-4 sm:w-5 h-5 ${hasCriticalDeadline ? 'text-rose-600' : 'text-slate-700'}`} />
+                {hasCriticalDeadline && (
+                  <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                )}
                 {unreadCount > 0 && (
-                  <span className="absolute top-0.5 right-0.5 min-w-[15px] h-[15px] sm:min-w-[17px] sm:h-[17px] px-0.5 sm:px-1 bg-[#E11D48] text-white text-[9px] sm:text-[10px] font-black rounded-full flex items-center justify-center shadow-xs">
+                  <span
+                    className={`absolute top-0.5 right-0.5 min-w-[15px] h-[15px] sm:min-w-[17px] sm:h-[17px] px-0.5 sm:px-1 text-white text-[9px] sm:text-[10px] font-black rounded-full flex items-center justify-center shadow-xs ${
+                      hasCriticalDeadline ? 'bg-rose-600 animate-pulse' : 'bg-[#E11D48]'
+                    }`}
+                  >
                     {unreadCount}
                   </span>
                 )}
@@ -252,15 +299,18 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
               {showNotifications && (
                 <div
                   id="notifications-dropdown"
-                  className="absolute right-0 mt-2 w-72 sm:w-80 max-w-[calc(100vw-1rem)] bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden animate-in fade-in zoom-in-95"
+                  className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-1rem)] bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95"
                 >
-                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                    <span className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+                    <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Bell className="w-3.5 h-3.5 text-blue-600" />
                       {t('platformAlerts')}
                     </span>
-                    <span className="text-[11px] text-blue-600 font-medium">{unreadCount} {t('unread')}</span>
+                    <span className="text-[11px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                      {unreadCount} {t('unread')}
+                    </span>
                   </div>
-                  <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                  <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
                     {notificationsList.length === 0 ? (
                       <div className="py-8 px-4 text-center">
                         <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto mb-1.5" />
@@ -273,14 +323,44 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
                       </div>
                     ) : (
                       notificationsList.map((item) => (
-                        <div key={item.id} className="p-3 hover:bg-slate-50 transition-colors cursor-pointer">
+                        <div
+                          key={item.id}
+                          onClick={() => {
+                            setShowNotifications(false);
+                            try {
+                              const targetEl = document.getElementById('upcoming-competitions-section');
+                              if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth' });
+                            } catch {}
+                          }}
+                          className={`p-3 transition-colors cursor-pointer ${
+                            item.isDeadline && item.urgency === 'critical'
+                              ? 'bg-rose-50/70 hover:bg-rose-100/80 border-l-3 border-l-rose-600'
+                              : item.isDeadline
+                              ? 'bg-amber-50/50 hover:bg-amber-100/60 border-l-3 border-l-amber-500'
+                              : 'hover:bg-slate-50'
+                          }`}
+                        >
                           <div className="flex items-start justify-between gap-2">
-                            <p className="text-xs font-medium text-slate-900">{item.title}</p>
+                            <div className="space-y-0.5">
+                              <p className={`text-xs font-bold ${item.isDeadline ? (item.urgency === 'critical' ? 'text-rose-900' : 'text-amber-950') : 'text-slate-900'}`}>
+                                {item.title}
+                              </p>
+                              {item.subtitle && (
+                                <p className="text-[11px] font-medium text-slate-600 line-clamp-1">
+                                  {item.subtitle}
+                                </p>
+                              )}
+                            </div>
                             {!item.read && (
-                              <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-1.5 shrink-0" />
+                              <span className={`w-2 h-2 rounded-full mt-1 shrink-0 ${item.urgency === 'critical' ? 'bg-rose-600 animate-ping' : 'bg-blue-600'}`} />
                             )}
                           </div>
-                          <p className="text-[10px] text-slate-400 mt-1">{item.time}</p>
+                          <div className="flex items-center justify-between mt-1 text-[10px] text-slate-500">
+                            <span>{item.time}</span>
+                            <span className="text-blue-600 font-bold hover:underline">
+                              {language === 'ta' ? 'காண்க →' : 'View →'}
+                            </span>
+                          </div>
                         </div>
                       ))
                     )}

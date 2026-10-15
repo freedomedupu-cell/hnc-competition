@@ -18,6 +18,7 @@ import {
   Sparkles,
   Camera,
   Share2,
+  Flame,
 } from 'lucide-react';
 import { CompetitionDetailsModal } from './CompetitionDetailsModal';
 import { CompetitionInstructionsModal } from './CompetitionInstructionsModal';
@@ -27,7 +28,7 @@ import { ExamCameraVerificationModal } from './ExamCameraVerificationModal';
 import { CompetitionLeaderboardModal } from '../common/CompetitionLeaderboardModal';
 import { ShareModal } from '../common/ShareModal';
 import { getCompetitionQuestions } from '../../data/questionPool';
-import { getCompetitionScheduleStatus } from '../../utils/competitionTimeUtils';
+import { getCompetitionScheduleStatus, parseDateTime } from '../../utils/competitionTimeUtils';
 import { GraduationCap, Shield } from 'lucide-react';
 import { APP_LOGO } from '../../assets/logo';
 import { StudentMembershipModal } from './StudentMembershipModal';
@@ -454,12 +455,60 @@ export const StudentCompetitionsView: React.FC = () => {
             const totalMarks =
               comp.totalMarks || questions.reduce((sum, q) => sum + (q.marks || 0), 0) || 100;
             const duration = comp.duration || 60;
+            const sched = getCompetitionScheduleStatus(comp);
+
+            // Dynamic Deadline Badge
+            let deadlineBadge: { text: string; classes: string; isCrit: boolean } | null = null;
+            if (!isSubmitted) {
+              const nowMs = Date.now();
+              const regDateStr = comp.registrationEnd || comp.registrationDeadline;
+              if (regDateStr && !isRegistered) {
+                const regEnd = parseDateTime(regDateStr, '23:59', 'end');
+                if (regEnd) {
+                  const diffMs = regEnd.getTime() - nowMs;
+                  if (diffMs > 0 && diffMs <= 24 * 3600 * 1000) {
+                    deadlineBadge = {
+                      text: language === 'ta' ? '🔥 பதிவு இன்று நிறைவு!' : language === 'si' ? '🔥 ලියාපදිංචිය අද අවසන්' : '🔥 Reg. Closes Today!',
+                      classes: 'bg-rose-600 text-white animate-pulse shadow-2xs',
+                      isCrit: true,
+                    };
+                  } else if (diffMs > 0 && diffMs <= 48 * 3600 * 1000) {
+                    deadlineBadge = {
+                      text: language === 'ta' ? '⏳ பதிவு: நாளை முடிவு' : language === 'si' ? '⏳ ලියාපදිංචිය හෙට අවසන්' : '⏳ Reg. Ends Tomorrow',
+                      classes: 'bg-amber-500 text-slate-950 font-bold',
+                      isCrit: false,
+                    };
+                  }
+                }
+              }
+
+              if (!deadlineBadge && sched.isLive && sched.endDateTime) {
+                const diffMs = sched.endDateTime.getTime() - nowMs;
+                if (diffMs > 0 && diffMs <= 24 * 3600 * 1000) {
+                  deadlineBadge = {
+                    text: language === 'ta' ? '🔥 தேர்வு இன்று நிறைவு!' : language === 'si' ? '🔥 විභාගය අද අවසන්' : '🔥 Exam Closes Today!',
+                    classes: 'bg-rose-600 text-white animate-pulse shadow-2xs',
+                    isCrit: true,
+                  };
+                } else if (diffMs > 0 && diffMs <= 48 * 3600 * 1000) {
+                  deadlineBadge = {
+                    text: language === 'ta' ? '⏰ தேர்வு: 2 நாளில் நிறைவு' : language === 'si' ? '⏰ දින 2කින් අවසන්' : '⏰ Exam Ends in 2d',
+                    classes: 'bg-amber-100 text-amber-900 border border-amber-300 font-bold',
+                    isCrit: false,
+                  };
+                }
+              }
+            }
 
             return (
               <div
                 key={comp.id}
                 id={`comp-card-${comp.id}`}
-                className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between space-y-4 hover:border-slate-300 hover:shadow-md transition duration-200"
+                className={`bg-white border rounded-2xl p-5 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition duration-200 ${
+                  deadlineBadge?.isCrit
+                    ? 'border-rose-400 ring-2 ring-rose-300/40'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
               >
                 <div className="space-y-3">
                   {/* Category & Status Badges */}
@@ -479,31 +528,41 @@ export const StudentCompetitionsView: React.FC = () => {
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 uppercase">
                         {comp.competitionType || 'Quiz'}
                       </span>
+                      {deadlineBadge && (
+                        <span
+                          className={`text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 ${deadlineBadge.classes}`}
+                        >
+                          <Flame className="w-3 h-3 text-yellow-300" />
+                          <span>{deadlineBadge.text}</span>
+                        </span>
+                      )}
                     </div>
 
-                    {isPaidComp ? (
-                      hasPaid ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          <span>Paid • LKR {comp.entryFee?.toLocaleString()}</span>
-                        </span>
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                      {isPaidComp ? (
+                        hasPaid ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Paid • LKR {comp.entryFee?.toLocaleString()}</span>
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                            Fee: LKR {comp.entryFee?.toLocaleString()}
+                          </span>
+                        )
                       ) : (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
-                          Fee: LKR {comp.entryFee?.toLocaleString()}
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                          Free Entry
                         </span>
-                      )
-                    ) : (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
-                        Free Entry
-                      </span>
-                    )}
+                      )}
 
-                    {comp.membershipRequired && (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-900 border border-purple-200 flex items-center gap-1">
-                        <Shield className="w-3 h-3 text-purple-600" />
-                        <span>Membership Pass</span>
-                      </span>
-                    )}
+                      {comp.membershipRequired && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-900 border border-purple-200 flex items-center gap-1">
+                          <Shield className="w-3 h-3 text-purple-600" />
+                          <span>Pass</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Title & Subject */}

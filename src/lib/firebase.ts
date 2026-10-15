@@ -17,12 +17,12 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 // Initialize Firebase Authentication
 export const auth = getAuth(app);
 
-// Initialize Cloud Firestore with resilient auto-detect long-polling
+// Initialize Cloud Firestore with resilient forced long-polling to eliminate iframe socket disconnects
 let firestoreInstance: Firestore;
 const configDbId = (firebaseConfig as any).firestoreDatabaseId || 'ai-studio-hnceduhub-87cf124f-0cc7-41e5-bd50-84681e12383b';
 try {
   const settings = {
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
     ignoreUndefinedProperties: true,
   };
   firestoreInstance = configDbId

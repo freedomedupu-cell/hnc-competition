@@ -11,43 +11,135 @@ import { AuthView } from './components/auth/AuthView';
 import { GraduationCap } from 'lucide-react';
 import { APP_LOGO } from './assets/logo';
 
-// Super Admin components (Lazy-loaded for instant startup)
-const SuperAdminDashboard = React.lazy(() => import('./components/superadmin/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
-const AdminManagement = React.lazy(() => import('./components/superadmin/AdminManagement').then(m => ({ default: m.AdminManagement })));
-const StudentManagement = React.lazy(() => import('./components/superadmin/StudentManagement').then(m => ({ default: m.StudentManagement })));
-const CompetitionManagement = React.lazy(() => import('./components/superadmin/CompetitionManagement').then(m => ({ default: m.CompetitionManagement })));
-const ResultsManagement = React.lazy(() => import('./components/superadmin/ResultsManagement').then(m => ({ default: m.ResultsManagement })));
-const SettingsView = React.lazy(() => import('./components/superadmin/SettingsView').then(m => ({ default: m.SettingsView })));
+// Primary Landing Dashboard components (Imported directly for instant, fail-proof rendering)
+import { SuperAdminDashboard } from './components/superadmin/SuperAdminDashboard';
+import { AdminDashboardView } from './components/admin/AdminDashboardView';
+import { StudentDashboardView } from './components/student/StudentDashboardView';
 
-// Admin components (Lazy-loaded)
-const AdminDashboardView = React.lazy(() => import('./components/admin/AdminDashboardView').then(m => ({ default: m.AdminDashboardView })));
-const AdminCompetitionsView = React.lazy(() => import('./components/admin/AdminCompetitionsView').then(m => ({ default: m.AdminCompetitionsView })));
-const StudentInfoView = React.lazy(() => import('./components/admin/StudentInfoView').then(m => ({ default: m.StudentInfoView })));
-const AdminResultsView = React.lazy(() => import('./components/admin/AdminResultsView').then(m => ({ default: m.AdminResultsView })));
-const AdminProfileView = React.lazy(() => import('./components/admin/AdminProfileView').then(m => ({ default: m.AdminProfileView })));
-const LiveProctorView = React.lazy(() => import('./components/admin/LiveProctorView').then(m => ({ default: m.LiveProctorView })));
+// Resilient Lazy Loader with auto-retry for secondary tabs
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+  retries = 3
+): React.LazyExoticComponent<T> {
+  return React.lazy(async () => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await factory();
+      } catch (err: any) {
+        if (i === retries - 1) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 500 * (i + 1)));
+      }
+    }
+    return factory();
+  });
+}
 
-// Student components (Lazy-loaded)
-const StudentDashboardView = React.lazy(() => import('./components/student/StudentDashboardView').then(m => ({ default: m.StudentDashboardView })));
-const StudentCompetitionsView = React.lazy(() => import('./components/student/StudentCompetitionsView').then(m => ({ default: m.StudentCompetitionsView })));
-const StudentResultsView = React.lazy(() => import('./components/student/StudentResultsView').then(m => ({ default: m.StudentResultsView })));
-const StudentProfileView = React.lazy(() => import('./components/student/StudentProfileView').then(m => ({ default: m.StudentProfileView })));
-const StudentExamInterface = React.lazy(() => import('./components/student/StudentExamInterface').then(m => ({ default: m.StudentExamInterface })));
-const StudentReferralView = React.lazy(() => import('./components/student/StudentReferralView').then(m => ({ default: m.StudentReferralView })));
-const StudentAnnouncementsView = React.lazy(() => import('./components/student/StudentAnnouncementsView').then(m => ({ default: m.StudentAnnouncementsView })));
-const GameQuest = React.lazy(() => import('./components/student/GameQuest').then(m => ({ default: m.GameQuest })));
-const StudyGamesHub = React.lazy(() => import('./components/student/StudyGamesHub').then(m => ({ default: m.StudyGamesHub })));
-const StudentFeedbackView = React.lazy(() => import('./components/student/StudentFeedbackView').then(m => ({ default: m.StudentFeedbackView })));
-const LeaderboardsHubView = React.lazy(() => import('./components/leaderboard/LeaderboardsHubView').then(m => ({ default: m.LeaderboardsHubView })));
+// Super Admin auxiliary components (Lazy-loaded with retry)
+const AdminManagement = lazyWithRetry(() => import('./components/superadmin/AdminManagement').then(m => ({ default: m.AdminManagement })));
+const StudentManagement = lazyWithRetry(() => import('./components/superadmin/StudentManagement').then(m => ({ default: m.StudentManagement })));
+const CompetitionManagement = lazyWithRetry(() => import('./components/superadmin/CompetitionManagement').then(m => ({ default: m.CompetitionManagement })));
+const ResultsManagement = lazyWithRetry(() => import('./components/superadmin/ResultsManagement').then(m => ({ default: m.ResultsManagement })));
+const SettingsView = lazyWithRetry(() => import('./components/superadmin/SettingsView').then(m => ({ default: m.SettingsView })));
 
-// Common & Auxiliary Management Views (Lazy-loaded)
-const AnnouncementsManagementView = React.lazy(() => import('./components/common/AnnouncementsManagementView').then(m => ({ default: m.AnnouncementsManagementView })));
-const SponsorsAndAdsView = React.lazy(() => import('./components/admin/SponsorsAndAdsView').then(m => ({ default: m.SponsorsAndAdsView })));
-const AdminFeedbackView = React.lazy(() => import('./components/admin/AdminFeedbackView').then(m => ({ default: m.AdminFeedbackView })));
-const SubjectAdminPortal = React.lazy(() => import('./components/admin/SubjectAdminPortal').then(m => ({ default: m.SubjectAdminPortal })));
+// Admin auxiliary components (Lazy-loaded with retry)
+const AdminCompetitionsView = lazyWithRetry(() => import('./components/admin/AdminCompetitionsView').then(m => ({ default: m.AdminCompetitionsView })));
+const StudentInfoView = lazyWithRetry(() => import('./components/admin/StudentInfoView').then(m => ({ default: m.StudentInfoView })));
+const AdminResultsView = lazyWithRetry(() => import('./components/admin/AdminResultsView').then(m => ({ default: m.AdminResultsView })));
+const AdminProfileView = lazyWithRetry(() => import('./components/admin/AdminProfileView').then(m => ({ default: m.AdminProfileView })));
+const LiveProctorView = lazyWithRetry(() => import('./components/admin/LiveProctorView').then(m => ({ default: m.LiveProctorView })));
+
+// Student auxiliary components (Lazy-loaded with retry)
+const StudentCompetitionsView = lazyWithRetry(() => import('./components/student/StudentCompetitionsView').then(m => ({ default: m.StudentCompetitionsView })));
+const StudentResultsView = lazyWithRetry(() => import('./components/student/StudentResultsView').then(m => ({ default: m.StudentResultsView })));
+const StudentProfileView = lazyWithRetry(() => import('./components/student/StudentProfileView').then(m => ({ default: m.StudentProfileView })));
+const StudentExamInterface = lazyWithRetry(() => import('./components/student/StudentExamInterface').then(m => ({ default: m.StudentExamInterface })));
+const StudentReferralView = lazyWithRetry(() => import('./components/student/StudentReferralView').then(m => ({ default: m.StudentReferralView })));
+const StudentAnnouncementsView = lazyWithRetry(() => import('./components/student/StudentAnnouncementsView').then(m => ({ default: m.StudentAnnouncementsView })));
+const GameQuest = lazyWithRetry(() => import('./components/student/GameQuest').then(m => ({ default: m.GameQuest })));
+const StudyGamesHub = lazyWithRetry(() => import('./components/student/StudyGamesHub').then(m => ({ default: m.StudyGamesHub })));
+const StudentFeedbackView = lazyWithRetry(() => import('./components/student/StudentFeedbackView').then(m => ({ default: m.StudentFeedbackView })));
+const LeaderboardsHubView = lazyWithRetry(() => import('./components/leaderboard/LeaderboardsHubView').then(m => ({ default: m.LeaderboardsHubView })));
+
+// Common & Auxiliary Management Views (Lazy-loaded with retry)
+const AnnouncementsManagementView = lazyWithRetry(() => import('./components/common/AnnouncementsManagementView').then(m => ({ default: m.AnnouncementsManagementView })));
+const SponsorsAndAdsView = lazyWithRetry(() => import('./components/admin/SponsorsAndAdsView').then(m => ({ default: m.SponsorsAndAdsView })));
+const AdminFeedbackView = lazyWithRetry(() => import('./components/admin/AdminFeedbackView').then(m => ({ default: m.AdminFeedbackView })));
+const SubjectAdminPortal = lazyWithRetry(() => import('./components/admin/SubjectAdminPortal').then(m => ({ default: m.SubjectAdminPortal })));
 
 // Session Security & Inactivity Timeout Warning
 import { SessionTimeoutWarning } from './components/common/SessionTimeoutWarning';
+
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class PortalErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Portal ErrorBoundary caught an error:', error, errorInfo);
+  }
+
+  handleReload = () => {
+    this.setState({ hasError: false, error: null });
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      const isChunkError =
+        this.state.error?.message?.includes('dynamically imported module') ||
+        this.state.error?.message?.includes('Failed to fetch') ||
+        this.state.error?.name === 'ChunkLoadError';
+
+      return (
+        <div className="w-full min-h-[400px] flex flex-col items-center justify-center p-6 text-center space-y-4 bg-white rounded-2xl border border-slate-200 shadow-sm my-4">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center text-xl">
+            ⚠️
+          </div>
+          <div className="max-w-md space-y-1">
+            <h3 className="text-base font-bold text-slate-900">
+              {isChunkError ? 'பக்கம் புதுப்பிக்கப்பட வேண்டும் (Page Update Required)' : 'ஏதேனும் தவறு நேர்ந்துவிட்டது (Something went wrong)'}
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              {isChunkError
+                ? 'புதிய பதிப்பு தயாராக உள்ளது. பக்கத்தை மீண்டும் ஏற்றுவதன் மூலம் தடையின்றி தொடரலாம்.'
+                : 'A temporary display issue occurred while loading this view.'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition cursor-pointer"
+            >
+              மீண்டும் முயற்சி செய் (Try Again)
+            </button>
+            <button
+              onClick={this.handleReload}
+              className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+            >
+              பக்கத்தை புதுப்பி (Reload)
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 const ViewSkeleton: React.FC = () => (
   <div className="w-full min-h-[380px] flex flex-col items-center justify-center p-8 space-y-3 animate-in fade-in duration-150">
@@ -261,9 +353,11 @@ const MainPortalArea: React.FC = () => {
         />
 
         <main id="portal-main-content" className="flex-1 p-3 sm:p-6 lg:p-8 min-w-0 w-full overflow-x-hidden">
-          <React.Suspense fallback={<ViewSkeleton />}>
-            {renderActiveView()}
-          </React.Suspense>
+          <PortalErrorBoundary>
+            <React.Suspense fallback={<ViewSkeleton />}>
+              {renderActiveView()}
+            </React.Suspense>
+          </PortalErrorBoundary>
         </main>
       </div>
     </div>

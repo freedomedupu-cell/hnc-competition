@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Competition, DbAttempt } from '../../types';
-import { getCompetitionScheduleStatus } from '../../utils/competitionTimeUtils';
+import { getCompetitionScheduleStatus, parseDateTime } from '../../utils/competitionTimeUtils';
 import {
   Trophy,
   Calendar,
@@ -52,6 +52,8 @@ import { ExamCameraVerificationModal } from './ExamCameraVerificationModal';
 import { StudentMembershipModal } from './StudentMembershipModal';
 import { DynamicAdBillboard } from '../common/DynamicAdBillboard';
 import { AnimatedHeroLeaderboard } from '../leaderboard/AnimatedHeroLeaderboard';
+import { SmartDailyTips } from './SmartDailyTips';
+import { StudentDeadlineAlertsBanner } from './StudentDeadlineAlertsBanner';
 
 interface StudentDashboardViewProps {
   onNavigate: (tab: any) => void;
@@ -149,20 +151,69 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
       formatType = 'True / False';
     }
 
-    let countdownText = 'Active Contest';
-    if (c.endDate) {
-      const endMs = new Date(c.endDate).getTime();
-      if (!isNaN(endMs)) {
-        const remainingSec = Math.max(0, Math.floor((endMs - Date.now()) / 1000));
-        if (remainingSec > 0) {
-          const days = Math.floor(remainingSec / 86400);
-          const hours = Math.floor((remainingSec % 86400) / 3600);
-          const minutes = Math.floor((remainingSec % 3600) / 60);
-          const pad = (n: number) => String(n).padStart(2, '0');
-          countdownText = days > 0 ? `Ends in ${days}d ${pad(hours)}:${pad(minutes)}` : `Ends in ${pad(hours)}:${pad(minutes)}`;
-        } else {
-          countdownText = 'Ending Soon';
+    const isRegistered = isStudentRegistered(c.id);
+    const hasSubmitted = hasStudentSubmitted(c.id);
+    const sched = getCompetitionScheduleStatus(c);
+
+    let deadlineBadge: {
+      text: string;
+      level: 'critical' | 'urgent' | 'warning' | 'normal';
+      classes: string;
+    } | null = null;
+
+    if (!hasSubmitted) {
+      const nowMs = Date.now();
+      const regDateStr = c.registrationEnd || c.registrationDeadline;
+      if (regDateStr && !isRegistered) {
+        const regEnd = parseDateTime(regDateStr, '23:59', 'end');
+        if (regEnd) {
+          const diffMs = regEnd.getTime() - nowMs;
+          if (diffMs > 0 && diffMs <= 24 * 3600 * 1000) {
+            deadlineBadge = {
+              text: language === 'ta' ? '🔥 பதிவு இன்று நிறைவு!' : language === 'si' ? '🔥 ලියාපදිංචිය අද අවසන්' : '🔥 Reg. Closes Today!',
+              level: 'critical',
+              classes: 'bg-rose-600 text-white animate-pulse shadow-2xs',
+            };
+          } else if (diffMs > 0 && diffMs <= 48 * 3600 * 1000) {
+            deadlineBadge = {
+              text: language === 'ta' ? '⏳ பதிவு: நாளை முடிவு' : language === 'si' ? '⏳ ලියාපදිංචිය හෙට අවසන්' : '⏳ Reg. Ends Tomorrow',
+              level: 'urgent',
+              classes: 'bg-amber-500 text-slate-950 font-bold shadow-2xs',
+            };
+          }
         }
+      }
+
+      if (!deadlineBadge && sched.isLive && sched.endDateTime) {
+        const diffMs = sched.endDateTime.getTime() - nowMs;
+        if (diffMs > 0 && diffMs <= 24 * 3600 * 1000) {
+          deadlineBadge = {
+            text: language === 'ta' ? '🔥 தேர்வு இன்று நிறைவு!' : language === 'si' ? '🔥 විභාගය අද අවසන්' : '🔥 Exam Closes Today!',
+            level: 'critical',
+            classes: 'bg-rose-600 text-white animate-pulse shadow-2xs',
+          };
+        } else if (diffMs > 0 && diffMs <= 48 * 3600 * 1000) {
+          deadlineBadge = {
+            text: language === 'ta' ? '⏰ தேர்வு: 2 நாளில் நிறைவு' : language === 'si' ? '⏰ දින 2කින් අවසන්' : '⏰ Exam Ends in 2d',
+            level: 'urgent',
+            classes: 'bg-amber-100 text-amber-900 border border-amber-300 font-bold',
+          };
+        }
+      }
+    }
+
+    let countdownText = 'Active Contest';
+    const targetEnd = sched.endDateTime;
+    if (targetEnd) {
+      const remainingSec = Math.max(0, Math.floor((targetEnd.getTime() - Date.now()) / 1000));
+      if (remainingSec > 0) {
+        const days = Math.floor(remainingSec / 86400);
+        const hours = Math.floor((remainingSec % 86400) / 3600);
+        const minutes = Math.floor((remainingSec % 3600) / 60);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        countdownText = days > 0 ? `Ends in ${days}d ${pad(hours)}:${pad(minutes)}` : `Ends in ${pad(hours)}:${pad(minutes)}`;
+      } else {
+        countdownText = language === 'ta' ? 'முடிவடைந்தது' : 'Closed';
       }
     }
 
@@ -174,12 +225,13 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
       formatType,
       questionsCount: c.questionsCount || 10,
       durationMinutes: c.duration || 30,
-      dateDisplay: c.startDate || 'Open Now',
+      dateDisplay: c.startDate || c.competitionStart || 'Open Now',
       gradeRange: c.grade || 'All Grades',
       countdownText,
       countdownPillClass: pillClass,
       iconComponent: iconComp,
       fullCompetition: c,
+      deadlineBadge,
     };
   });
 
@@ -281,6 +333,12 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
 
       {/* TOP BAR கீழ், WELCOME CARD மேலேயும்: ANIMATED NATIONAL LEADERBOARD */}
       <AnimatedHeroLeaderboard onNavigate={onNavigate} />
+
+      {/* 0.5 URGENT COMPETITION DEADLINES & LOCAL PUSH NOTIFICATION SYSTEM */}
+      <StudentDeadlineAlertsBanner
+        onJoinCompetition={handleJoinCompetition}
+        onViewDetails={(comp) => setDetailsComp(comp)}
+      />
 
       {/* 1. HERO BANNER: "Challenge Yourself and Win!" (COMPACT) */}
       <div
@@ -490,7 +548,10 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
         </div>
       </div>
 
-      {/* 2. FORMAT / CATEGORY CARDS (4 in a Row) (COMPACT) */}
+      {/* 2. SMART DAILY TIPS & EXAM TRICKS (AI-POWERED) */}
+      <SmartDailyTips />
+
+      {/* 3. FORMAT / CATEGORY CARDS (4 in a Row) (COMPACT) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
         {/* Card 1: Quiz ( MCQ ) */}
         <div
@@ -772,7 +833,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
 
         {/* Competitions Items List */}
         <div className="divide-y divide-slate-100">
-          {competitions.length === 0 ? (
+          {visibleCompetitions.length === 0 ? (
             <div className="py-12 px-4 text-center">
               <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 shadow-2xs">
                 <Trophy className="w-7 h-7" />
@@ -825,7 +886,13 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
             return (
               <div
                 key={item.id}
-                className="py-4 sm:py-5 first:pt-2 last:pb-2 flex flex-col lg:flex-row lg:items-center justify-between gap-4 group hover:bg-slate-50/60 p-2 sm:p-3 rounded-2xl transition-colors"
+                className={`py-4 sm:py-5 first:pt-2 last:pb-2 flex flex-col lg:flex-row lg:items-center justify-between gap-4 group hover:bg-slate-50/60 p-2 sm:p-3 rounded-2xl transition-all ${
+                  item.deadlineBadge?.level === 'critical'
+                    ? 'border-l-4 border-l-rose-500 bg-rose-50/30'
+                    : item.deadlineBadge?.level === 'urgent'
+                    ? 'border-l-4 border-l-amber-500 bg-amber-50/20'
+                    : ''
+                }`}
               >
                 {/* Left: 3D Icon Box + Meta Details */}
                 <div className="flex items-start sm:items-center gap-3.5 sm:gap-4 min-w-0">
@@ -843,6 +910,14 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
                       >
                         {item.categoryBadge}
                       </span>
+                      {item.deadlineBadge && (
+                        <span
+                          className={`text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 ${item.deadlineBadge.classes}`}
+                        >
+                          <Flame className="w-3 h-3 text-yellow-300" />
+                          <span>{item.deadlineBadge.text}</span>
+                        </span>
+                      )}
                     </div>
 
                     {/* Meta Row: Questions | Duration | Date | Grade */}

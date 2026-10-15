@@ -2073,6 +2073,7 @@ export async function saveMembershipInFirestore(membership: DbMembership): Promi
  * Fetch a student's membership record from Firestore
  */
 export async function getMembershipInFirestore(studentId: string): Promise<DbMembership | null> {
+  if (!studentId || typeof studentId !== 'string') return null;
   try {
     const memRef = doc(db, 'memberships', studentId);
     const snap = await getDoc(memRef);
@@ -2080,8 +2081,13 @@ export async function getMembershipInFirestore(studentId: string): Promise<DbMem
       return snap.data() as DbMembership;
     }
     return null;
-  } catch (err) {
-    console.error('Error fetching membership:', err);
+  } catch (err: any) {
+    const msg = String(err?.message || '').toLowerCase();
+    if (err?.code === 'unavailable' || msg.includes('offline') || err?.code === 'failed-precondition') {
+      console.warn('Firestore offline or reconnecting during membership lookup; returning null safely.');
+    } else {
+      console.warn('Notice fetching student membership record:', err?.message || err);
+    }
     return null;
   }
 }
@@ -2094,8 +2100,13 @@ export async function getAllMembershipsInFirestore(): Promise<DbMembership[]> {
     const memCol = collection(db, 'memberships');
     const snap = await getDocs(memCol);
     return snap.docs.map((d) => d.data() as DbMembership);
-  } catch (err) {
-    console.error('Error fetching all memberships:', err);
+  } catch (err: any) {
+    const msg = String(err?.message || '').toLowerCase();
+    if (err?.code === 'unavailable' || msg.includes('offline') || err?.code === 'failed-precondition') {
+      console.warn('Firestore offline or reconnecting during all memberships lookup; returning empty list.');
+    } else {
+      console.warn('Notice fetching all memberships:', err?.message || err);
+    }
     return [];
   }
 }
@@ -2157,8 +2168,13 @@ export async function getAllMembershipPaymentsInFirestore(): Promise<DbMembershi
     const snap = await getDocs(payCol);
     const payments = snap.docs.map((d) => d.data() as DbMembershipPayment);
     return payments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  } catch (err) {
-    console.error('Error fetching membership payments:', err);
+  } catch (err: any) {
+    const msg = String(err?.message || '').toLowerCase();
+    if (err?.code === 'unavailable' || msg.includes('offline') || err?.code === 'failed-precondition') {
+      console.warn('Firestore offline or reconnecting during membership payments lookup; returning empty list.');
+    } else {
+      console.warn('Notice fetching membership payments:', err?.message || err);
+    }
     return [];
   }
 }

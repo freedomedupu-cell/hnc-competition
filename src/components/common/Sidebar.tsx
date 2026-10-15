@@ -35,6 +35,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { SuperAdminNav, AdminNav, StudentNav } from '../../context/AppContext';
+import { isGradeEligible } from '../../lib/gradeUtils';
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -338,6 +339,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
     },
   ];
 
+  const studentGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 6';
+  const eligibleStudentCompetitions = competitions.filter((c) => {
+    if (!c) return false;
+    const s = (c.status || '').toLowerCase().trim();
+    if (s.includes('draft') || s.includes('closed') || s.includes('inactive') || s.includes('unpublished')) {
+      return false;
+    }
+    return isGradeEligible(c.grade, studentGrade);
+  });
+
   const studentNavItems: {
     id: StudentNav;
     label: string;
@@ -353,11 +364,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
       id: 'Competitions',
       label: t('navCompetitions'),
       icon: <Trophy className="w-5 h-5" />,
-      badge: competitions.filter((c) => {
-        if (!c) return false;
-        const s = (c.status || '').toLowerCase().trim();
-        return !s.includes('draft') && !s.includes('closed') && !s.includes('inactive');
-      }).length,
+      badge: eligibleStudentCompetitions.length,
     },
     {
       id: 'Edu-Arena Quest',
