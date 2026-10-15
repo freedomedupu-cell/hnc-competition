@@ -54,8 +54,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
     switch (effectivePortal) {
       case 'super_admin':
         return {
-          name: currentAuthUser?.fullName || superAdminUser.name,
-          subtitle: currentAuthUser?.email || superAdminUser.email,
+          name: currentAuthUser?.fullName || superAdminUser?.name || 'Super Admin',
+          subtitle: currentAuthUser?.email || superAdminUser?.email || '',
           badge: t('superAdminLevel'),
           badgeColor: 'bg-blue-900 text-white',
           icon: <ShieldCheck className="w-4 h-4 text-blue-600" />,
@@ -63,30 +63,39 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
         };
       case 'admin': {
         const isSubjectAdmin =
-          currentAdmin.adminType === 'subject_admin' || Boolean(currentAdmin.assignedSubject);
+          currentAdmin?.adminType === 'subject_admin' || Boolean(currentAdmin?.assignedSubject);
         return {
-          name: currentAuthUser?.fullName || currentAdmin.name,
-          subtitle: isSubjectAdmin && currentAdmin.assignedSubject
-            ? `${currentAdmin.assignedSubject} Specialist • ${currentAuthUser?.email || currentAdmin.email}`
-            : currentAuthUser?.email || currentAdmin.email,
+          name: currentAuthUser?.fullName || currentAdmin?.name || 'Admin',
+          subtitle: isSubjectAdmin && currentAdmin?.assignedSubject
+            ? `${currentAdmin.assignedSubject} Specialist • ${currentAuthUser?.email || currentAdmin?.email}`
+            : currentAuthUser?.email || currentAdmin?.email || '',
           badge: isSubjectAdmin
-            ? (currentAdmin.assignedSubject ? `Subject: ${currentAdmin.assignedSubject}` : 'Subject Admin')
+            ? (currentAdmin?.assignedSubject ? `Subject: ${currentAdmin.assignedSubject}` : 'Subject Admin')
             : t('adminLevel'),
           badgeColor: isSubjectAdmin ? 'bg-purple-700 text-white' : 'bg-blue-700 text-white',
           icon: <UserCheck className="w-4 h-4 text-emerald-600" />,
           portalName: isSubjectAdmin
-            ? (language === 'ta' ? `${currentAdmin.assignedSubject || 'பாடம்'} நிர்வாக மையம்` : `${currentAdmin.assignedSubject || 'Subject'} Admin Hub`)
+            ? (language === 'ta' ? `${currentAdmin?.assignedSubject || 'பாடம்'} நிர்வாக மையம்` : `${currentAdmin?.assignedSubject || 'Subject'} Admin Hub`)
             : t('adminDashboard'),
         };
       }
       case 'student':
         return {
-          name: currentAuthUser?.fullName || currentStudent.name,
-          subtitle: currentAuthUser?.email || currentStudent.email,
+          name: currentAuthUser?.fullName || currentStudent?.name || 'Student',
+          subtitle: currentAuthUser?.email || currentStudent?.email || '',
           badge: t('studentLevel'),
           badgeColor: 'bg-slate-800 text-white',
           icon: <Award className="w-4 h-4 text-amber-600" />,
           portalName: t('studentPortal'),
+        };
+      default:
+        return {
+          name: currentAuthUser?.fullName || 'User',
+          subtitle: currentAuthUser?.email || '',
+          badge: 'Member',
+          badgeColor: 'bg-slate-800 text-white',
+          icon: <Award className="w-4 h-4 text-amber-600" />,
+          portalName: 'Portal',
         };
     }
   };
@@ -406,17 +415,17 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
             ) : (
               <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200">
                 <div className="w-8 h-8 rounded-full bg-blue-100 border border-blue-300 text-blue-800 font-bold text-xs flex items-center justify-center">
-                  {activeUser.name.charAt(0)}
+                  {(activeUser?.name || 'A').charAt(0)}
                 </div>
                 <div className="text-left">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-slate-900 leading-none">
-                      {activeUser.name.split(' ')[0]} {activeUser.name.split(' ').slice(-1)[0]}
+                      {(activeUser?.name || 'Administrator').split(' ')[0]}
                     </span>
                     <CheckCircle2 className="w-3 h-3 text-blue-600" />
                   </div>
                   <span className="text-[10px] text-slate-500 font-medium leading-tight block truncate max-w-[120px]">
-                    {activeUser.subtitle}
+                    {activeUser?.subtitle || ''}
                   </span>
                 </div>
               </div>

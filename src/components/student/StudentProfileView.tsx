@@ -31,9 +31,13 @@ import {
   MessageCircle,
   Share2,
   ExternalLink,
+  Pencil,
+  Save,
 } from 'lucide-react';
 import { StudentMembershipModal } from './StudentMembershipModal';
 import { StudentAchievements } from './StudentAchievements';
+import { SavePulseIndicator, SaveStatus } from '../common/SavePulseIndicator';
+import { SRI_LANKA_25_DISTRICTS } from '../../data/sriLankaDistricts';
 
 export const StudentProfileView: React.FC = () => {
   const {
@@ -51,6 +55,28 @@ export const StudentProfileView: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [localAvatar, setLocalAvatar] = useState<string>(() => currentStudent.avatarUrl || '');
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // Real-time save status for student profile changes
+  const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>('saved');
+  const [profileLastSavedAt, setProfileLastSavedAt] = useState<Date | null>(() => new Date());
+
+  // Personal contact details edit state
+  const [isEditingPersonal, setIsEditingPersonal] = useState(false);
+  const [personalForm, setPersonalForm] = useState({
+    phone: currentStudent.phone || '',
+    district: currentStudent.district || '',
+    address: currentStudent.address || '',
+    bio: currentStudent.bio || '',
+  });
+
+  React.useEffect(() => {
+    setPersonalForm({
+      phone: currentStudent.phone || '',
+      district: currentStudent.district || '',
+      address: currentStudent.address || '',
+      bio: currentStudent.bio || '',
+    });
+  }, [currentStudent.phone, currentStudent.district, currentStudent.address, currentStudent.bio]);
 
   React.useEffect(() => {
     if (currentStudent.avatarUrl) {
@@ -132,9 +158,13 @@ export const StudentProfileView: React.FC = () => {
 
       // Step 2: Immediate optimistic UI update
       setLocalAvatar(compressedDataUrl);
+      setProfileSaveStatus('saving');
 
       // Step 3: Update student profile in context, localStorage and Firestore immediately
       await updateStudentProfile({ avatarUrl: compressedDataUrl });
+      setProfileLastSavedAt(new Date());
+      setProfileSaveStatus('saved');
+
       setShowAvatarModal(false);
       setAvatarToast(
         language === 'ta'
@@ -157,6 +187,8 @@ export const StudentProfileView: React.FC = () => {
           if (cloudUrl) {
             setLocalAvatar(cloudUrl);
             await updateStudentProfile({ avatarUrl: cloudUrl });
+            setProfileLastSavedAt(new Date());
+            setProfileSaveStatus('saved');
           }
         } catch (storageError) {
           console.warn('Firebase Storage background sync note (local URL active):', storageError);
@@ -173,7 +205,10 @@ export const StudentProfileView: React.FC = () => {
 
   const handleSelectPreset = async (emoji: string) => {
     setLocalAvatar(emoji);
+    setProfileSaveStatus('saving');
     await updateStudentProfile({ avatarUrl: emoji });
+    setProfileLastSavedAt(new Date());
+    setProfileSaveStatus('saved');
     setShowAvatarModal(false);
     setAvatarToast(
       language === 'ta'
@@ -187,7 +222,10 @@ export const StudentProfileView: React.FC = () => {
 
   const handleRemoveAvatar = async () => {
     setLocalAvatar('');
+    setProfileSaveStatus('saving');
     await updateStudentProfile({ avatarUrl: '' });
+    setProfileLastSavedAt(new Date());
+    setProfileSaveStatus('saved');
     setShowAvatarModal(false);
     setAvatarToast(
       language === 'ta'
@@ -197,6 +235,34 @@ export const StudentProfileView: React.FC = () => {
         : 'Profile picture removed.'
     );
     setTimeout(() => setAvatarToast(null), 3000);
+  };
+
+  const handleSavePersonalInfo = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setProfileSaveStatus('saving');
+    try {
+      await updateStudentProfile({
+        phone: personalForm.phone.trim(),
+        district: personalForm.district.trim(),
+        address: personalForm.address.trim(),
+        bio: personalForm.bio.trim(),
+      });
+      setProfileLastSavedAt(new Date());
+      setProfileSaveStatus('saved');
+      setIsEditingPersonal(false);
+      setAvatarToast(
+        language === 'ta'
+          ? 'தொடர்பு விபரங்கள் வெற்றிகரமாக சேமிக்கப்பட்டன!'
+          : language === 'si'
+          ? 'තොරතුරු සාර්ථකව සුරැකිණි!'
+          : 'Personal details saved successfully!'
+      );
+      setTimeout(() => setAvatarToast(null), 3000);
+    } catch (err) {
+      console.error('Save personal info error:', err);
+      setProfileLastSavedAt(new Date());
+      setProfileSaveStatus('saved');
+    }
   };
 
   const referralCode =
@@ -493,11 +559,158 @@ export const StudentProfileView: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex items-center gap-1.5 self-start sm:self-auto px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-semibold">
-              <Lock className="w-3.5 h-3.5 text-slate-500" />
-              <span>{language === 'ta' ? 'பதிவு பூட்டப்பட்டுள்ளது' : 'Profile Locked'}</span>
+            <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+              {/* Subtle Real-time Save Pulse Indicator */}
+              <SavePulseIndicator
+                status={profileSaveStatus}
+                lastSavedAt={profileLastSavedAt}
+                language={language}
+                variant="pill"
+                size="xs"
+                customLabel={
+                  language === 'ta'
+                    ? 'சுயவிவரம் சேமிக்கப்பட்டது'
+                    : language === 'si'
+                    ? 'පැතිකඩ සුරැකිණි'
+                    : 'Profile saved'
+                }
+                customSavingLabel={
+                  language === 'ta'
+                    ? 'சேமிக்கப்படுகிறது...'
+                    : language === 'si'
+                    ? 'සුරැකෙමින්...'
+                    : 'Saving profile...'
+                }
+              />
+
+              <button
+                type="button"
+                onClick={() => setIsEditingPersonal(!isEditingPersonal)}
+                className="px-2.5 py-1 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-bold flex items-center gap-1 transition"
+              >
+                <Pencil className="w-3 h-3 text-blue-600" />
+                <span>
+                  {isEditingPersonal
+                    ? (language === 'ta' ? 'படிவத்தை மூடு' : 'Close Form')
+                    : (language === 'ta' ? 'தொடர்பு விபரம் திருத்து' : 'Edit Contact & Bio')}
+                </span>
+              </button>
+
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-semibold">
+                <Lock className="w-3.5 h-3.5 text-slate-500" />
+                <span>{language === 'ta' ? 'அடிப்படை பதிவு பூட்டப்பட்டது' : 'Core Record Locked'}</span>
+              </div>
             </div>
           </div>
+
+          {/* Editable Personal Contact & Bio Form */}
+          {isEditingPersonal && (
+            <form
+              onSubmit={handleSavePersonalInfo}
+              className="p-4 sm:p-5 rounded-2xl border border-blue-300 bg-gradient-to-br from-blue-50/90 to-indigo-50/70 space-y-4 animate-in fade-in duration-300"
+            >
+              <div className="flex items-center justify-between border-b border-blue-200/80 pb-3">
+                <div className="flex items-center gap-2">
+                  <Pencil className="w-4 h-4 text-blue-700" />
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-900">
+                    {language === 'ta' ? 'தனிப்பட்ட தொடர்பு விபரங்களைத் திருத்தவும்' : 'Edit Personal Contact & Bio'}
+                  </h3>
+                </div>
+                <SavePulseIndicator
+                  status={profileSaveStatus}
+                  lastSavedAt={profileLastSavedAt}
+                  language={language}
+                  variant="pill"
+                  size="xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 block">
+                    {language === 'ta' ? 'தொடர்பு தொலைபேசி எண்' : 'Contact Phone'}
+                  </label>
+                  <input
+                    type="tel"
+                    value={personalForm.phone}
+                    onChange={(e) => setPersonalForm({ ...personalForm, phone: e.target.value })}
+                    placeholder="+94 7X XXX XXXX"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 block">
+                    {language === 'ta' ? 'மாவட்டம்' : 'District'}
+                  </label>
+                  <select
+                    value={personalForm.district}
+                    onChange={(e) => setPersonalForm({ ...personalForm, district: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  >
+                    <option value="">{language === 'ta' ? '— மாவட்டம் தேர்வு செய்க —' : '— Select District —'}</option>
+                    {SRI_LANKA_25_DISTRICTS.map((d) => (
+                      <option key={d.id} value={d.nameEn}>
+                        {d.nameEn} {d.nameTa ? `(${d.nameTa})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 block">
+                    {language === 'ta' ? 'வசிப்பிட முகவரி' : 'Residential Address'}
+                  </label>
+                  <input
+                    type="text"
+                    value={personalForm.address}
+                    onChange={(e) => setPersonalForm({ ...personalForm, address: e.target.value })}
+                    placeholder="No. 12, Main Street, Town"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 block">
+                    {language === 'ta' ? 'சுயகுறிப்பு & கல்விசார் ஆர்வங்கள்' : 'Academic Bio & Interests'}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={personalForm.bio}
+                    onChange={(e) => setPersonalForm({ ...personalForm, bio: e.target.value })}
+                    placeholder="Tell us about your Olympiad goals or favorite science/math topics..."
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <SavePulseIndicator
+                  status={profileSaveStatus}
+                  lastSavedAt={profileLastSavedAt}
+                  language={language}
+                  size="xs"
+                />
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingPersonal(false)}
+                    className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold transition"
+                  >
+                    {language === 'ta' ? 'ரத்துசெய்' : 'Cancel'}
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{language === 'ta' ? 'சேமித்து ஒத்திசைக்கவும்' : 'Save Details'}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
 
           {/* Security & Integrity Banner */}
           <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 flex items-start gap-3 text-xs text-blue-900">
@@ -752,13 +965,22 @@ export const StudentProfileView: React.FC = () => {
                     : 'Update Profile Picture'}
                 </h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowAvatarModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <SavePulseIndicator
+                  status={profileSaveStatus}
+                  lastSavedAt={profileLastSavedAt}
+                  language={language}
+                  variant="pill"
+                  size="xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAvatarModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Current Avatar Preview */}

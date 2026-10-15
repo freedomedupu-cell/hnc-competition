@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   RefreshCw,
 } from 'lucide-react';
+import { SavePulseIndicator } from '../common/SavePulseIndicator';
 
 export const StudentFeedbackView: React.FC = () => {
   const {
@@ -479,40 +480,67 @@ export const StudentFeedbackView: React.FC = () => {
               </label>
             </div>
 
-            {/* Submit Button */}
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSubject('');
-                  setMessage('');
-                  setRating(5);
-                }}
-                className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs sm:text-sm hover:bg-slate-50 transition-all"
-              >
-                {language === 'ta' ? 'அழிக்க (Reset)' : 'Reset'}
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm shadow-md transition-all disabled:opacity-50"
-              >
-                {submitting ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>{language === 'ta' ? 'சமர்ப்பிக்கப்படுகிறது...' : 'Submitting...'}</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    <span>
-                      {language === 'ta'
-                        ? 'கருத்தை சமர்ப்பிக்கவும் (Submit)'
-                        : 'Submit Feedback'}
-                    </span>
-                  </>
+            {/* Submit Button & Save Indicator */}
+            <div className="flex items-center justify-between flex-wrap gap-3 pt-2">
+              <div className="flex items-center gap-2">
+                {submitting && (
+                  <SavePulseIndicator
+                    status="saving"
+                    language={language}
+                    variant="pill"
+                    size="sm"
+                    customSavingLabel={
+                      language === 'ta' ? 'கருத்து சேமிக்கப்படுகிறது...' : 'Submitting feedback...'
+                    }
+                  />
                 )}
-              </button>
+                {submitSuccess && (
+                  <SavePulseIndicator
+                    status="saved"
+                    language={language}
+                    variant="pill"
+                    size="sm"
+                    customLabel={
+                      language === 'ta' ? 'கருத்து வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Feedback submitted successfully!'
+                    }
+                  />
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubject('');
+                    setMessage('');
+                    setRating(5);
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs sm:text-sm hover:bg-slate-50 transition-all"
+                >
+                  {language === 'ta' ? 'அழிக்க (Reset)' : 'Reset'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm shadow-md transition-all disabled:opacity-50"
+                >
+                  {submitting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>{language === 'ta' ? 'சமர்ப்பிக்கப்படுகிறது...' : 'Submitting...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>
+                        {language === 'ta'
+                          ? 'கருத்தை சமர்ப்பிக்கவும் (Submit)'
+                          : 'Submit Feedback'}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </form>
         </div>

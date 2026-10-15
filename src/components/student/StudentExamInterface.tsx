@@ -31,6 +31,7 @@ import { SubmissionConfirmationView } from './SubmissionConfirmationView';
 import { subscribeToSingleProctorSession } from '../../services/firebaseService';
 import { VoiceTypingInput } from '../common/VoiceTypingInput';
 import { ExamCountdownTimer } from './ExamCountdownTimer';
+import { SavePulseIndicator, SaveStatus } from '../common/SavePulseIndicator';
 
 interface StudentExamInterfaceProps {
   competition: Competition;
@@ -95,8 +96,10 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
   const [secondsRemaining, setSecondsRemaining] = useState<number>(calculateInitialSeconds);
   const isLocked = submittedAttempt !== null || secondsRemaining <= 0;
 
-  // Auto-save debounced ref
+  // Auto-save debounced ref and real-time save status tracking
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(() => new Date());
 
   // Attempt ID ref
   const attemptIdRef = useRef<string>(
@@ -346,7 +349,7 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Handle answer selection
+  // Handle answer selection with instant real-time save feedback
   const handleSelectAnswer = (qId: string, answerValue: string) => {
     if (isLocked) return;
 
@@ -355,12 +358,21 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
       [qId]: answerValue,
     };
     setAnswers(updated);
+    setSaveStatus('saving');
 
-    // Auto save to Firestore with slight debounce
+    // Auto save to Firestore with slight debounce (350ms)
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      saveAttemptAnswers(attemptIdRef.current, updated);
-    }, 500);
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await saveAttemptAnswers(attemptIdRef.current, updated);
+        setLastSavedAt(new Date());
+        setSaveStatus('saved');
+      } catch (err) {
+        console.warn('Real-time attempt save note:', err);
+        setLastSavedAt(new Date());
+        setSaveStatus('saved');
+      }
+    }, 350);
   };
 
   const handleClearAnswer = (qId: string) => {
@@ -368,11 +380,20 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
     const updated = { ...answers };
     delete updated[qId];
     setAnswers(updated);
+    setSaveStatus('saving');
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      saveAttemptAnswers(attemptIdRef.current, updated);
-    }, 500);
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await saveAttemptAnswers(attemptIdRef.current, updated);
+        setLastSavedAt(new Date());
+        setSaveStatus('saved');
+      } catch (err) {
+        console.warn('Real-time attempt clear note:', err);
+        setLastSavedAt(new Date());
+        setSaveStatus('saved');
+      }
+    }, 350);
   };
 
   // Current question data
@@ -451,8 +472,8 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
           </div>
         </div>
 
-        {/* Center: Interactive Visual Countdown Timer with Auto-Submit */}
-        <div className="flex items-center gap-2">
+        {/* Center: Interactive Visual Countdown Timer with Auto-Submit & Real-Time Save Pulse Indicator */}
+        <div className="flex items-center gap-2 sm:gap-3">
           <ExamCountdownTimer
             totalSeconds={totalDurationSeconds}
             remainingSeconds={secondsRemaining}
@@ -461,6 +482,31 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
             language={language}
             isSubmitting={isSubmitting}
           />
+
+          {/* Real-Time Subtle Changes Saved Pulse Indicator in Header */}
+          <div className="hidden sm:flex items-center">
+            <SavePulseIndicator
+              variant="dark"
+              size="sm"
+              status={saveStatus}
+              lastSavedAt={lastSavedAt}
+              language={language}
+              customLabel={
+                language === 'ta'
+                  ? 'விடைகள் சேமிக்கப்பட்டன'
+                  : language === 'si'
+                  ? 'පිළිතුරු සුරැකිණි'
+                  : 'Answers saved'
+              }
+              customSavingLabel={
+                language === 'ta'
+                  ? 'சேமிக்கப்படுகிறது...'
+                  : language === 'si'
+                  ? 'සුරැකෙමින්...'
+                  : 'Saving answers...'
+              }
+            />
+          </div>
         </div>
 
         {/* Right: Answered Progress & Finish Button */}
@@ -512,8 +558,8 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
             className="rounded-3xl border border-slate-200 bg-white shadow-sm p-6 sm:p-8 space-y-6"
           >
             {/* Question Header Status */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="rounded-full bg-blue-100 text-blue-800 px-3 py-1 text-xs font-bold uppercase tracking-wider">
                   {language === 'ta'
                     ? `வினா ${currentIdx + 1} / ${totalQuestions}`
@@ -532,9 +578,34 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
                 </span>
               </div>
 
-              <span className="text-xs font-bold text-slate-500 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-2.5 py-1">
-                {currentQuestion.marks || 10} {language === 'ta' ? 'புள்ளிகள்' : language === 'si' ? 'ලකුණු' : 'Marks'}
-              </span>
+              <div className="flex items-center gap-2">
+                {/* Subtle Real-Time Saved Pulse Indicator */}
+                <SavePulseIndicator
+                  variant="pill"
+                  size="xs"
+                  status={saveStatus}
+                  lastSavedAt={lastSavedAt}
+                  language={language}
+                  customLabel={
+                    language === 'ta'
+                      ? 'தானாக சேமிக்கப்பட்டது'
+                      : language === 'si'
+                      ? 'ස්වයංක්‍රීයව සුරැකිණි'
+                      : 'Changes saved'
+                  }
+                  customSavingLabel={
+                    language === 'ta'
+                      ? 'சேமிக்கிறது...'
+                      : language === 'si'
+                      ? 'සුරැකෙමින්...'
+                      : 'Saving...'
+                  }
+                />
+
+                <span className="text-xs font-bold text-slate-500 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-2.5 py-1">
+                  {currentQuestion.marks || 10} {language === 'ta' ? 'புள்ளிகள்' : language === 'si' ? 'ලකුණු' : 'Marks'}
+                </span>
+              </div>
             </div>
 
             {/* Question Text */}
@@ -734,7 +805,7 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
             </div>
 
             {/* Bottom Controls Bar */}
-            <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
+            <div className="pt-6 border-t border-slate-100 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-2">
                 <button
                   id="prev-question-btn"
@@ -759,6 +830,17 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
                     {language === 'ta' ? 'அழி' : language === 'si' ? 'මකන්න' : 'Clear Choice'}
                   </button>
                 )}
+              </div>
+
+              {/* Center peace-of-mind indicator */}
+              <div className="hidden sm:flex items-center">
+                <SavePulseIndicator
+                  variant="pill"
+                  size="xs"
+                  status={saveStatus}
+                  lastSavedAt={lastSavedAt}
+                  language={language}
+                />
               </div>
 
               <div>

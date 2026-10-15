@@ -8,63 +8,40 @@ import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/common/Header';
 import { Sidebar } from './components/common/Sidebar';
 import { AuthView } from './components/auth/AuthView';
-import { GraduationCap } from 'lucide-react';
 import { APP_LOGO } from './assets/logo';
 
-// Primary Landing Dashboard components (Imported directly for instant, fail-proof rendering)
+// Direct imports for ALL platform views (zero dynamic import delay, zero chunk failures)
 import { SuperAdminDashboard } from './components/superadmin/SuperAdminDashboard';
 import { AdminDashboardView } from './components/admin/AdminDashboardView';
 import { StudentDashboardView } from './components/student/StudentDashboardView';
 
-// Resilient Lazy Loader with auto-retry for secondary tabs
-function lazyWithRetry<T extends React.ComponentType<any>>(
-  factory: () => Promise<{ default: T }>,
-  retries = 3
-): React.LazyExoticComponent<T> {
-  return React.lazy(async () => {
-    for (let i = 0; i < retries; i++) {
-      try {
-        return await factory();
-      } catch (err: any) {
-        if (i === retries - 1) throw err;
-        await new Promise((resolve) => setTimeout(resolve, 500 * (i + 1)));
-      }
-    }
-    return factory();
-  });
-}
+import { AdminManagement } from './components/superadmin/AdminManagement';
+import { StudentManagement } from './components/superadmin/StudentManagement';
+import { CompetitionManagement } from './components/superadmin/CompetitionManagement';
+import { ResultsManagement } from './components/superadmin/ResultsManagement';
+import { SettingsView } from './components/superadmin/SettingsView';
 
-// Super Admin auxiliary components (Lazy-loaded with retry)
-const AdminManagement = lazyWithRetry(() => import('./components/superadmin/AdminManagement').then(m => ({ default: m.AdminManagement })));
-const StudentManagement = lazyWithRetry(() => import('./components/superadmin/StudentManagement').then(m => ({ default: m.StudentManagement })));
-const CompetitionManagement = lazyWithRetry(() => import('./components/superadmin/CompetitionManagement').then(m => ({ default: m.CompetitionManagement })));
-const ResultsManagement = lazyWithRetry(() => import('./components/superadmin/ResultsManagement').then(m => ({ default: m.ResultsManagement })));
-const SettingsView = lazyWithRetry(() => import('./components/superadmin/SettingsView').then(m => ({ default: m.SettingsView })));
+import { AdminCompetitionsView } from './components/admin/AdminCompetitionsView';
+import { StudentInfoView } from './components/admin/StudentInfoView';
+import { AdminResultsView } from './components/admin/AdminResultsView';
+import { AdminProfileView } from './components/admin/AdminProfileView';
+import { LiveProctorView } from './components/admin/LiveProctorView';
+import { SubjectAdminPortal } from './components/admin/SubjectAdminPortal';
 
-// Admin auxiliary components (Lazy-loaded with retry)
-const AdminCompetitionsView = lazyWithRetry(() => import('./components/admin/AdminCompetitionsView').then(m => ({ default: m.AdminCompetitionsView })));
-const StudentInfoView = lazyWithRetry(() => import('./components/admin/StudentInfoView').then(m => ({ default: m.StudentInfoView })));
-const AdminResultsView = lazyWithRetry(() => import('./components/admin/AdminResultsView').then(m => ({ default: m.AdminResultsView })));
-const AdminProfileView = lazyWithRetry(() => import('./components/admin/AdminProfileView').then(m => ({ default: m.AdminProfileView })));
-const LiveProctorView = lazyWithRetry(() => import('./components/admin/LiveProctorView').then(m => ({ default: m.LiveProctorView })));
+import { StudentCompetitionsView } from './components/student/StudentCompetitionsView';
+import { StudentResultsView } from './components/student/StudentResultsView';
+import { StudentProfileView } from './components/student/StudentProfileView';
+import { StudentExamInterface } from './components/student/StudentExamInterface';
+import { StudentReferralView } from './components/student/StudentReferralView';
+import { StudentAnnouncementsView } from './components/student/StudentAnnouncementsView';
+import { GameQuest } from './components/student/GameQuest';
+import { StudyGamesHub } from './components/student/StudyGamesHub';
+import { StudentFeedbackView } from './components/student/StudentFeedbackView';
+import { LeaderboardsHubView } from './components/leaderboard/LeaderboardsHubView';
 
-// Student auxiliary components (Lazy-loaded with retry)
-const StudentCompetitionsView = lazyWithRetry(() => import('./components/student/StudentCompetitionsView').then(m => ({ default: m.StudentCompetitionsView })));
-const StudentResultsView = lazyWithRetry(() => import('./components/student/StudentResultsView').then(m => ({ default: m.StudentResultsView })));
-const StudentProfileView = lazyWithRetry(() => import('./components/student/StudentProfileView').then(m => ({ default: m.StudentProfileView })));
-const StudentExamInterface = lazyWithRetry(() => import('./components/student/StudentExamInterface').then(m => ({ default: m.StudentExamInterface })));
-const StudentReferralView = lazyWithRetry(() => import('./components/student/StudentReferralView').then(m => ({ default: m.StudentReferralView })));
-const StudentAnnouncementsView = lazyWithRetry(() => import('./components/student/StudentAnnouncementsView').then(m => ({ default: m.StudentAnnouncementsView })));
-const GameQuest = lazyWithRetry(() => import('./components/student/GameQuest').then(m => ({ default: m.GameQuest })));
-const StudyGamesHub = lazyWithRetry(() => import('./components/student/StudyGamesHub').then(m => ({ default: m.StudyGamesHub })));
-const StudentFeedbackView = lazyWithRetry(() => import('./components/student/StudentFeedbackView').then(m => ({ default: m.StudentFeedbackView })));
-const LeaderboardsHubView = lazyWithRetry(() => import('./components/leaderboard/LeaderboardsHubView').then(m => ({ default: m.LeaderboardsHubView })));
-
-// Common & Auxiliary Management Views (Lazy-loaded with retry)
-const AnnouncementsManagementView = lazyWithRetry(() => import('./components/common/AnnouncementsManagementView').then(m => ({ default: m.AnnouncementsManagementView })));
-const SponsorsAndAdsView = lazyWithRetry(() => import('./components/admin/SponsorsAndAdsView').then(m => ({ default: m.SponsorsAndAdsView })));
-const AdminFeedbackView = lazyWithRetry(() => import('./components/admin/AdminFeedbackView').then(m => ({ default: m.AdminFeedbackView })));
-const SubjectAdminPortal = lazyWithRetry(() => import('./components/admin/SubjectAdminPortal').then(m => ({ default: m.SubjectAdminPortal })));
+import { AnnouncementsManagementView } from './components/common/AnnouncementsManagementView';
+import { SponsorsAndAdsView } from './components/admin/SponsorsAndAdsView';
+import { AdminFeedbackView } from './components/admin/AdminFeedbackView';
 
 // Session Security & Inactivity Timeout Warning
 import { SessionTimeoutWarning } from './components/common/SessionTimeoutWarning';
@@ -78,7 +55,7 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-class PortalErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class PortalErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -89,7 +66,7 @@ class PortalErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBound
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Portal ErrorBoundary caught an error:', error, errorInfo);
+    console.error('PortalErrorBoundary caught an error:', error, errorInfo);
   }
 
   handleReload = () => {
@@ -99,11 +76,6 @@ class PortalErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBound
 
   render() {
     if (this.state.hasError) {
-      const isChunkError =
-        this.state.error?.message?.includes('dynamically imported module') ||
-        this.state.error?.message?.includes('Failed to fetch') ||
-        this.state.error?.name === 'ChunkLoadError';
-
       return (
         <div className="w-full min-h-[400px] flex flex-col items-center justify-center p-6 text-center space-y-4 bg-white rounded-2xl border border-slate-200 shadow-sm my-4">
           <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center text-xl">
@@ -111,12 +83,14 @@ class PortalErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBound
           </div>
           <div className="max-w-md space-y-1">
             <h3 className="text-base font-bold text-slate-900">
-              {isChunkError ? 'பக்கம் புதுப்பிக்கப்பட வேண்டும் (Page Update Required)' : 'ஏதேனும் தவறு நேர்ந்துவிட்டது (Something went wrong)'}
+              பக்கத்தை ஏற்றுவதில் தற்காலிக இடையூறு (Display Notice)
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              {isChunkError
-                ? 'புதிய பதிப்பு தயாராக உள்ளது. பக்கத்தை மீண்டும் ஏற்றுவதன் மூலம் தடையின்றி தொடரலாம்.'
-                : 'A temporary display issue occurred while loading this view.'}
+              பக்கத்தை மீண்டும் ஏற்றுவதன் மூலம் தடையின்றி தொடரலாம்.
+              <br />
+              <span className="text-[11px] text-slate-500">
+                (A display issue occurred. Please click below to refresh and continue.)
+              </span>
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -141,20 +115,11 @@ class PortalErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBound
   }
 }
 
-const ViewSkeleton: React.FC = () => (
-  <div className="w-full min-h-[380px] flex flex-col items-center justify-center p-8 space-y-3 animate-in fade-in duration-150">
-    <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-    <span className="text-xs font-semibold text-slate-500">Loading view...</span>
-  </div>
-);
-
 const MainPortalArea: React.FC = () => {
   const {
     currentAuthUser,
     currentAdmin,
-    authLoading,
     currentPortal,
-    setCurrentPortal,
     superAdminNav,
     setSuperAdminNav,
     adminNav,
@@ -164,7 +129,6 @@ const MainPortalArea: React.FC = () => {
     activeExamComp,
     examSessionStage,
     exitActiveExam,
-    language,
   } = useApp();
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -181,36 +145,7 @@ const MainPortalArea: React.FC = () => {
     } catch {}
   }, [currentAuthUser?.uid]);
 
-  // 1. Loading State (Only shown for fresh visits, with instant skip action)
-  if (authLoading && !currentAuthUser) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
-        <img
-          src={APP_LOGO}
-          alt="HNC Competition"
-          className="w-16 h-16 rounded-2xl mb-4 animate-pulse shadow-xl border border-white/20 object-contain bg-white/10 p-1"
-          referrerPolicy="no-referrer"
-        />
-        <p className="text-white text-sm font-semibold tracking-wide">
-          HNC Competition • Initializing Secure Session...
-        </p>
-        <p className="text-slate-400 text-xs mt-1">Connecting to Firebase & Cloud Firestore</p>
-        <button
-          type="button"
-          onClick={() => {
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new Event('hnc_force_ready'));
-            }
-          }}
-          className="mt-4 px-3 py-1.5 text-xs text-blue-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 rounded-lg border border-slate-700 transition cursor-pointer"
-        >
-          {language === 'ta' ? 'உடனடியாக திறக்கவும் (Skip Wait)' : 'Open Directly'}
-        </button>
-      </div>
-    );
-  }
-
-  // 2. Unauthenticated State -> Show Real Firebase Auth Screen
+  // 1. Unauthenticated State -> Immediately show Auth / Login View without any blocking delay
   if (!currentAuthUser) {
     return <AuthView />;
   }
@@ -223,23 +158,21 @@ const MainPortalArea: React.FC = () => {
       ? currentPortal === 'student' ? 'student' : 'admin'
       : currentPortal;
 
-  // 3. Phase 4: Distraction-Free Student Exam Engine
+  // 2. Distraction-Free Student Exam Engine (Direct render, zero delay)
   if (effectivePortal === 'student' && activeExamComp && examSessionStage === 'taking') {
     return (
-      <React.Suspense fallback={<ViewSkeleton />}>
-        <StudentExamInterface
-          competition={activeExamComp}
-          onExit={exitActiveExam}
-          onViewResults={() => {
-            exitActiveExam();
-            setStudentNav('My Results');
-          }}
-        />
-      </React.Suspense>
+      <StudentExamInterface
+        competition={activeExamComp}
+        onExit={exitActiveExam}
+        onViewResults={() => {
+          exitActiveExam();
+          setStudentNav('My Results');
+        }}
+      />
     );
   }
 
-  // 4. Authenticated State -> Route by enforced role
+  // 3. Authenticated State -> Route by enforced role
   const renderActiveView = () => {
     switch (effectivePortal) {
       case 'super_admin':
@@ -272,7 +205,7 @@ const MainPortalArea: React.FC = () => {
 
       case 'admin': {
         const isSubjectAdmin =
-          currentAdmin.adminType === 'subject_admin' || Boolean(currentAdmin.assignedSubject);
+          currentAdmin?.adminType === 'subject_admin' || Boolean(currentAdmin?.assignedSubject);
 
         if (isSubjectAdmin) {
           const activeType: 'Quiz' | 'Exam' | 'Competition' =
@@ -336,6 +269,9 @@ const MainPortalArea: React.FC = () => {
           default:
             return <StudentDashboardView onNavigate={setStudentNav} />;
         }
+
+      default:
+        return <StudentDashboardView onNavigate={setStudentNav} />;
     }
   };
 
@@ -354,9 +290,7 @@ const MainPortalArea: React.FC = () => {
 
         <main id="portal-main-content" className="flex-1 p-3 sm:p-6 lg:p-8 min-w-0 w-full overflow-x-hidden">
           <PortalErrorBoundary>
-            <React.Suspense fallback={<ViewSkeleton />}>
-              {renderActiveView()}
-            </React.Suspense>
+            {renderActiveView()}
           </PortalErrorBoundary>
         </main>
       </div>
@@ -366,8 +300,12 @@ const MainPortalArea: React.FC = () => {
 
 export default function App() {
   return (
-    <AppProvider>
-      <MainPortalArea />
-    </AppProvider>
+    <PortalErrorBoundary>
+      <AppProvider>
+        <PortalErrorBoundary>
+          <MainPortalArea />
+        </PortalErrorBoundary>
+      </AppProvider>
+    </PortalErrorBoundary>
   );
 }
