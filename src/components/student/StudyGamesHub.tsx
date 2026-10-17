@@ -29,6 +29,8 @@ import {
   Gift,
   HelpCircle,
   Timer,
+  Lock,
+  RefreshCw,
 } from 'lucide-react';
 
 export type StudyGameTab = 'spin' | 'streak' | 'math' | 'focus';
@@ -237,32 +239,361 @@ const WHEEL_SECTORS: WheelSector[] = [
   { label: '+10 Pts', sublabel: 'Daily Gift', points: 10, color: '#14B8A6', textColor: '#ffffff', icon: '🎁' },
 ];
 
+// Local calendar date key (YYYY-MM-DD) matching user's real calendar date
+const getLocalTodayKey = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+export type GradeTier =
+  | 'primary_early' // Gr 1 - 2 (ஆரம்ப பிரிவு 1)
+  | 'primary_late'  // Gr 3 - 5 (புலமைப்பரிசில் பிரிவு)
+  | 'junior'        // Gr 6 - 9 (இடைநிலைப் பிரிவு)
+  | 'senior'        // Gr 10 - 11 (சாதாரண தரம் O/L)
+  | 'advanced';     // Gr 12 - 13 (உயர் தரம் A/L)
+
+export const parseGradeToTier = (gradeStr?: string): GradeTier => {
+  if (!gradeStr) return 'junior';
+  const s = gradeStr.toLowerCase().trim();
+  if (
+    s.includes('grade 1') ||
+    s.includes('grade 01') ||
+    s.includes('grade 2') ||
+    s.includes('grade 02') ||
+    s.includes('தரம் 1') ||
+    s.includes('தரம் 01') ||
+    s.includes('தரம் 2') ||
+    s.includes('தரம் 02') ||
+    s.includes('gr 1') ||
+    s.includes('gr 2') ||
+    s === 'grade 1' ||
+    s === 'grade 2'
+  ) {
+    return 'primary_early';
+  }
+  if (
+    s.includes('grade 3') ||
+    s.includes('grade 03') ||
+    s.includes('grade 4') ||
+    s.includes('grade 04') ||
+    s.includes('grade 5') ||
+    s.includes('grade 05') ||
+    s.includes('தரம் 3') ||
+    s.includes('தரம் 4') ||
+    s.includes('தரம் 5') ||
+    s.includes('scholarship') ||
+    s.includes('புலமைப்பரிசில்')
+  ) {
+    return 'primary_late';
+  }
+  if (
+    s.includes('grade 10') ||
+    s.includes('grade 11') ||
+    s.includes('தரம் 10') ||
+    s.includes('தரம் 11') ||
+    s.includes('o/l') ||
+    s.includes('ol')
+  ) {
+    return 'senior';
+  }
+  if (
+    s.includes('grade 12') ||
+    s.includes('grade 13') ||
+    s.includes('தரம் 12') ||
+    s.includes('தரம் 13') ||
+    s.includes('a/l') ||
+    s.includes('al') ||
+    s.includes('advanced')
+  ) {
+    return 'advanced';
+  }
+  return 'junior';
+};
+
+export const GRADE_TIERS_META: Record<
+  GradeTier,
+  {
+    nameTa: string;
+    nameEn: string;
+    icon: string;
+    badgeColor: string;
+    descTa: string;
+    descEn: string;
+  }
+> = {
+  primary_early: {
+    nameTa: 'தரம் 01 - 02 (ஆரம்ப நிலை)',
+    nameEn: 'Grade 01 - 02 (Early Primary)',
+    icon: '🌱',
+    badgeColor: 'bg-emerald-500 text-white border-emerald-400',
+    descTa: 'எளிய ஒற்றை இலக்க கூட்டல்/கழித்தல் & எளிய வண்ணப் புதிர்கள்',
+    descEn: 'Single-digit arithmetic & fun visual logic for young kids',
+  },
+  primary_late: {
+    nameTa: 'தரம் 03 - 05 (புலமைப்பரிசில்)',
+    nameEn: 'Grade 03 - 05 (Scholarship)',
+    icon: '🌿',
+    badgeColor: 'bg-teal-600 text-white border-teal-400',
+    descTa: 'இரட்டை இலக்க கணக்குகள், வாய்ப்பாடுகள் & புலமைப்பரிசில் நுண்ணறிவு',
+    descEn: 'Double-digit arithmetic, multiplication tables & scholarship logic',
+  },
+  junior: {
+    nameTa: 'தரம் 06 - 09 (இடைநிலைப் பிரிவு)',
+    nameEn: 'Grade 06 - 09 (Junior Secondary)',
+    icon: '📘',
+    badgeColor: 'bg-blue-600 text-white border-blue-400',
+    descTa: 'இருபடி எண்கள், வகுத்தல், அடிப்படை இயற்கணிதம் & அறிவியல்',
+    descEn: 'Squares, division, rapid order of operations & junior science',
+  },
+  senior: {
+    nameTa: 'தரம் 10 - 11 (சாதாரண தரம் O/L)',
+    nameEn: 'Grade 10 - 11 (G.C.E. O/L)',
+    icon: '🎓',
+    badgeColor: 'bg-indigo-600 text-white border-indigo-400',
+    descTa: 'வர்க்கமூலம், சதவீதங்கள், O/L கணிதம் & தர்க்க சிந்தனை',
+    descEn: 'Square roots, percentages, fast mental algebra & O/L logic',
+  },
+  advanced: {
+    nameTa: 'தரம் 12 - 13 (உயர் தரம் A/L)',
+    nameEn: 'Grade 12 - 13 (G.C.E. A/L)',
+    icon: '🚀',
+    badgeColor: 'bg-purple-600 text-white border-purple-400',
+    descTa: 'A/L வேகக் கணக்கீடுகள், அடுக்குகளின் மதிப்பு & உயர்நிலை அறிவியல் தர்க்கம்',
+    descEn: 'A/L rapid powers, higher roots, calculus aptitude & advanced puzzles',
+  },
+};
+
+export const DAILY_QUESTIONS_BY_TIER: Record<
+  GradeTier,
+  Array<{
+    id: string;
+    questionTa: string;
+    questionEn: string;
+    options: string[];
+    correctIndex: number;
+    explanation: string;
+  }>
+> = {
+  primary_early: [
+    {
+      id: 'pe1',
+      questionTa: 'ஒரு பசுவிற்கு (Cow) எத்தனை கால்கள் உள்ளன?',
+      questionEn: 'How many legs does a cow have?',
+      options: ['2', '4', '6', '8'],
+      correctIndex: 1,
+      explanation: 'பசுவிற்கு 4 கால்கள் உள்ளன! (A cow has 4 legs!)',
+    },
+    {
+      id: 'pe2',
+      questionTa: '1, 2, 3, 4, 5 — அடுத்து வரும் எண் எது?',
+      questionEn: '1, 2, 3, 4, 5 — What number comes next?',
+      options: ['6', '7', '8', '4'],
+      correctIndex: 0,
+      explanation: '5-க்கு அடுத்து வரும் எண் 6! (The next number is 6!)',
+    },
+    {
+      id: 'pe3',
+      questionTa: 'பந்து போல் வட்ட வடிவமான பழம் எது?',
+      questionEn: 'Which fruit is round like a ball?',
+      options: ['ஆரஞ்சு (Orange)', 'வாழைப்பழம் (Banana)', 'அன்னாசி (Pineapple)', 'வெள்ளரி (Cucumber)'],
+      correctIndex: 0,
+      explanation: 'ஆரஞ்சு உருண்டையான வட்ட வடிவம் கொண்டது! (An orange is round!)',
+    },
+  ],
+  primary_late: [
+    {
+      id: 'pl1',
+      questionTa: 'தொடரில் அடுத்த எண் என்ன: 5, 10, 15, 20, ?',
+      questionEn: 'What is the next number in the pattern: 5, 10, 15, 20, ?',
+      options: ['25', '30', '22', '24'],
+      correctIndex: 0,
+      explanation: 'ஒவ்வொரு எண்ணும் 5 கூடுகிறது: 20 + 5 = 25! (Increases by 5!)',
+    },
+    {
+      id: 'pl2',
+      questionTa: 'ஒரு வாரத்தில் 7 நாட்கள் எனில், 4 வாரங்களில் எத்தனை நாட்கள் உள்ளன?',
+      questionEn: 'If 1 week has 7 days, how many days are there in 4 weeks?',
+      options: ['28', '30', '24', '32'],
+      correctIndex: 0,
+      explanation: '4 × 7 = 28 நாட்கள்! (4 × 7 = 28 days!)',
+    },
+    {
+      id: 'pl3',
+      questionTa: 'கடிகாரத்தில் முட்கள் சரியாக 3:00 மணியைக் காட்டும்போது உருவாகும் கோணம் என்ன?',
+      questionEn: 'What angle is formed by the clock hands at exactly 3:00?',
+      options: ['செங்கோணம் (90° Right Angle)', 'விரிகோணம் (120°)', 'குறுகோணம் (45°)', 'நேர்கோடு (180°)'],
+      correctIndex: 0,
+      explanation: '3:00 மணிக்கு உருவாகும் கோணம் 90° செங்கோணம் ஆகும்! (90° Right Angle)',
+    },
+  ],
+  junior: [
+    {
+      id: 'j1',
+      questionTa: 'தொடரில் அடுத்த எண் என்ன: 2, 4, 8, 16, ?',
+      questionEn: 'What is the next number in the pattern: 2, 4, 8, 16, ?',
+      options: ['32', '24', '30', '64'],
+      correctIndex: 0,
+      explanation: 'ஒவ்வொரு எண்ணும் 2-ஆல் பெருக்கப்படுகிறது: 16 × 2 = 32! (Doubling pattern)',
+    },
+    {
+      id: 'j2',
+      questionTa: 'கடல் மட்டத்தில் தூய நீரின் கொதிநிலை (Boiling Point of water) என்ன?',
+      questionEn: 'What is the boiling point of pure water at standard sea level?',
+      options: ['100°C', '0°C', '50°C', '120°C'],
+      correctIndex: 0,
+      explanation: 'கடல் மட்டத்தில் நீரின் கொதிநிலை 100°C ஆகும்! (100°C boiling point)',
+    },
+    {
+      id: 'j3',
+      questionTa: 'ஒரு முக்கோணத்தின் மூன்று உட்கோணங்களின் கூட்டுத்தொகை எவ்வளவு?',
+      questionEn: 'What is the sum of all three interior angles of a triangle?',
+      options: ['180°', '360°', '90°', '270°'],
+      correctIndex: 0,
+      explanation: 'எந்தவொரு முக்கோணத்தின் உட்கோணங்களின் கூட்டுத்தொகை 180° ஆகும்!',
+    },
+  ],
+  senior: [
+    {
+      id: 's1',
+      questionTa: 'ஒரு மட்டையும் பந்தும் சேர்த்து $1.10. மட்டையின் விலை பந்தை விட $1.00 அதிகம் என்றால், பந்தின் விலை எவ்வளவு?',
+      questionEn: 'A bat and ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost?',
+      options: ['$0.05', '$0.10', '$0.15', '$0.01'],
+      correctIndex: 0,
+      explanation: 'பந்து = $0.05, மட்டை = $1.05. மொத்தம் = $1.10! (Ball = $0.05)',
+    },
+    {
+      id: 's2',
+      questionTa: 'தொடரில் அடுத்த எண் என்ன: 2, 6, 12, 20, 30, ?',
+      questionEn: 'What is the next number in the pattern: 2, 6, 12, 20, 30, ?',
+      options: ['42', '40', '36', '48'],
+      correctIndex: 0,
+      explanation: 'வித்தியாசம்: +4, +6, +8, +10, +12 => 30 + 12 = 42!',
+    },
+    {
+      id: 's3',
+      questionTa: 'வெற்றிடத்தில் ஒளியின் வேகம் (Speed of light in vacuum) தோராயமாக எவ்வளவு?',
+      questionEn: 'Approximately what is the speed of light in a vacuum?',
+      options: ['3 × 10⁸ m/s', '3 × 10⁶ m/s', '3 × 10¹⁰ m/s', '330 m/s'],
+      correctIndex: 0,
+      explanation: 'ஒளியின் வேகம் c ≈ 3 × 10⁸ m/s (300,000 km/s)!',
+    },
+  ],
+  advanced: [
+    {
+      id: 'a1',
+      questionTa: 'ஒரு சமச்சீரான நாணயத்தை 3 முறை சுண்டும் போது, சரியாக 2 தலைகள் (Exactly 2 Heads) கிடைப்பதற்கான நிகழ்தகவு என்ன?',
+      questionEn: 'When tossing a fair coin 3 times, what is the probability of getting exactly 2 heads?',
+      options: ['3/8 (0.375)', '1/2 (0.500)', '1/4 (0.250)', '5/8 (0.625)'],
+      correctIndex: 0,
+      explanation: 'மொத்த நிலைகள் = 8. (HHT, HTH, THH) = 3 நிலைகள். நிகழ்தகவு = 3/8!',
+    },
+    {
+      id: 'a2',
+      questionTa: 'சார்பு f(x) = x³ - 3x² + 5 எனில், x = 2-ல் அதன் முதலாம் வகைக்கெழு f\'(2) மதிப்பு என்ன?',
+      questionEn: 'If f(x) = x³ - 3x² + 5, what is the value of the derivative f\'(2)?',
+      options: ['0', '4', '-2', '12'],
+      correctIndex: 0,
+      explanation: 'f\'(x) = 3x² - 6x. x=2 எனில், 3(4) - 6(2) = 12 - 12 = 0!',
+    },
+    {
+      id: 'a3',
+      questionTa: 'சூரிய ஒளி பூமியை வந்தடைய சராசரியாக எத்தனை நிமிடங்கள் ஆகிறது?',
+      questionEn: 'Approximately how many minutes does sunlight take to reach Earth?',
+      options: ['8 நிமிடங்கள் 20 விநாடிகள்', '3 நிமிடங்கள்', '12 நிமிடங்கள்', 'உடனடியாக (0s)'],
+      correctIndex: 0,
+      explanation: 'சூரிய ஒளி ~150 மில்லியன் கி.மீ பயணித்து பூமியை அடைய 8 நிமிடம் 20 விநாடிகள் (~500s) ஆகும்!',
+    },
+  ],
+};
+
 export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin', onNavigate }) => {
   const { currentStudent, currentAuthUser, adjustStudentPoints, language } = useApp();
   const [activeTab, setActiveTab] = useState<StudyGameTab>(initialTab);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   const studentUid = currentAuthUser?.uid || currentStudent?.id || 'guest';
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const studentId = currentAuthUser?.studentId || currentStudent?.studentId || '';
+  const todayKey = getLocalTodayKey();
+
+  // Student Enrolled Grade Tier (Defaults to student's enrolled grade, allows toggle)
+  const studentEnrolledGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 6';
+  const [selectedGradeTier, setSelectedGradeTier] = useState<GradeTier>(() =>
+    parseGradeToTier(studentEnrolledGrade)
+  );
 
   // ----------------------------------------------------
-  // 1. LUCKY SPIN WHEEL STATE
+  // 1. LUCKY SPIN WHEEL STATE & AIRTIGHT 24-HOUR LOCKOUT
   // ----------------------------------------------------
   const [isSpinning, setIsSpinning] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
   const [wonPrize, setWonPrize] = useState<WheelSector | null>(null);
-  const [hasSpunToday, setHasSpunToday] = useState(false);
+
+  const checkHasSpunToday = () => {
+    if (typeof window === 'undefined') return false;
+    const currentToday = getLocalTodayKey();
+    const isToday = (d?: string | null) => Boolean(d && (d === currentToday || d.startsWith(currentToday)));
+
+    if (isToday(currentAuthUser?.lastSpinDate)) return true;
+    if (isToday(currentStudent?.lastSpinDate)) return true;
+    if (studentUid && localStorage.getItem(`hnc_spin_date_${studentUid}`) === currentToday) return true;
+    if (studentId && localStorage.getItem(`hnc_spin_date_${studentId}`) === currentToday) return true;
+    if (localStorage.getItem('hnc_spin_date_last') === currentToday) return true;
+
+    const ts = localStorage.getItem('hnc_spin_last_timestamp');
+    if (ts) {
+      const spinTime = parseInt(ts, 10);
+      if (!isNaN(spinTime)) {
+        const d = new Date(spinTime);
+        const now = new Date();
+        if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  const [hasSpunToday, setHasSpunToday] = useState<boolean>(() => checkHasSpunToday());
   const [spinToast, setSpinToast] = useState<string | null>(null);
 
+  // Live countdown to midnight when the next free spin unlocks
+  const [timeUntilTomorrow, setTimeUntilTomorrow] = useState<string>('');
   useEffect(() => {
-    const lastSpinDate = localStorage.getItem(`hnc_spin_date_${studentUid}`);
-    if (lastSpinDate === todayKey) {
+    const updateCountdown = () => {
+      const now = new Date();
+      const tomorrowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
+      const diff = Math.max(0, tomorrowMidnight.getTime() - now.getTime());
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeUntilTomorrow(`${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`);
+    };
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Multi-layer check for daily spin eligibility across Firestore session & localStorage
+  useEffect(() => {
+    if (checkHasSpunToday()) {
       setHasSpunToday(true);
     }
-  }, [studentUid, todayKey]);
+  }, [
+    currentAuthUser?.uid,
+    currentAuthUser?.lastSpinDate,
+    currentAuthUser?.studentId,
+    currentStudent?.lastSpinDate,
+    studentUid,
+    studentId,
+    todayKey,
+  ]);
 
   const handleSpinWheel = async () => {
-    if (isSpinning) return;
+    // Strictly prevent any spin if already spinning or already claimed today
+    if (isSpinning || hasSpunToday) return;
 
     setIsSpinning(true);
     setWonPrize(null);
@@ -271,11 +602,29 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
     const sectorCount = WHEEL_SECTORS.length;
     const chosenIndex = Math.floor(Math.random() * sectorCount);
     const sectorAngle = 360 / sectorCount;
+    const sector = WHEEL_SECTORS[chosenIndex];
 
     // 5 to 7 full rotations plus offset to center chosen sector under top indicator (270 deg)
     const extraRotations = (5 + Math.floor(Math.random() * 3)) * 360;
     const targetOffset = 360 - (chosenIndex * sectorAngle + sectorAngle / 2);
     const finalRotation = wheelRotation + extraRotations + targetOffset;
+
+    // IMMEDIATE AIRTIGHT LOCKOUT: Write to localStorage & React state before animation begins
+    const currentToday = getLocalTodayKey();
+    if (studentUid) localStorage.setItem(`hnc_spin_date_${studentUid}`, currentToday);
+    if (studentId) localStorage.setItem(`hnc_spin_date_${studentId}`, currentToday);
+    localStorage.setItem('hnc_spin_date_last', currentToday);
+    localStorage.setItem('hnc_spin_last_timestamp', String(Date.now()));
+    setHasSpunToday(true);
+
+    // Credit student points immediately to AppContext & Cloud Firestore
+    if (adjustStudentPoints) {
+      adjustStudentPoints(
+        studentUid,
+        sector.points,
+        `Daily Lucky Spin Reward: ${sector.label} (${currentToday})`
+      ).catch((err) => console.error('Error awarding spin points:', err));
+    }
 
     if (soundEnabled) {
       // Audio ticks
@@ -289,12 +638,9 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
 
     setWheelRotation(finalRotation);
 
-    setTimeout(async () => {
+    setTimeout(() => {
       setIsSpinning(false);
-      const sector = WHEEL_SECTORS[chosenIndex];
       setWonPrize(sector);
-      localStorage.setItem(`hnc_spin_date_${studentUid}`, todayKey);
-      setHasSpunToday(true);
 
       if (soundEnabled) {
         audio.playWin();
@@ -306,24 +652,13 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
         origin: { y: 0.6 },
       });
 
-      // Credit student points
-      if (adjustStudentPoints && studentUid) {
-        try {
-          await adjustStudentPoints(
-            studentUid,
-            sector.points,
-            `Daily Lucky Spin Reward: ${sector.label} (${todayKey})`
-          );
-          setSpinToast(
-            language === 'ta'
-              ? `வெற்றி! +${sector.points} புள்ளிகள் உங்கள் கணக்கில் சேர்க்கப்பட்டது!`
-              : `Awesome! +${sector.points} points credited to your profile!`
-          );
-          setTimeout(() => setSpinToast(null), 5000);
-        } catch {
-          // Point fallback
-        }
-      }
+      const updatedPoints = (currentStudent?.referralPoints ?? currentAuthUser?.referralPoints ?? 0) + sector.points;
+      setSpinToast(
+        language === 'ta'
+          ? `🎉 வெற்றி! +${sector.points} புள்ளிகள் உங்கள் டாஷ்போர்டில் சேர்க்கப்பட்டது! (மொத்த புள்ளிகள்: ${updatedPoints} PTS)`
+          : `🎉 Awesome! +${sector.points} points credited to your dashboard! (Total: ${updatedPoints} PTS)`
+      );
+      setTimeout(() => setSpinToast(null), 6000);
     }, 4500);
   };
 
@@ -338,32 +673,8 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
   const [workoutCompleted, setWorkoutCompleted] = useState(false);
   const [workoutScore, setWorkoutScore] = useState(0);
 
-  const DAILY_QUESTIONS = [
-    {
-      id: 'q1',
-      questionTa: 'ஒரு மட்டையும் பந்தும் சேர்த்து $1.10. மட்டையின் விலை பந்தை விட $1.00 அதிகம் என்றால், பந்தின் விலை எவ்வளவு?',
-      questionEn: 'A bat and ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost?',
-      options: ['$0.10', '$0.05', '$0.15', '$0.01'],
-      correctIndex: 1, // $0.05
-      explanation: 'Ball = $0.05, Bat = $1.05. Total = $1.10!',
-    },
-    {
-      id: 'q2',
-      questionTa: 'தொடரில் அடுத்த எண் என்ன: 2, 6, 12, 20, 30, ?',
-      questionEn: 'What is the next number in the pattern: 2, 6, 12, 20, 30, ?',
-      options: ['40', '42', '36', '48'],
-      correctIndex: 1, // 42 (+4, +6, +8, +10, +12)
-      explanation: 'Differences increase by 2: +4, +6, +8, +10, +12 -> 30 + 12 = 42!',
-    },
-    {
-      id: 'q3',
-      questionTa: 'சூரிய ஒளி பூமியை வந்தடைய சராசரியாக எத்தனை நிமிடங்கள் ஆகிறது?',
-      questionEn: 'Approximately how many minutes does sunlight take to reach Earth?',
-      options: ['3 நிமிடங்கள் (min)', '8 நிமிடங்கள் (min)', '12 நிமிடங்கள் (min)', 'உடனடியாக (0s)'],
-      correctIndex: 1, // ~8 minutes 20 seconds
-      explanation: 'Sunlight travels ~150M km at the speed of light, taking approx 8 minutes and 20 seconds!',
-    },
-  ];
+  // Active question set dynamically adapted to student's chosen Grade Tier!
+  const activeQuestions = DAILY_QUESTIONS_BY_TIER[selectedGradeTier] || DAILY_QUESTIONS_BY_TIER.junior;
 
   useEffect(() => {
     // Load and update streak
@@ -402,7 +713,8 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
   }, [workoutStarted, workoutCompleted, workoutTimer]);
 
   const handleAnswerWorkout = (selectedIdx: number) => {
-    const isCorrect = selectedIdx === DAILY_QUESTIONS[currentQuestionIndex].correctIndex;
+    const currentQ = activeQuestions[currentQuestionIndex] || activeQuestions[0];
+    const isCorrect = selectedIdx === currentQ.correctIndex;
     if (soundEnabled) {
       if (isCorrect) audio.playCorrect();
       else audio.playIncorrect();
@@ -411,26 +723,26 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
     const updated = [...workoutAnswers, selectedIdx];
     setWorkoutAnswers(updated);
 
-    if (currentQuestionIndex + 1 < DAILY_QUESTIONS.length) {
+    if (currentQuestionIndex + 1 < activeQuestions.length) {
       setCurrentQuestionIndex((prev) => prev + 1);
     } else {
       // Calculate score
       let score = 0;
-      DAILY_QUESTIONS.forEach((q, idx) => {
+      activeQuestions.forEach((q, idx) => {
         if (updated[idx] === q.correctIndex) score++;
       });
       setWorkoutScore(score);
       setWorkoutCompleted(true);
       setWorkoutStarted(false);
 
-      if (score === DAILY_QUESTIONS.length) {
+      if (score === activeQuestions.length) {
         confetti({ particleCount: 80, spread: 60 });
         if (adjustStudentPoints && studentUid) {
-          adjustStudentPoints(studentUid, 30, 'Daily 1-Minute Brain Workout: 100% Correct!');
+          adjustStudentPoints(studentUid, 30, `Daily 1-Minute Brain Workout: 100% (${selectedGradeTier})`);
         }
       } else if (score > 0) {
         if (adjustStudentPoints && studentUid) {
-          adjustStudentPoints(studentUid, score * 10, 'Daily Brain Workout Participation');
+          adjustStudentPoints(studentUid, score * 10, `Daily Brain Workout Participation (${selectedGradeTier})`);
         }
       }
     }
@@ -442,17 +754,29 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
   };
 
   // ----------------------------------------------------
-  // 3. SPEED MATH RUSH STATE
+  // 3. GRADE-DIFFERENTIATED SPEED MATH RUSH STATE
   // ----------------------------------------------------
   const [mathPlaying, setMathPlaying] = useState(false);
   const [mathTimer, setMathTimer] = useState(60);
   const [mathScore, setMathScore] = useState(0);
   const [mathCombo, setMathCombo] = useState(0);
-  const [mathQuestion, setMathQuestion] = useState<{ num1: number; num2: number; op: string; answer: number }>({
-    num1: 7,
-    num2: 8,
-    op: '×',
-    answer: 56,
+
+  interface MathQuestionData {
+    num1: number | string;
+    num2?: number | string;
+    op: string;
+    answer: number;
+    displayText: string;
+    options: number[];
+  }
+
+  const [mathQuestion, setMathQuestion] = useState<MathQuestionData>({
+    num1: 3,
+    num2: 2,
+    op: '+',
+    answer: 5,
+    displayText: '3 + 2 = ?',
+    options: [5, 4, 6, 7],
   });
   const [mathInput, setMathInput] = useState('');
   const [mathHighScore, setMathHighScore] = useState(() => {
@@ -460,28 +784,202 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
   });
   const [mathFeedback, setMathFeedback] = useState<'correct' | 'wrong' | null>(null);
 
-  const generateMathQuestion = () => {
-    const ops = ['+', '-', '×'];
-    const op = ops[Math.floor(Math.random() * ops.length)];
-    let num1 = 0;
-    let num2 = 0;
-    let answer = 0;
+  // Helper to build 4 unique randomized options around correct answer
+  const buildOptions = (correct: number): number[] => {
+    const set = new Set<number>();
+    set.add(correct);
+    const deltas = [-1, 1, -2, 2, -3, 3, 5, -5];
+    for (const d of deltas) {
+      if (set.size >= 4) break;
+      const c = correct + d;
+      if (c >= 0) set.add(c);
+    }
+    while (set.size < 4) {
+      set.add(correct + Math.floor(Math.random() * 6) + 1);
+    }
+    return Array.from(set).sort(() => Math.random() - 0.5);
+  };
 
-    if (op === '+') {
-      num1 = Math.floor(Math.random() * 40) + 10;
-      num2 = Math.floor(Math.random() * 40) + 10;
-      answer = num1 + num2;
-    } else if (op === '-') {
-      num1 = Math.floor(Math.random() * 50) + 20;
-      num2 = Math.floor(Math.random() * (num1 - 5)) + 5;
-      answer = num1 - num2;
+  const generateMathQuestion = (tier: GradeTier = selectedGradeTier) => {
+    let num1: number | string = 0;
+    let num2: number | string = 0;
+    let op = '+';
+    let answer = 0;
+    let displayText = '';
+
+    if (tier === 'primary_early') {
+      // Grade 1 - 2: Single-digit addition and subtraction (sums up to 10, no negatives)
+      const isAdd = Math.random() > 0.45;
+      if (isAdd) {
+        op = '+';
+        const n1 = Math.floor(Math.random() * 5) + 1; // 1 to 5
+        const n2 = Math.floor(Math.random() * 5) + 1; // 1 to 5
+        answer = n1 + n2;
+        num1 = n1;
+        num2 = n2;
+        displayText = `${n1} + ${n2} = ?`;
+      } else {
+        op = '-';
+        const n1 = Math.floor(Math.random() * 6) + 4; // 4 to 9
+        const n2 = Math.floor(Math.random() * (n1 - 1)) + 1; // 1 to n1-1
+        answer = n1 - n2;
+        num1 = n1;
+        num2 = n2;
+        displayText = `${n1} - ${n2} = ?`;
+      }
+    } else if (tier === 'primary_late') {
+      // Grade 3 - 5: 2-digit sums, multiplication tables 2-9, clean division
+      const ops = ['+', '-', '×', '÷'];
+      op = ops[Math.floor(Math.random() * ops.length)];
+      if (op === '+') {
+        const n1 = Math.floor(Math.random() * 35) + 12;
+        const n2 = Math.floor(Math.random() * 35) + 10;
+        answer = n1 + n2;
+        num1 = n1;
+        num2 = n2;
+        displayText = `${n1} + ${n2} = ?`;
+      } else if (op === '-') {
+        const n1 = Math.floor(Math.random() * 50) + 30;
+        const n2 = Math.floor(Math.random() * 25) + 10;
+        answer = n1 - n2;
+        num1 = n1;
+        num2 = n2;
+        displayText = `${n1} - ${n2} = ?`;
+      } else if (op === '×') {
+        const n1 = Math.floor(Math.random() * 7) + 3; // 3 to 9
+        const n2 = Math.floor(Math.random() * 7) + 3; // 3 to 9
+        answer = n1 * n2;
+        num1 = n1;
+        num2 = n2;
+        displayText = `${n1} × ${n2} = ?`;
+      } else {
+        const divisor = Math.floor(Math.random() * 7) + 2; // 2 to 8
+        const quotient = Math.floor(Math.random() * 8) + 2; // 2 to 9
+        const dividend = divisor * quotient;
+        answer = quotient;
+        num1 = dividend;
+        num2 = divisor;
+        displayText = `${dividend} ÷ ${divisor} = ?`;
+      }
+    } else if (tier === 'junior') {
+      // Grade 6 - 9: 2-digit multiplication, division, squares up to 15
+      const ops = ['+', '-', '×', '÷', 'x²'];
+      op = ops[Math.floor(Math.random() * ops.length)];
+      if (op === 'x²') {
+        const n1 = Math.floor(Math.random() * 9) + 7; // 7 to 15
+        answer = n1 * n1;
+        num1 = n1;
+        num2 = '';
+        displayText = `${n1}² = ?`;
+      } else if (op === '×') {
+        const n1 = Math.floor(Math.random() * 8) + 12; // 12 to 19
+        const n2 = Math.floor(Math.random() * 6) + 4; // 4 to 9
+        answer = n1 * n2;
+        num1 = n1;
+        num2 = n2;
+        displayText = `${n1} × ${n2} = ?`;
+      } else if (op === '÷') {
+        const divisor = Math.floor(Math.random() * 8) + 4; // 4 to 11
+        const quotient = Math.floor(Math.random() * 9) + 6; // 6 to 14
+        const dividend = divisor * quotient;
+        answer = quotient;
+        num1 = dividend;
+        num2 = divisor;
+        displayText = `${dividend} ÷ ${divisor} = ?`;
+      } else if (op === '+') {
+        const n1 = Math.floor(Math.random() * 50) + 45;
+        const n2 = Math.floor(Math.random() * 50) + 35;
+        answer = n1 + n2;
+        num1 = n1;
+        num2 = n2;
+        displayText = `${n1} + ${n2} = ?`;
+      } else {
+        const n1 = Math.floor(Math.random() * 80) + 70;
+        const n2 = Math.floor(Math.random() * 40) + 25;
+        answer = n1 - n2;
+        num1 = n1;
+        num2 = n2;
+        displayText = `${n1} - ${n2} = ?`;
+      }
+    } else if (tier === 'senior') {
+      // Grade 10 - 11 (O/L): fast mental arithmetic, square roots, squares, percentages
+      const ops = ['×', 'x²', '√x', '%'];
+      op = ops[Math.floor(Math.random() * ops.length)];
+      if (op === '√x') {
+        const roots = [121, 144, 169, 196, 225, 256, 289, 324, 361, 400, 625];
+        const val = roots[Math.floor(Math.random() * roots.length)];
+        answer = Math.round(Math.sqrt(val));
+        num1 = val;
+        num2 = '';
+        displayText = `√${val} = ?`;
+      } else if (op === '%') {
+        const pcts = [10, 20, 25, 50, 15];
+        const bases = [120, 160, 200, 240, 300, 400];
+        const p = pcts[Math.floor(Math.random() * pcts.length)];
+        const b = bases[Math.floor(Math.random() * bases.length)];
+        answer = (p * b) / 100;
+        num1 = p;
+        num2 = b;
+        displayText = `${p}% of ${b} = ?`;
+      } else if (op === 'x²') {
+        const n1 = Math.floor(Math.random() * 12) + 13; // 13 to 24
+        answer = n1 * n1;
+        num1 = n1;
+        num2 = '';
+        displayText = `${n1}² = ?`;
+      } else {
+        const n1 = Math.floor(Math.random() * 9) + 14; // 14 to 22
+        const n2 = Math.floor(Math.random() * 6) + 11; // 11 to 16
+        answer = n1 * n2;
+        num1 = n1;
+        num2 = n2;
+        displayText = `${n1} × ${n2} = ?`;
+      }
     } else {
-      num1 = Math.floor(Math.random() * 12) + 2;
-      num2 = Math.floor(Math.random() * 12) + 2;
-      answer = num1 * num2;
+      // Grade 12 - 13 (A/L): Advanced rapid arithmetic, 2ⁿ powers, percentages, roots
+      const ops = ['×', '2ⁿ', '√x', '%', 'x²'];
+      op = ops[Math.floor(Math.random() * ops.length)];
+      if (op === '2ⁿ') {
+        const exps = [4, 5, 6, 7, 8, 9];
+        const exp = exps[Math.floor(Math.random() * exps.length)];
+        answer = Math.pow(2, exp);
+        num1 = 2;
+        num2 = exp;
+        displayText = `2^${exp} (2ⁿ) = ?`;
+      } else if (op === '√x') {
+        const roots = [576, 625, 729, 784, 900, 1024, 1296];
+        const val = roots[Math.floor(Math.random() * roots.length)];
+        answer = Math.round(Math.sqrt(val));
+        num1 = val;
+        num2 = '';
+        displayText = `√${val} = ?`;
+      } else if (op === '%') {
+        const pcts = [35, 45, 15, 75, 40, 25];
+        const bases = [200, 300, 400, 500, 600];
+        const p = pcts[Math.floor(Math.random() * pcts.length)];
+        const b = bases[Math.floor(Math.random() * bases.length)];
+        answer = (p * b) / 100;
+        num1 = p;
+        num2 = b;
+        displayText = `${p}% of ${b} = ?`;
+      } else if (op === 'x²') {
+        const n1 = Math.floor(Math.random() * 12) + 21; // 21 to 32
+        answer = n1 * n1;
+        num1 = n1;
+        num2 = '';
+        displayText = `${n1}² = ?`;
+      } else {
+        const n1 = Math.floor(Math.random() * 12) + 19; // 19 to 30
+        const n2 = Math.floor(Math.random() * 11) + 13; // 13 to 23
+        answer = n1 * n2;
+        num1 = n1;
+        num2 = n2;
+        displayText = `${n1} × ${n2} = ?`;
+      }
     }
 
-    setMathQuestion({ num1, num2, op, answer });
+    const options = buildOptions(answer);
+    setMathQuestion({ num1, num2, op, answer, displayText, options });
     setMathInput('');
   };
 
@@ -506,7 +1004,7 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
     setMathCombo(0);
     setMathTimer(60);
     setMathPlaying(true);
-    generateMathQuestion();
+    generateMathQuestion(selectedGradeTier);
   };
 
   const endMathGame = () => {
@@ -518,8 +1016,36 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
     }
     if (adjustStudentPoints && studentUid && mathScore > 0) {
       const earned = Math.min(50, Math.floor(mathScore / 2));
-      adjustStudentPoints(studentUid, earned, `Speed Math Rush Score: ${mathScore}`);
+      adjustStudentPoints(studentUid, earned, `Speed Math Rush (${selectedGradeTier}) Score: ${mathScore}`);
     }
+  };
+
+  const submitNumericAnswer = (userVal: number) => {
+    if (!mathPlaying) return;
+
+    if (userVal === mathQuestion.answer) {
+      const newCombo = mathCombo + 1;
+      const pointsAdded = 10 + Math.min(newCombo * 2, 20);
+      setMathScore((prev) => prev + pointsAdded);
+      setMathCombo(newCombo);
+      setMathFeedback('correct');
+      if (soundEnabled) audio.playCorrect();
+      setTimeout(() => setMathFeedback(null), 300);
+      generateMathQuestion(selectedGradeTier);
+    } else {
+      setMathCombo(0);
+      setMathFeedback('wrong');
+      if (soundEnabled) audio.playIncorrect();
+      setTimeout(() => setMathFeedback(null), 300);
+      setMathInput('');
+    }
+  };
+
+  const handleMathSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const val = parseInt(mathInput.trim(), 10);
+    if (isNaN(val)) return;
+    submitNumericAnswer(val);
   };
 
   const handleMathSubmit = (e?: React.FormEvent) => {
@@ -668,7 +1194,12 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-center">
+        <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+          <div className="px-3.5 py-2 rounded-xl bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-xs border border-amber-300">
+            <Coins className="w-4 h-4 text-slate-950 shrink-0" />
+            <span>{currentStudent.referralPoints ?? currentAuthUser?.referralPoints ?? 0} PTS</span>
+          </div>
+
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
             className={`px-3 py-2 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition ${
@@ -841,14 +1372,29 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
                 </div>
 
                 {/* Center Hub Button */}
-                <div className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-gradient-to-b from-slate-900 to-slate-800 text-white font-black text-xs flex flex-col items-center justify-center shadow-lg border-2 border-amber-300 z-10 pointer-events-none">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <span>SPIN</span>
+                <div
+                  className={`absolute inset-0 m-auto w-16 h-16 rounded-full flex flex-col items-center justify-center shadow-lg z-10 pointer-events-none transition-all ${
+                    hasSpunToday
+                      ? 'bg-slate-900 text-amber-300 border-2 border-slate-600'
+                      : 'bg-gradient-to-b from-slate-900 to-slate-800 text-white border-2 border-amber-300'
+                  }`}
+                >
+                  {hasSpunToday ? (
+                    <>
+                      <Lock className="w-4 h-4 text-amber-400" />
+                      <span className="text-[9px] font-black uppercase tracking-wider text-amber-300">CLAIMED</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span className="font-black text-xs">SPIN</span>
+                    </>
+                  )}
                 </div>
               </div>
 
               {spinToast && (
-                <div className="mt-4 px-4 py-2 bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-bold rounded-xl shadow-xs">
+                <div className="mt-4 px-4 py-2.5 bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-bold rounded-xl shadow-xs animate-in fade-in duration-300">
                   {spinToast}
                 </div>
               )}
@@ -858,15 +1404,15 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
             <div className="md:col-span-6 space-y-4">
               <div>
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600">
-                  {language === 'ta' ? 'தினசரி இலவச வாய்ப்பு' : 'Daily Free Spin'}
+                  {language === 'ta' ? 'தினசரி இலவச வாய்ப்பு (1 Spin / Day)' : 'Daily Free Spin (1 Spin / Day)'}
                 </span>
                 <h3 className="text-xl font-black text-slate-900 mt-0.5">
                   {language === 'ta' ? 'அதிர்ஷ்ட சுழல் சக்கரம் (Lucky Wheel)' : 'Daily Knowledge Wheel'}
                 </h3>
                 <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                   {language === 'ta'
-                    ? 'மாணவர்கள் தினமும் வெப்சைட்டைத் திறந்ததும் ஒருமுறை இலவசமாகச் சுழற்றி +10 முதல் +50 புள்ளிகள் மற்றும் போனஸ் பரிசுகளை வெல்லலாம்!'
-                    : 'Spin the wheel every day to unlock study points, bonuses, and special candidate rewards credited straight to your profile.'}
+                    ? 'மாணவர்கள் தினமும் ஒருமுறை மட்டுமே இலவசமாகச் சுழற்றலாம். கிடைக்கும் புள்ளிகள் உடனடியாக உங்கள் டாஷ்போர்டில் சேர்க்கப்படும்!'
+                    : 'Spin once per day to unlock study points, bonuses, and special candidate rewards credited straight to your dashboard!'}
                 </p>
               </div>
 
@@ -910,35 +1456,53 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
               {/* Spin Button */}
               <div className="pt-2">
                 <button
-                  disabled={isSpinning}
+                  disabled={isSpinning || hasSpunToday}
                   onClick={handleSpinWheel}
                   className={`w-full py-3.5 px-6 rounded-2xl font-black text-sm transition-all transform flex items-center justify-center gap-2 shadow-md ${
                     isSpinning
                       ? 'bg-slate-400 text-white cursor-not-allowed'
-                      : !hasSpunToday
-                      ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-slate-950 active:scale-[0.98]'
-                      : 'bg-indigo-600 hover:bg-indigo-700 text-white active:scale-[0.98]'
+                      : hasSpunToday
+                      ? 'bg-slate-200 text-slate-500 border border-slate-300 cursor-not-allowed opacity-90'
+                      : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-slate-950 active:scale-[0.98] shadow-amber-500/20 cursor-pointer'
                   }`}
                 >
-                  <Sparkles className="w-5 h-5" />
+                  {isSpinning ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                  ) : hasSpunToday ? (
+                    <Lock className="w-5 h-5 text-slate-500" />
+                  ) : (
+                    <Sparkles className="w-5 h-5 text-slate-950" />
+                  )}
                   <span>
                     {isSpinning
-                      ? language === 'ta'
-                        ? 'சுழல்கிறது...'
-                        : 'Spinning...'
-                      : !hasSpunToday
-                      ? language === 'ta'
-                        ? 'இன்றைய இலவச ஸ்பின்னை சுழற்று (Spin Now!)'
-                        : 'Claim Free Daily Spin (Spin Now!)'
-                      : language === 'ta'
-                        ? 'பயிற்சி சுழற்சி (Practice Spin)'
-                        : 'Practice Spin (Already Claimed Today)'}
+                      ? (language === 'ta' ? 'சுழல்கிறது...' : 'Spinning...')
+                      : hasSpunToday
+                      ? (language === 'ta'
+                          ? `இன்றைய வாய்ப்பு முடிந்தது (${timeUntilTomorrow})`
+                          : `Today's Daily Spin Claimed (${timeUntilTomorrow})`)
+                      : (language === 'ta'
+                          ? 'இன்றைய இலவச ஸ்பின்னை சுழற்று (Spin Now!)'
+                          : 'Claim Free Daily Spin (Spin Now!)')}
                   </span>
                 </button>
+
                 {hasSpunToday && (
-                  <p className="text-[11px] text-slate-500 text-center mt-2">
-                    ✓ {language === 'ta' ? 'இன்றைய நாளுக்கான பரிசு பெறப்பட்டுவிட்டது. நாளை மீண்டும் இலவச ஸ்பின் கிடைக்கும்!' : 'Today\'s reward claimed! Next free official spin unlocks tomorrow.'}
-                  </p>
+                  <div className="mt-3 p-3.5 bg-amber-50/90 border border-amber-200 rounded-xl text-center space-y-1 animate-in fade-in">
+                    <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-amber-900">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>
+                        {language === 'ta'
+                          ? 'இன்றைய இலவச ஸ்பின் பரிசு வெற்றிகரமாகப் பெறப்பட்டது!'
+                          : "Today's daily free spin reward claimed successfully!"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      {language === 'ta'
+                        ? 'ஒரு நாளைக்கு ஒரு முறை மட்டுமே இலவச ஸ்பின் செய்ய முடியும். அடுத்த சுழற்சி நள்ளிரவு 12:00 மணிக்கு திறக்கப்படும். இன்னும் மீதமுள்ள நேரம்: '
+                        : 'Only 1 free spin allowed per calendar day. Next free spin unlocks at midnight tomorrow. Time remaining: '}
+                      <span className="font-extrabold text-amber-800 font-mono ml-1">{timeUntilTomorrow}</span>
+                    </p>
+                  </div>
                 )}
               </div>
             </div>

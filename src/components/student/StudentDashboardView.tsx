@@ -105,6 +105,60 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
   // Student's academic grade level (e.g. Grade 11 (O/L), Grade 6, etc.)
   const studentGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 6';
 
+  // Live points update listener for instant synchronization
+  const [livePoints, setLivePoints] = useState<number>(() => {
+    return (
+      currentStudent?.referralPoints ??
+      currentAuthUser?.referralPoints ??
+      (typeof window !== 'undefined'
+        ? parseInt(
+            localStorage.getItem(`hnc_student_points_${currentAuthUser?.uid}`) ||
+            localStorage.getItem('hnc_student_points_active') ||
+            '0',
+            10
+          )
+        : 0)
+    );
+  });
+
+  useEffect(() => {
+    const handlePointsUpdate = (e: any) => {
+      if (e?.detail?.points !== undefined) {
+        setLivePoints(e.detail.points);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('hnc_points_updated', handlePointsUpdate);
+      return () => window.removeEventListener('hnc_points_updated', handlePointsUpdate);
+    }
+  }, []);
+
+  useEffect(() => {
+    const pts = currentStudent?.referralPoints ?? currentAuthUser?.referralPoints;
+    if (pts !== undefined && pts !== null) {
+      setLivePoints(pts);
+    }
+  }, [currentStudent?.referralPoints, currentAuthUser?.referralPoints]);
+
+  // Check if daily spin is already claimed today across all persistent layers
+  const localToday = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+  const isSpinClaimedToday = Boolean(
+    (currentAuthUser?.lastSpinDate && (currentAuthUser.lastSpinDate === localToday || currentAuthUser.lastSpinDate.startsWith(localToday))) ||
+    (currentStudent?.lastSpinDate && (currentStudent.lastSpinDate === localToday || currentStudent.lastSpinDate.startsWith(localToday))) ||
+    (typeof window !== 'undefined' &&
+      (localStorage.getItem(`hnc_spin_date_${currentAuthUser?.uid}`) === localToday ||
+       localStorage.getItem(`hnc_spin_date_${currentStudent?.id}`) === localToday ||
+       localStorage.getItem(`hnc_spin_date_${currentAuthUser?.studentId}`) === localToday ||
+       localStorage.getItem('hnc_spin_date_last') === localToday ||
+       (() => {
+         const ts = localStorage.getItem('hnc_spin_last_timestamp');
+         if (!ts) return false;
+         const d = new Date(parseInt(ts, 10));
+         const now = new Date();
+         return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+       })()))
+  );
+
   // Filter only real active/published competitions from Firestore
   // STRICT GRADE FILTER:
   // "குறிப்பிட்ட மாணவருடைய தரங்களுக்கு மட்டுமே அவரவர் டாஸ் போர்டுல பரீட்சைகள் டிஸ்ப்ளே ஆக வேண்டும் ஓபன் அண்ட் கொடுத்தா மட்டும் தான் எல்லா மாணவர்களும் டிஸ்ப்ளே ஆகணும்"
@@ -423,6 +477,59 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
         </div>
       </div>
 
+      {/* STUDENT REWARD POINTS & DAILY SPIN STATUS DASHBOARD WIDGET */}
+      <div className="bg-gradient-to-r from-amber-500/15 via-indigo-500/10 to-blue-500/15 border-2 border-amber-300/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 w-full md:w-auto">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-slate-950 flex items-center justify-center font-black shadow-md shadow-amber-500/25 shrink-0 text-2xl">
+            🪙
+          </div>
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                {language === 'ta' ? 'மொத்த புள்ளிகள் (Reward Points)' : language === 'si' ? 'මුළු ලකුණු (Reward Points)' : 'Student Reward Points'}
+              </span>
+              <span className="text-base sm:text-lg font-black text-slate-900 font-mono tracking-tight flex items-center gap-1">
+                <span>{livePoints}</span>
+                <span className="text-xs text-amber-700 font-bold">PTS</span>
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 leading-snug">
+              {language === 'ta'
+                ? 'அதிர்ஷ்ட ஸ்பின், வேகக் கணிதம், மற்றும் பரிந்துரை மூலம் பெற்ற புள்ளிகள்.'
+                : 'Points accumulated from Lucky Spin Wheel, Speed Math & Referral Rewards.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 w-full md:w-auto justify-end flex-wrap sm:flex-nowrap">
+          <button
+            type="button"
+            onClick={() => setStudentNav('Study Games Hub')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-xs cursor-pointer ${
+              isSpinClaimedToday
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                : 'bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 hover:brightness-105 active:scale-95 shadow-amber-400/20 animate-pulse'
+            }`}
+          >
+            <span className="text-sm">🎡</span>
+            <span>
+              {isSpinClaimedToday
+                ? (language === 'ta' ? 'இன்றைய ஸ்பின் முடிந்தது ✓' : 'Today’s Spin Claimed ✓')
+                : (language === 'ta' ? 'அதிர்ஷ்ட ஸ்பின் சுழற்றுக! 🎡' : 'Spin Lucky Wheel Now! 🎡')}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStudentNav('Referral & Points')}
+            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs active:scale-95 cursor-pointer"
+          >
+            <Gift className="w-3.5 h-3.5" />
+            <span>{language === 'ta' ? 'புள்ளிகளைப் பயன்படுத்து (Redeem)' : 'Redeem Points'}</span>
+          </button>
+        </div>
+      </div>
+
       {/* 4-IN-1 STUDY GAMES, DAILY STREAK & FOCUS CAM QUICK DECK */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-800 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -469,8 +576,12 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
           >
             <div className="flex items-center justify-between">
               <span className="text-xl">🎡</span>
-              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-400/95 text-slate-950">
-                Free Spin
+              <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                isSpinClaimedToday
+                  ? 'bg-slate-700/80 text-emerald-300 border border-emerald-500/30'
+                  : 'bg-amber-400/95 text-slate-950 animate-pulse'
+              }`}>
+                {isSpinClaimedToday ? 'Done ✓' : 'Free Spin'}
               </span>
             </div>
             <div className="mt-2">
@@ -478,7 +589,9 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
                 Lucky Spin Wheel
               </div>
               <div className="text-[10px] text-slate-300">
-                {language === 'ta' ? 'அதிர்ஷ்ட சுழல் சக்கரம்' : 'Daily Coin Rewards'}
+                {isSpinClaimedToday
+                  ? (language === 'ta' ? 'இன்றைய ஸ்பின் முடிந்தது ✓' : 'Claimed for Today ✓')
+                  : (language === 'ta' ? 'இன்றைய இலவச சுழல் தயார்!' : 'Daily Free Spin Ready!')}
               </div>
             </div>
           </div>
@@ -660,7 +773,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
                 {language === 'ta' ? 'புள்ளிகள் & வெகுமதிகள்' : 'Earn Points'}
               </span>
               <span className="text-xs font-bold text-slate-800">
-                {currentStudent.referralPoints ?? 0} PTS
+                {currentStudent.referralPoints ?? currentAuthUser?.referralPoints ?? 0} PTS
               </span>
             </div>
             <h3 className="text-sm sm:text-base font-extrabold text-slate-900 mt-1">

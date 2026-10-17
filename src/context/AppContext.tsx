@@ -80,6 +80,7 @@ import {
   awardSharePointsInFirestore,
   redeemPerkInFirestore,
   adjustStudentPointsInFirestore,
+  recordStudentSpinWheelRewardInFirestore,
   saveAnnouncementToFirestore,
   updateAnnouncementInFirestore,
   deleteAnnouncementFromFirestore,
@@ -654,6 +655,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                           redeemedPerks: stuData.redeemedPerks || prev.redeemedPerks || [],
                           referralCode: stuData.referralCode || prev.referralCode,
                           avatarUrl: stuData.avatarUrl || prev.avatarUrl || '',
+                          lastSpinDate: stuData.lastSpinDate || prev.lastSpinDate || '',
                         };
                         saveActiveUser(merged);
                         return merged;
@@ -663,10 +665,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   .catch(() => {});
               }
 
+              const preservedLastSpinDate =
+                resolvedUser.lastSpinDate ||
+                saved?.lastSpinDate ||
+                (typeof window !== 'undefined'
+                  ? localStorage.getItem(`hnc_spin_date_${resolvedUser.uid}`) ||
+                    localStorage.getItem(`hnc_spin_date_${resolvedUser.studentId}`) ||
+                    localStorage.getItem('hnc_spin_date_last') ||
+                    ''
+                  : '');
+
+              const preservedPoints = Math.max(
+                resolvedUser.referralPoints || 0,
+                saved?.referralPoints || 0,
+                typeof window !== 'undefined'
+                  ? parseInt(
+                      localStorage.getItem(`hnc_student_points_${resolvedUser.uid}`) ||
+                      localStorage.getItem('hnc_student_points_active') ||
+                      '0',
+                      10
+                    )
+                  : 0
+              );
+
+              const mergedResolved: DbUser = {
+                ...resolvedUser,
+                lastSpinDate: preservedLastSpinDate,
+                referralPoints: preservedPoints,
+              };
+
               // Update session and persist to storage
-              saveActiveUser(resolvedUser);
-              setCurrentAuthUser(resolvedUser);
-              setInternalPortal(resolvedUser.role);
+              saveActiveUser(mergedResolved);
+              setCurrentAuthUser(mergedResolved);
+              setInternalPortal(mergedResolved.role);
             }
           } else {
             // Neither Firestore nor query resolved this fbUser.
@@ -863,6 +894,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           totalReferrals: s.totalReferrals || 0,
           sharesCount: s.sharesCount || 0,
           redeemedPerks: s.redeemedPerks || [],
+          lastSpinDate: s.lastSpinDate || '',
         }));
         setStudents(mapped);
       });
@@ -942,6 +974,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const newPerks = stuData.redeemedPerks || prev.redeemedPerks || [];
               const newCode = stuData.referralCode || prev.referralCode || '';
               const newAvatar = stuData.avatarUrl || prev.avatarUrl || (typeof window !== 'undefined' ? localStorage.getItem(`hnc_student_avatar_${currentAuthUser.uid}`) : '') || '';
+              const newSpinDate = stuData.lastSpinDate || prev.lastSpinDate || '';
 
               if (
                 (prev.referralPoints ?? 0) === newPts &&
@@ -949,7 +982,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 (prev.sharesCount ?? 0) === newShares &&
                 (prev.redeemedPerks?.length || 0) === newPerks.length &&
                 (prev.referralCode || '') === newCode &&
-                (prev.avatarUrl || '') === newAvatar
+                (prev.avatarUrl || '') === newAvatar &&
+                (prev.lastSpinDate || '') === newSpinDate
               ) {
                 return prev;
               }
@@ -962,6 +996,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 redeemedPerks: newPerks,
                 referralCode: newCode,
                 avatarUrl: newAvatar,
+                lastSpinDate: newSpinDate,
               };
               saveActiveUser(updated);
               return updated;
@@ -1114,10 +1149,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, '')}`,
     referredBy: currentAuthUser?.referredBy,
-    referralPoints: currentAuthUser?.referralPoints !== undefined ? currentAuthUser.referralPoints : 0,
+    referralPoints:
+      currentAuthUser?.referralPoints !== undefined
+        ? currentAuthUser.referralPoints
+        : (typeof window !== 'undefined'
+            ? parseInt(
+                localStorage.getItem(`hnc_student_points_${currentAuthUser?.uid}`) ||
+                localStorage.getItem(`hnc_student_points_${currentAuthUser?.studentId}`) ||
+                localStorage.getItem('hnc_student_points_active') ||
+                '0',
+                10
+              )
+            : 0),
     totalReferrals: currentAuthUser?.totalReferrals || 0,
     sharesCount: currentAuthUser?.sharesCount || 0,
     redeemedPerks: currentAuthUser?.redeemedPerks || [],
+    lastSpinDate:
+      currentAuthUser?.lastSpinDate ||
+      (typeof window !== 'undefined'
+        ? localStorage.getItem(`hnc_spin_date_${currentAuthUser?.uid}`) ||
+          localStorage.getItem(`hnc_spin_date_${currentAuthUser?.studentId}`) ||
+          localStorage.getItem('hnc_spin_date_last') ||
+          ''
+        : ''),
   }), [
     currentAuthUser?.uid,
     currentAuthUser?.avatarUrl,
@@ -1139,6 +1193,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     currentAuthUser?.totalReferrals,
     currentAuthUser?.sharesCount,
     currentAuthUser?.redeemedPerks,
+    currentAuthUser?.lastSpinDate,
     studentRegistrations.length,
     results,
   ]);
@@ -2381,21 +2436,97 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     pointsDelta: number,
     reason?: string
   ): Promise<number> => {
-    const res = await adjustStudentPointsInFirestore(studentUid, pointsDelta, reason);
-    if (res.success) {
+    // Determine local date string (YYYY-MM-DD)
+    const localNow = new Date();
+    const todayDateStr = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`;
+    const isSpin = Boolean(reason?.toLowerCase().includes('spin'));
+
+    const isTargetCurrentUser =
+      !studentUid ||
+      studentUid === 'guest' ||
+      currentAuthUser?.uid === studentUid ||
+      currentStudent?.id === studentUid ||
+      currentAuthUser?.studentId === studentUid ||
+      currentStudent?.studentId === studentUid;
+
+    let optimisticPoints = 0;
+    if (isTargetCurrentUser && currentAuthUser) {
+      optimisticPoints = Math.max(0, (currentAuthUser.referralPoints || 0) + pointsDelta);
+      setCurrentAuthUser((prev) => {
+        if (!prev) return null;
+        const updated: DbUser = {
+          ...prev,
+          referralPoints: optimisticPoints,
+          ...(isSpin ? { lastSpinDate: todayDateStr } : {}),
+        };
+        saveActiveUser(updated);
+        return updated;
+      });
+
       setStudents((prev) =>
-        prev.map((s) => (s.id === studentUid ? { ...s, referralPoints: res.newPoints } : s))
+        prev.map((s) =>
+          s.id === currentAuthUser.uid || s.studentId === currentAuthUser.studentId
+            ? { ...s, referralPoints: optimisticPoints, ...(isSpin ? { lastSpinDate: todayDateStr } : {}) }
+            : s
+        )
       );
-      if (currentAuthUser?.uid === studentUid) {
-        setCurrentAuthUser((prev) => {
-          if (!prev) return null;
-          const updated = { ...prev, referralPoints: res.newPoints };
-          saveActiveUser(updated);
-          return updated;
-        });
+    }
+
+    const targetUid = currentAuthUser?.uid || studentUid || 'guest';
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`hnc_student_points_${targetUid}`, String(optimisticPoints));
+      localStorage.setItem('hnc_student_points_active', String(optimisticPoints));
+      if (isSpin) {
+        localStorage.setItem(`hnc_spin_date_${targetUid}`, todayDateStr);
+        localStorage.setItem('hnc_spin_date_last', todayDateStr);
+        localStorage.setItem('hnc_spin_last_timestamp', String(Date.now()));
       }
     }
-    return res.newPoints;
+
+    const res = await adjustStudentPointsInFirestore(
+      targetUid,
+      pointsDelta,
+      reason,
+      isSpin ? { lastSpinDate: todayDateStr } : undefined
+    );
+
+    const finalPoints = res.success ? res.newPoints : (optimisticPoints || pointsDelta);
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`hnc_student_points_${targetUid}`, String(finalPoints));
+      localStorage.setItem('hnc_student_points_active', String(finalPoints));
+      if (isSpin) {
+        localStorage.setItem(`hnc_spin_date_${targetUid}`, todayDateStr);
+        localStorage.setItem('hnc_spin_date_last', todayDateStr);
+        localStorage.setItem('hnc_spin_last_timestamp', String(Date.now()));
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('hnc_points_updated', { detail: { points: finalPoints } }));
+      } catch {}
+    }
+
+    if (isTargetCurrentUser && currentAuthUser) {
+      setCurrentAuthUser((prev) => {
+        if (!prev) return null;
+        const updated: DbUser = {
+          ...prev,
+          referralPoints: finalPoints,
+          ...(isSpin ? { lastSpinDate: todayDateStr } : {}),
+        };
+        saveActiveUser(updated);
+        return updated;
+      });
+      setStudents((prev) =>
+        prev.map((s) =>
+          s.id === currentAuthUser.uid || s.studentId === currentAuthUser.studentId
+            ? { ...s, referralPoints: finalPoints, ...(isSpin ? { lastSpinDate: todayDateStr } : {}) }
+            : s
+        )
+      );
+    }
+
+    return finalPoints;
   };
 
   // Phase 07: Membership helper methods

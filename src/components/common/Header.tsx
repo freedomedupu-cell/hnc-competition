@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Share2,
   Eye,
+  Coins,
 } from 'lucide-react';
 import { ShareModal } from './ShareModal';
 import { getStudentDeadlineAlerts } from '../../utils/deadlineNotificationUtils';
@@ -36,6 +37,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
     logout,
     language,
     setLanguage,
+    setStudentNav,
     t,
   } = useApp();
 
@@ -385,6 +387,19 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
                 </div>
               )}
             </div>
+
+            {/* Student Points Balance Chip */}
+            {effectivePortal === 'student' && (
+              <button
+                type="button"
+                onClick={() => setStudentNav('Study Games Hub')}
+                title={language === 'ta' ? 'புள்ளிகள் & தினசரி விளையாட்டுகள்' : 'Reward Points & Study Games'}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-400/90 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-xs border border-amber-300 transition active:scale-95 cursor-pointer"
+              >
+                <Coins className="w-3.5 h-3.5 text-slate-950 shrink-0" />
+                <span className="font-mono">{currentStudent.referralPoints ?? currentAuthUser?.referralPoints ?? 0} PTS</span>
+              </button>
+            )}
 
             {/* Profile Pill */}
             {effectivePortal === 'student' ? (

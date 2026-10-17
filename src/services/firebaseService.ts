@@ -409,6 +409,7 @@ export async function loginWithEmailPassword(
           grade: sData.grade || targetUserDoc.grade,
           school: sData.school || targetUserDoc.school,
           avatarUrl: sData.avatarUrl || targetUserDoc.avatarUrl || '',
+          lastSpinDate: sData.lastSpinDate || targetUserDoc.lastSpinDate || (typeof window !== 'undefined' ? localStorage.getItem(`hnc_spin_date_${targetUserDoc.uid}`) || localStorage.getItem('hnc_spin_date_last') || '' : ''),
         };
       }
     } catch {}
@@ -1790,34 +1791,132 @@ export async function redeemPerkInFirestore(
 export async function adjustStudentPointsInFirestore(
   studentUid: string,
   pointsDelta: number,
-  _reason?: string
+  _reason?: string,
+  extraFields?: { lastSpinDate?: string; [key: string]: any }
 ): Promise<{ success: boolean; newPoints: number }> {
   try {
-    const uRef = doc(db, 'users', studentUid);
-    const uSnap = await getDoc(uRef);
-    let pts = 0;
-    if (uSnap.exists()) {
-      const uData = uSnap.data() as DbUser;
-      pts = Math.max(0, (uData.referralPoints || 0) + pointsDelta);
-      await updateDoc(uRef, { referralPoints: pts });
+    if (!studentUid || studentUid === 'guest') {
+      const stored = typeof window !== 'undefined'
+        ? parseInt(localStorage.getItem('hnc_student_points_active') || '0', 10)
+        : 0;
+      const newPts = Math.max(0, stored + pointsDelta);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hnc_student_points_active', newPts.toString());
+        if (extraFields?.lastSpinDate) {
+          localStorage.setItem('hnc_spin_date_last', extraFields.lastSpinDate);
+          localStorage.setItem('hnc_spin_last_timestamp', String(Date.now()));
+        }
+      }
+      return { success: true, newPoints: newPts };
     }
 
+    let resolvedUserRef = doc(db, 'users', studentUid);
+    let uSnap = await getDoc(resolvedUserRef);
+    let currentPts = 0;
+
+    if (uSnap.exists()) {
+      const uData = uSnap.data() as DbUser;
+      currentPts = Math.max(currentPts, uData.referralPoints || 0);
+    } else {
+      // Check if studentUid is studentId in users collection
+      const qSnap = await getDocs(query(collection(db, 'users'), where('studentId', '==', studentUid)));
+      if (!qSnap.empty) {
+        resolvedUserRef = qSnap.docs[0].ref;
+        currentPts = Math.max(currentPts, (qSnap.docs[0].data() as DbUser).referralPoints || 0);
+      }
+    }
+
+    // Also check students collection to take the higher real points
+    let resolvedStudentRef = doc(db, 'students', studentUid);
     try {
-      const sRef = doc(db, 'students', studentUid);
-      const sSnap = await getDoc(sRef);
+      const sSnap = await getDoc(resolvedStudentRef);
       if (sSnap.exists()) {
-        const sData = sSnap.data() as DbStudent;
-        const sPts = Math.max(0, (sData.referralPoints || 0) + pointsDelta);
-        await updateDoc(sRef, { referralPoints: sPts });
-        pts = sPts;
+        const sData = sSnap.data();
+        currentPts = Math.max(currentPts, sData.referralPoints || 0);
+      } else {
+        const sqSnap = await getDocs(query(collection(db, 'students'), where('studentId', '==', studentUid)));
+        if (!sqSnap.empty) {
+          resolvedStudentRef = sqSnap.docs[0].ref;
+          currentPts = Math.max(currentPts, sqSnap.docs[0].data().referralPoints || 0);
+        }
       }
     } catch {}
 
-    return { success: true, newPoints: pts };
+    // Check localStorage cache as well
+    if (typeof window !== 'undefined') {
+      const localCachedPts = parseInt(
+        localStorage.getItem(`hnc_student_points_${studentUid}`) ||
+        localStorage.getItem('hnc_student_points_active') ||
+        '0',
+        10
+      );
+      if (localCachedPts > currentPts) {
+        currentPts = localCachedPts;
+      }
+    }
+
+    const newPts = Math.max(0, currentPts + pointsDelta);
+    const updatePayload: Record<string, any> = {
+      referralPoints: newPts,
+      ...(extraFields || {}),
+    };
+
+    // Save to users collection
+    await setDoc(resolvedUserRef, updatePayload, { merge: true });
+
+    // Save to students collection
+    try {
+      await setDoc(resolvedStudentRef, updatePayload, { merge: true });
+    } catch (sErr) {
+      console.warn('Students collection points update notice:', sErr);
+    }
+
+    // Immediate local storage backup
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`hnc_student_points_${studentUid}`, newPts.toString());
+      localStorage.setItem('hnc_student_points_active', newPts.toString());
+      if (extraFields?.lastSpinDate) {
+        localStorage.setItem(`hnc_spin_date_${studentUid}`, extraFields.lastSpinDate);
+        localStorage.setItem('hnc_spin_date_last', extraFields.lastSpinDate);
+        localStorage.setItem('hnc_spin_last_timestamp', String(Date.now()));
+      }
+    }
+
+    return { success: true, newPoints: newPts };
   } catch (err) {
     console.error('adjustStudentPoints error:', err);
-    return { success: false, newPoints: 0 };
+    // Even if remote write errored, calculate optimistic new points from local cache
+    const stored = typeof window !== 'undefined'
+      ? parseInt(localStorage.getItem(`hnc_student_points_${studentUid}`) || localStorage.getItem('hnc_student_points_active') || '0', 10)
+      : 0;
+    const fallbackPts = Math.max(0, stored + pointsDelta);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`hnc_student_points_${studentUid}`, fallbackPts.toString());
+      localStorage.setItem('hnc_student_points_active', fallbackPts.toString());
+      if (extraFields?.lastSpinDate) {
+        localStorage.setItem(`hnc_spin_date_${studentUid}`, extraFields.lastSpinDate);
+        localStorage.setItem('hnc_spin_date_last', extraFields.lastSpinDate);
+        localStorage.setItem('hnc_spin_last_timestamp', String(Date.now()));
+      }
+    }
+    return { success: true, newPoints: fallbackPts };
   }
+}
+
+/**
+ * Record lucky spin wheel reward in Firestore with immediate point credit & spin date lockdown
+ */
+export async function recordStudentSpinWheelRewardInFirestore(
+  studentUid: string,
+  pointsWon: number,
+  spinDate: string
+): Promise<{ success: boolean; newPoints: number }> {
+  return adjustStudentPointsInFirestore(
+    studentUid,
+    pointsWon,
+    `Daily Lucky Spin Reward (+${pointsWon} PTS)`,
+    { lastSpinDate: spinDate }
+  );
 }
 
 // -------------------------------------------------------------

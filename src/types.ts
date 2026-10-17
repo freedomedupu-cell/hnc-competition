@@ -37,6 +37,7 @@ export interface DbUser {
   redeemedPerks?: string[];
   guardianName?: string;
   bio?: string;
+  lastSpinDate?: string;
 }
 
 export interface DbStudent {
@@ -61,6 +62,7 @@ export interface DbStudent {
   totalReferrals?: number;
   sharesCount?: number;
   redeemedPerks?: string[];
+  lastSpinDate?: string;
 }
 
 export interface DbAdmin {
@@ -341,6 +343,7 @@ export interface StudentUser extends BaseUser {
   sharesCount?: number;
   redeemedPerks?: string[];
   initialPassword?: string;
+  lastSpinDate?: string;
 }
 
 export interface ReferralPerk {
