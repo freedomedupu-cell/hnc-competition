@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { StudentUser } from '../../types';
 import { Badge } from '../common/Badge';
@@ -22,6 +22,8 @@ import {
   Clock,
   Key,
   Pencil,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { EditStudentModal } from '../superadmin/EditStudentModal';
 
@@ -77,19 +79,40 @@ export const StudentInfoView: React.FC = () => {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const totalPoints = students.reduce(
-    (acc, s) => acc + (s.referralPoints !== undefined ? s.referralPoints : 25),
-    0
-  );
+  // Pagination states for high-performance candidate rendering
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
 
-  const filteredStudents = students.filter((std) => {
-    return (
-      std.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      std.studentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      std.institution.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (std.referralCode && std.referralCode.toLowerCase().includes(searchTerm.toLowerCase()))
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, pageSize]);
+
+  const totalPoints = useMemo(() => {
+    return students.reduce(
+      (acc, s) => acc + (s.referralPoints !== undefined ? s.referralPoints : 25),
+      0
     );
-  });
+  }, [students]);
+
+  const filteredStudents = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return students;
+
+    return students.filter((std) => {
+      return (
+        std.name.toLowerCase().includes(term) ||
+        std.studentId.toLowerCase().includes(term) ||
+        std.institution.toLowerCase().includes(term) ||
+        (std.referralCode && std.referralCode.toLowerCase().includes(term))
+      );
+    });
+  }, [students, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredStudents.slice(start, start + pageSize);
+  }, [filteredStudents, currentPage, pageSize]);
 
   return (
     <div className="space-y-6">
@@ -180,7 +203,7 @@ export const StudentInfoView: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((std) => {
+                paginatedStudents.map((std) => {
                 const pts = std.referralPoints !== undefined ? std.referralPoints : 25;
 
                 return (
@@ -281,9 +304,99 @@ export const StudentInfoView: React.FC = () => {
                     </td>
                   </tr>
                 );
-              }))}
+              })
+            )}
             </tbody>
           </table>
+        </div>
+
+        {/* High-Performance Pagination & Range Controls */}
+        <div className="bg-slate-50 border-t border-slate-200 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span>
+              {language === 'ta' ? 'காண்பிக்கப்படுகிறது: ' : 'Showing: '}
+              <span className="font-bold text-slate-900">
+                {filteredStudents.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
+              </span>
+              {' - '}
+              <span className="font-bold text-slate-900">
+                {Math.min(currentPage * pageSize, filteredStudents.length)}
+              </span>
+              {' of '}
+              <span className="font-bold text-slate-900">{filteredStudents.length}</span>
+              {language === 'ta' ? ' மாணவர்கள்' : ' candidates'}
+            </span>
+
+            {filteredStudents.length > 10 && (
+              <div className="flex items-center gap-1.5 sm:ml-3 sm:pl-3 sm:border-l sm:border-slate-200">
+                <span className="text-[11px] text-slate-500">
+                  {language === 'ta' ? 'பக்கத்திற்கு:' : 'Per page:'}
+                </span>
+                <select
+                  aria-label="Candidates per page"
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-xs text-slate-800 font-medium focus:ring-1 focus:ring-blue-600 focus:outline-none cursor-pointer"
+                >
+                  <option value={10}>10</option>
+                  <option value={15}>15</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none transition flex items-center gap-1 font-semibold text-slate-700 cursor-pointer shadow-2xs"
+                title="Previous Page"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{language === 'ta' ? 'முந்தைய' : 'Prev'}</span>
+              </button>
+
+              <div className="flex items-center gap-1 px-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                  .map((p, idx, arr) => {
+                    const prevVal = arr[idx - 1];
+                    const showEllipsis = prevVal && p - prevVal > 1;
+                    return (
+                      <React.Fragment key={p}>
+                        {showEllipsis && <span className="px-1 text-slate-400">...</span>}
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(p)}
+                          className={`w-7 h-7 rounded-lg text-xs font-bold transition cursor-pointer ${
+                            currentPage === p
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none transition flex items-center gap-1 font-semibold text-slate-700 cursor-pointer shadow-2xs"
+                title="Next Page"
+              >
+                <span className="hidden sm:inline">{language === 'ta' ? 'அடுத்த' : 'Next'}</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -184,11 +184,9 @@ export const SmartDailyTips: React.FC = () => {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      // Use intelligent heuristic generator if API key is not yet configured
-      setTimeout(() => {
-        setTipsData(getCuratedSmartTips());
-        setLoading(false);
-      }, 500);
+      // Instant intelligent heuristic generator (zero delay, zero lag)
+      setTipsData(getCuratedSmartTips());
+      setLoading(false);
       return;
     }
 
@@ -249,6 +247,12 @@ Instructions:
   "motivationalQuote": "Inspiring closing line"
 }
 `;
+
+      if (!apiKey || apiKey.trim().length < 5) {
+        setTipsData(getCuratedSmartTips());
+        setLoading(false);
+        return;
+      }
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.8-flash',

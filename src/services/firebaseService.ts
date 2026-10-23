@@ -49,6 +49,7 @@ import {
   deleteMediaFromIndexedDB,
   estimateObjectByteSize,
 } from '../utils/mediaStorage';
+import { detectStudentCurriculumPath } from '../lib/gradeUtils';
 
 // -------------------------------------------------------------
 // Authentication Functions & Resilient Security Helpers
@@ -226,83 +227,91 @@ export async function loginWithEmailPassword(
     return { firebaseUser, userProfile };
   }
 
-  // 2. Candidate & Staff Look-up: Locate user account by Username, Student ID, Staff ID, or Email
+  // 2. Candidate & Staff Look-up: Locate user account by Username, Student ID, Staff ID, or Email (Parallelized)
   let targetUserDoc: DbUser | null = null;
 
   try {
-    // A. Search by Username in 'users' collection
-    let snap = await getDocs(query(collection(db, 'users'), where('username', '==', normalizedIdentifier)));
-    if (!snap.empty) {
-      targetUserDoc = snap.docs[0].data() as DbUser;
-    }
+    const isEmail = normalizedIdentifier.includes('@');
+    const isStudentId = normalizedIdentifier.startsWith('hnc-') || normalizedIdentifier.startsWith('std-');
 
-    // B. Search by Student ID in 'users' collection (case-insensitive checks)
-    if (!targetUserDoc) {
-      snap = await getDocs(query(collection(db, 'users'), where('studentId', '==', rawIdentifier)));
-      if (!snap.empty) targetUserDoc = snap.docs[0].data() as DbUser;
-    }
-    if (!targetUserDoc) {
-      snap = await getDocs(query(collection(db, 'users'), where('studentId', '==', rawIdentifier.toUpperCase())));
-      if (!snap.empty) targetUserDoc = snap.docs[0].data() as DbUser;
-    }
-    if (!targetUserDoc) {
-      snap = await getDocs(query(collection(db, 'users'), where('studentId', '==', normalizedIdentifier)));
-      if (!snap.empty) targetUserDoc = snap.docs[0].data() as DbUser;
-    }
+    // Create a 5-second safety timeout promise to avoid infinite spinning
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Network lookup timed out. Please try again.')), 5000)
+    );
 
-    // C. Search in 'students' collection if not yet found
-    if (!targetUserDoc) {
-      let snapStudent = await getDocs(query(collection(db, 'students'), where('studentId', '==', rawIdentifier)));
-      if (snapStudent.empty) {
-        snapStudent = await getDocs(query(collection(db, 'students'), where('studentId', '==', rawIdentifier.toUpperCase())));
-      }
-      if (snapStudent.empty) {
-        snapStudent = await getDocs(query(collection(db, 'students'), where('username', '==', normalizedIdentifier)));
-      }
+    const lookupTask = (async () => {
+      if (isEmail) {
+        // Fast-path: Email lookup across users and admins in parallel
+        const [usersSnap, adminsSnap] = await Promise.all([
+          getDocs(query(collection(db, 'users'), where('email', '==', normalizedIdentifier))),
+          getDocs(query(collection(db, 'admins'), where('email', '==', normalizedIdentifier))),
+        ]);
 
-      if (!snapStudent.empty) {
-        const studentData = snapStudent.docs[0].data() as DbStudent;
-        const uSnap = await getDoc(doc(db, 'users', studentData.uid));
-        if (uSnap.exists()) {
-          targetUserDoc = uSnap.data() as DbUser;
+        if (usersSnap.docs.length > 1) {
+          throw new Error(
+            'Multiple student accounts (siblings) are registered with this email address. Please sign in using your specific Student ID or Username.'
+          );
+        } else if (usersSnap.docs.length === 1) {
+          return usersSnap.docs[0].data() as DbUser;
         }
-      }
-    }
 
-    // D. Search in 'admins' collection if not yet found
-    if (!targetUserDoc) {
-      let snapAdmin = await getDocs(query(collection(db, 'admins'), where('staffId', '==', rawIdentifier)));
-      if (snapAdmin.empty) {
-        snapAdmin = await getDocs(query(collection(db, 'admins'), where('staffId', '==', rawIdentifier.toUpperCase())));
-      }
-      if (snapAdmin.empty) {
-        snapAdmin = await getDocs(query(collection(db, 'admins'), where('username', '==', normalizedIdentifier)));
-      }
-      if (snapAdmin.empty) {
-        snapAdmin = await getDocs(query(collection(db, 'admins'), where('email', '==', normalizedIdentifier)));
-      }
-
-      if (!snapAdmin.empty) {
-        const adminData = snapAdmin.docs[0].data() as DbAdmin;
-        const uSnap = await getDoc(doc(db, 'users', adminData.uid));
-        if (uSnap.exists()) {
-          targetUserDoc = uSnap.data() as DbUser;
+        if (!adminsSnap.empty) {
+          const adm = adminsSnap.docs[0].data() as DbAdmin;
+          const uSnap = await getDoc(doc(db, 'users', adm.uid));
+          if (uSnap.exists()) return uSnap.data() as DbUser;
         }
-      }
-    }
+        return null;
+      } else if (isStudentId) {
+        // Fast-path: Student ID lookup in parallel across formats
+        const [uSnapRaw, uSnapUpper, sSnapRaw] = await Promise.all([
+          getDocs(query(collection(db, 'users'), where('studentId', '==', rawIdentifier))),
+          getDocs(query(collection(db, 'users'), where('studentId', '==', rawIdentifier.toUpperCase()))),
+          getDocs(query(collection(db, 'students'), where('studentId', '==', rawIdentifier.toUpperCase()))),
+        ]);
 
-    // E. Search by Email in 'users' collection
-    if (!targetUserDoc) {
-      const snapEmail = await getDocs(query(collection(db, 'users'), where('email', '==', normalizedIdentifier)));
-      if (snapEmail.docs.length > 1) {
-        // Multiple students in the same family share this parent email!
-        throw new Error(
-          'Multiple student accounts (siblings) are registered with this email address. Please sign in using your specific Student ID or Username.'
-        );
-      } else if (snapEmail.docs.length === 1) {
-        targetUserDoc = snapEmail.docs[0].data() as DbUser;
+        if (!uSnapUpper.empty) return uSnapUpper.docs[0].data() as DbUser;
+        if (!uSnapRaw.empty) return uSnapRaw.docs[0].data() as DbUser;
+        if (!sSnapRaw.empty) {
+          const sData = sSnapRaw.docs[0].data() as DbStudent;
+          const uDoc = await getDoc(doc(db, 'users', sData.uid));
+          if (uDoc.exists()) return uDoc.data() as DbUser;
+        }
+        return null;
+      } else {
+        // Fast-path: Username and Staff ID lookup in parallel
+        const [uSnapUser, sSnapUser, aSnapUser, aSnapStaff] = await Promise.all([
+          getDocs(query(collection(db, 'users'), where('username', '==', normalizedIdentifier))),
+          getDocs(query(collection(db, 'students'), where('username', '==', normalizedIdentifier))),
+          getDocs(query(collection(db, 'admins'), where('username', '==', normalizedIdentifier))),
+          getDocs(query(collection(db, 'admins'), where('staffId', '==', rawIdentifier.toUpperCase()))),
+        ]);
+
+        if (!uSnapUser.empty) return uSnapUser.docs[0].data() as DbUser;
+        if (!sSnapUser.empty) {
+          const sData = sSnapUser.docs[0].data() as DbStudent;
+          const uDoc = await getDoc(doc(db, 'users', sData.uid));
+          if (uDoc.exists()) return uDoc.data() as DbUser;
+        }
+        if (!aSnapUser.empty) {
+          const aData = aSnapUser.docs[0].data() as DbAdmin;
+          const uDoc = await getDoc(doc(db, 'users', aData.uid));
+          if (uDoc.exists()) return uDoc.data() as DbUser;
+        }
+        if (!aSnapStaff.empty) {
+          const aData = aSnapStaff.docs[0].data() as DbAdmin;
+          const uDoc = await getDoc(doc(db, 'users', aData.uid));
+          if (uDoc.exists()) return uDoc.data() as DbUser;
+        }
+
+        // Secondary fallback search for Student ID if user typed without prefix
+        const uSnapId = await getDocs(query(collection(db, 'users'), where('studentId', '==', rawIdentifier)));
+        if (!uSnapId.empty) return uSnapId.docs[0].data() as DbUser;
+
+        return null;
       }
-    }
+    })();
+
+    targetUserDoc = await Promise.race([lookupTask, timeoutPromise]);
   } catch (lookupErr: any) {
     if (lookupErr?.message?.includes('Multiple student accounts')) {
       throw lookupErr;
@@ -413,6 +422,12 @@ export async function loginWithEmailPassword(
         };
       }
     } catch {}
+  }
+
+  if (targetUserDoc.grade) {
+    const curPath = detectStudentCurriculumPath(targetUserDoc.grade);
+    targetUserDoc.curriculumPathId = curPath.id;
+    targetUserDoc.curriculumPathTitle = curPath.titleTa;
   }
 
   saveActiveUser(targetUserDoc);
@@ -611,6 +626,8 @@ export async function registerStudentAccount(data: {
     totalReferrals: 0,
     sharesCount: 0,
     redeemedPerks: [],
+    curriculumPathId: detectStudentCurriculumPath(data.grade).id,
+    curriculumPathTitle: detectStudentCurriculumPath(data.grade).titleTa,
   };
   await setDoc(doc(db, 'users', uid), userRecord);
 
@@ -921,6 +938,17 @@ export async function saveCompetitionToFirestore(
     requireCameraVerification: competition.requireCameraVerification ?? existingData?.requireCameraVerification ?? false,
     evaluationMode: competition.evaluationMode ?? existingData?.evaluationMode ?? 'Automated',
     membershipRequired: competition.membershipRequired ?? existingData?.membershipRequired ?? false,
+    district: competition.district ?? existingData?.district ?? '',
+    province: competition.province ?? existingData?.province ?? '',
+    scope: competition.scope ?? existingData?.scope ?? 'all_island',
+    gamingMode: competition.gamingMode ?? existingData?.gamingMode ?? 'standard',
+    approvalStatus: competition.approvalStatus ?? existingData?.approvalStatus ?? 'approved',
+    approvalComment: competition.approvalComment ?? existingData?.approvalComment ?? '',
+    approvedBy: competition.approvedBy ?? existingData?.approvedBy ?? '',
+    approvedByName: competition.approvedByName ?? existingData?.approvedByName ?? '',
+    approvedAt: competition.approvedAt ?? existingData?.approvedAt ?? '',
+    isAiGenerated: competition.isAiGenerated ?? existingData?.isAiGenerated ?? false,
+    aiMode: competition.aiMode ?? existingData?.aiMode ?? 'quiz',
   };
 
   await setDoc(compRef, record, { merge: true });
@@ -1461,22 +1489,27 @@ export async function purgeLegacyDemoFirestoreData(): Promise<{ competitionsDele
       'HNC-GR7-SCI-2026',
     ]);
 
-    // 1. Direct document deletion for known demo IDs
-    for (const id of knownDemoCompIds) {
-      try {
-        const compRef = doc(db, 'competitions', id);
-        const snap = await getDoc(compRef);
-        if (snap.exists()) {
-          await deleteDoc(compRef);
-          competitionsDeleted++;
-        }
-      } catch (_) {}
+    // Check if deep scan was already completed to prevent repetitive startup latency
+    if (typeof window !== 'undefined' && localStorage.getItem('hnc_demo_scanned_v3')) {
+      return { competitionsDeleted: 0 };
     }
 
-    // 2. Scan competitions collection to delete any remaining demo competitions by code or title
+    // 1. Parallel document deletion for known demo IDs (Single concurrent batch)
+    await Promise.allSettled(
+      knownDemoCompIds.map(async (id) => {
+        try {
+          await deleteDoc(doc(db, 'competitions', id));
+          competitionsDeleted++;
+        } catch (_) {}
+      })
+    );
+
+    // 2. Fast scan competitions collection once
     try {
       const compColRef = collection(db, 'competitions');
       const compSnap = await getDocs(compColRef);
+      const deletionPromises: Promise<void>[] = [];
+
       for (const d of compSnap.docs) {
         const data = d.data();
         const code = (data.code || '').toUpperCase();
@@ -1489,33 +1522,13 @@ export async function purgeLegacyDemoFirestoreData(): Promise<{ competitionsDele
           title.includes('test competition');
 
         if (isDemoDoc) {
-          await deleteDoc(d.ref);
-          competitionsDeleted++;
-        } else if (Array.isArray(data.questions)) {
-          // Strip sample demo questions from real/user competitions in Firestore
-          const cleaned = data.questions.filter((q: any) => {
-            const text = (q?.questionText || '').toLowerCase();
-            const qId = (q?.id || '').toLowerCase();
-            const isSample =
-              text.includes('red planet') ||
-              text.includes('interior angles') ||
-              text.includes('atomic number 6') ||
-              text.includes('sound travels faster') ||
-              text.includes('value of (2³') ||
-              qId.startsWith('q-sample-') ||
-              qId.startsWith('gk-q') ||
-              qId.startsWith('math-q') ||
-              qId.startsWith('sci-q');
-            return !isSample;
-          });
-          if (cleaned.length !== data.questions.length) {
-            await updateDoc(d.ref, {
-              questions: cleaned,
-              questionsCount: cleaned.length,
-              totalMarks: cleaned.reduce((sum: number, item: any) => sum + (Number(item?.marks) || 0), 0),
-            });
-          }
+          deletionPromises.push(deleteDoc(d.ref).then(() => { competitionsDeleted++; }).catch(() => {}));
         }
+      }
+
+      await Promise.allSettled(deletionPromises);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hnc_demo_scanned_v3', 'true');
       }
     } catch (_) {}
 

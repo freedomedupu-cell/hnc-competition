@@ -2,32 +2,22 @@ import React, { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { registerSW } from 'virtual:pwa-register';
 
-// Purge any stale client-side caches and service workers on boot safely
-if (typeof window !== 'undefined') {
-  try {
-    if (typeof caches !== 'undefined' && caches && typeof caches.keys === 'function') {
-      caches.keys().then((keys) => {
-        keys.forEach((key) => caches.delete(key).catch(() => {}));
-      }).catch(() => {});
-    }
-  } catch {}
-
-  try {
-    if (
-      typeof navigator !== 'undefined' &&
-      'serviceWorker' in navigator &&
-      navigator.serviceWorker &&
-      typeof navigator.serviceWorker.getRegistrations === 'function'
-    ) {
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        for (const reg of registrations) {
-          reg.unregister().catch(() => {});
-        }
-      }).catch(() => {});
-    }
-  } catch {}
+// Register PWA Service Worker for offline student study materials and application caching
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  registerSW({
+    immediate: true,
+    onNeedRefresh() {
+      console.log('HNC EduHub: App update / new curriculum materials available.');
+    },
+    onOfflineReady() {
+      console.log('HNC EduHub: Offline study materials cache is active.');
+    },
+  });
 }
+
+// Preserve browser HTTP caching for fast instant page loads
 
 interface RootBoundaryProps {
   children: React.ReactNode;

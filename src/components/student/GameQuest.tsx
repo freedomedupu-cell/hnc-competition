@@ -332,9 +332,71 @@ export const GameQuest: React.FC = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedProvinceTab, setSelectedProvinceTab] = useState<string>('all');
   const [selectedGamingModeFilter, setSelectedGamingModeFilter] = useState<string>('all');
-  const [selectedGradeFilter, setSelectedGradeFilter] = useState<
-    'all' | 'primary' | 'junior' | 'senior' | 'advanced' | 'after_school'
-  >('all');
+
+  // Student's academic grade level (e.g. Grade 02, Grade 6, etc.)
+  const studentEnrolledGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 6';
+
+  const getStudentGradeCategory = (gradeStr: string): 'primary' | 'junior' | 'senior' | 'advanced' | 'after_school' => {
+    const s = (gradeStr || '').toLowerCase();
+    if (
+      s.includes('grade 1') ||
+      s.includes('grade 2') ||
+      s.includes('grade 3') ||
+      s.includes('grade 4') ||
+      s.includes('grade 5') ||
+      s.includes('தரம் 1') ||
+      s.includes('தரம் 2') ||
+      s.includes('தரம் 3') ||
+      s.includes('தரம் 4') ||
+      s.includes('தரம் 5') ||
+      s.includes('primary') ||
+      s.includes('scholarship') ||
+      s.includes('புலமைப்பரிசில்')
+    ) {
+      return 'primary';
+    }
+    if (
+      s.includes('grade 6') ||
+      s.includes('grade 7') ||
+      s.includes('grade 8') ||
+      s.includes('grade 9') ||
+      s.includes('தரம் 6') ||
+      s.includes('தரம் 7') ||
+      s.includes('தரம் 8') ||
+      s.includes('தரம் 9') ||
+      s.includes('junior')
+    ) {
+      return 'junior';
+    }
+    if (
+      s.includes('grade 10') ||
+      s.includes('grade 11') ||
+      s.includes('தரம் 10') ||
+      s.includes('தரம் 11') ||
+      s.includes('o/l') ||
+      s.includes('ol') ||
+      s.includes('senior')
+    ) {
+      return 'senior';
+    }
+    if (
+      s.includes('grade 12') ||
+      s.includes('grade 13') ||
+      s.includes('தரம் 12') ||
+      s.includes('தரம் 13') ||
+      s.includes('a/l') ||
+      s.includes('al') ||
+      s.includes('advanced')
+    ) {
+      return 'advanced';
+    }
+    if (s.includes('public') || s.includes('service') || s.includes('mso') || s.includes('sleas') || s.includes('slas') || s.includes('slps')) {
+      return 'after_school';
+    }
+    return 'junior';
+  };
+
+  const studentGradeCategory = getStudentGradeCategory(studentEnrolledGrade);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
 
   // Active game play session state
@@ -750,7 +812,7 @@ export const GameQuest: React.FC = () => {
       selectedGamingModeFilter === 'all' ? true : l.gamingMode === selectedGamingModeFilter;
 
     const matchesGrade =
-      selectedGradeFilter === 'all' ? true : l.gradeCategory === selectedGradeFilter;
+      !l.gradeCategory || l.gradeCategory === studentGradeCategory;
 
     return matchesProvince && matchesMode && matchesGrade;
   });
@@ -931,91 +993,24 @@ export const GameQuest: React.FC = () => {
         </div>
       </div>
 
-      {/* Grade Level Category Filter Bar */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2 text-xs">
-        <div className="flex items-center justify-between">
-          <span className="font-extrabold text-slate-800 flex items-center gap-1.5">
-            <Award className="w-4 h-4 text-indigo-600" />
-            <span>{questLang === 'ta' ? 'வகுப்பு நிலை வடிகட்டி (Grade Wise Levels):' : 'Grade Level Categories:'}</span>
+      {/* Student's Enrolled Academic Grade Badge (Automatic, no manual tier switcher needed) */}
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2.5">
+          <span className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-900 to-blue-900 text-amber-300 font-extrabold text-xs flex items-center gap-1.5 shadow-2xs border border-indigo-700">
+            <Award className="w-4 h-4 text-amber-300" />
+            <span>{studentEnrolledGrade}</span>
           </span>
-          <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-            {questLang === 'ta' ? 'தகுந்த வகுப்பு மட்டத்தைத் தேர்வு செய்க' : 'Select Academic Grade'}
+          <span className="text-slate-700 font-bold">
+            {questLang === 'ta'
+              ? 'உங்கள் வகுப்பிற்கான பிரத்தியேக இலங்கை 25 மாவட்ட தீவுப் போட்டிகள் & சவால்கள்'
+              : questLang === 'si'
+              ? 'ඔබගේ ශ්‍රේණියට අදාළ ශ්‍රී ලංකා දිස්ත්‍රික් 25 දූපත් අභියෝග'
+              : 'Exclusive Sri Lanka 25 Districts Island Arena aligned to your enrolled grade'}
           </span>
         </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          <button
-            type="button"
-            onClick={() => setSelectedGradeFilter('all')}
-            className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap cursor-pointer ${
-              selectedGradeFilter === 'all'
-                ? 'bg-indigo-900 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            {questLang === 'ta' ? 'அனைத்து வகுப்புகளும் (All Grades)' : 'All Grade Levels'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedGradeFilter('primary')}
-            className={`px-3.5 py-1.5 rounded-xl font-bold transition whitespace-nowrap border cursor-pointer ${
-              selectedGradeFilter === 'primary'
-                ? 'bg-amber-600 text-white border-amber-600 shadow-xs font-black'
-                : 'bg-amber-50/70 text-amber-950 border-amber-200 hover:bg-amber-100'
-            }`}
-          >
-            {questLang === 'ta' ? '🌱 ஆரம்பப் பிரிவு (Grades 1-5)' : '🌱 Primary (Grades 1-5)'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedGradeFilter('junior')}
-            className={`px-3.5 py-1.5 rounded-xl font-bold transition whitespace-nowrap border cursor-pointer ${
-              selectedGradeFilter === 'junior'
-                ? 'bg-blue-600 text-white border-blue-600 shadow-xs font-black'
-                : 'bg-blue-50/70 text-blue-950 border-blue-200 hover:bg-blue-100'
-            }`}
-          >
-            {questLang === 'ta' ? '📘 இடைநிலைப் பிரிவு (Grades 6-9)' : '📘 Junior (Grades 6-9)'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedGradeFilter('senior')}
-            className={`px-3.5 py-1.5 rounded-xl font-bold transition whitespace-nowrap border cursor-pointer ${
-              selectedGradeFilter === 'senior'
-                ? 'bg-purple-600 text-white border-purple-600 shadow-xs font-black'
-                : 'bg-purple-50/70 text-purple-950 border-purple-200 hover:bg-purple-100'
-            }`}
-          >
-            {questLang === 'ta' ? '🎓 சாதாரண தரம் O/L (Grades 10-11)' : '🎓 Senior O/L (Grades 10-11)'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedGradeFilter('advanced')}
-            className={`px-3.5 py-1.5 rounded-xl font-bold transition whitespace-nowrap border cursor-pointer ${
-              selectedGradeFilter === 'advanced'
-                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs font-black'
-                : 'bg-emerald-50/70 text-emerald-950 border-emerald-200 hover:bg-emerald-100'
-            }`}
-          >
-            {questLang === 'ta' ? '🔥 உயர்தரம் A/L (Grades 12-13)' : '🔥 Advanced A/L (Grades 12-13)'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedGradeFilter('after_school')}
-            className={`px-3.5 py-1.5 rounded-xl font-bold transition whitespace-nowrap border cursor-pointer ${
-              selectedGradeFilter === 'after_school'
-                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs font-black'
-                : 'bg-indigo-50/70 text-indigo-950 border-indigo-200 hover:bg-indigo-100'
-            }`}
-          >
-            {questLang === 'ta' ? '👔 பாடசாலைக்குப் பிந்திய போட்டிப் பரீட்சைகள் (Teaching, GS, MA, SLEAS, SLAS)' : '👔 After School Competitions (Teaching, GS, MA, SLEAS, SLAS)'}
-          </button>
-        </div>
+        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 self-start sm:self-auto">
+          {questLang === 'ta' ? 'தானியங்கி பாடத்திட்ட நிலை (Adaptive Grade Active)' : 'Adaptive Grade Active'}
+        </span>
       </div>
 
       {/* 4 Study Gaming Modes Filter Strip */}

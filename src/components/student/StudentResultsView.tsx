@@ -183,6 +183,39 @@ export const StudentResultsView: React.FC = () => {
         </div>
       </div>
 
+      {/* AI STUDY TIMETABLE PROMOTION BANNER */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white shadow-md border border-indigo-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 flex items-center justify-center font-black text-xl shadow-md shrink-0">
+            <Sparkles className="w-5 h-5 text-slate-950" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full">
+                Gemini 3.8 Flash AI
+              </span>
+              <h3 className="font-extrabold text-sm sm:text-base text-white">
+                {language === 'ta' ? 'தேர்வு முடிவுகளை அதிக மதிப்பெண்களாக மாற்றுங்கள்!' : 'Turn Past Results into Higher Scores!'}
+              </h3>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              {language === 'ta'
+                ? 'உங்கள் முடிவுகளில் பலவீனமான பாடங்களை ஜெமினி AI தானாக ஆய்வு செய்து, எதிர்வரும் போட்டிகளுக்கான 7-நாள் தனிப்பயனாக்கப்பட்ட படிப்பு அட்டவணையை உருவாக்குகிறது.'
+                : 'Gemini AI automatically analyzes your weak subjects from these results and builds a personalized study timetable for your upcoming competitions.'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setStudentNav('AI Study Timetable')}
+          className="self-start sm:self-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-400 hover:brightness-105 active:scale-95 text-slate-950 font-black text-xs shadow-md shadow-amber-400/20 transition flex items-center gap-2 shrink-0 cursor-pointer"
+        >
+          <Calendar className="w-4 h-4 text-slate-950" />
+          <span>{language === 'ta' ? 'படிப்பு அட்டவணை உருவாக்குக →' : 'Generate Study Timetable →'}</span>
+        </button>
+      </div>
+
       {/* Results Cards List */}
       <div className="space-y-4">
         {studentResults.length === 0 ? (

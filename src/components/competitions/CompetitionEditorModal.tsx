@@ -49,6 +49,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { CompetitionPreviewModal } from './CompetitionPreviewModal';
 import { BulkQuestionImportModal } from './BulkQuestionImportModal';
+import { SriLankanAiExamGeneratorModal } from './SriLankanAiExamGeneratorModal';
 import { getSampleQuestionsForCategory } from '../../data/questionPool';
 
 interface QuestionEditorCardProps {
@@ -385,6 +386,7 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
   const [evaluationMode, setEvaluationMode] = useState<'Automated' | 'Manual Panel' | 'Hybrid'>('Automated');
   const [isOptionsExpanded, setIsOptionsExpanded] = useState<boolean>(true);
   const [showBulkImportModal, setShowBulkImportModal] = useState<boolean>(false);
+  const [showAiExamGeneratorModal, setShowAiExamGeneratorModal] = useState<boolean>(false);
 
   // Guard to prevent re-initialization when modal is already open and user is editing
   const prevOpenRef = useRef(false);
@@ -874,6 +876,37 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
     ) {
       setTitle(suggestedTitle);
     }
+  };
+
+  const handleAiImportQuestions = (
+    newQuestions: QuestionItem[],
+    mode: 'append' | 'replace',
+    meta?: {
+      title?: string;
+      category?: string;
+      grade?: string;
+      language?: string;
+      duration?: number;
+      curriculumVersion?: string;
+      term?: string;
+      examCategory?: any;
+      gazetteNumber?: string;
+    }
+  ) => {
+    handleBulkImportQuestions(newQuestions, mode, meta?.title);
+    if (meta) {
+      if (meta.grade) setGrade(meta.grade);
+      if (meta.category && (!category.trim() || category === 'General' || category === 'Mathematics')) {
+        setCategory(meta.category);
+      }
+      if (meta.language) {
+        setLanguage(meta.language as any);
+      }
+      if (meta.duration && (!duration || duration === 30)) {
+        setDuration(meta.duration);
+      }
+    }
+    setShowAiExamGeneratorModal(false);
   };
 
   const handleImageUpload = useCallback((qId: string, file: File) => {
@@ -2410,6 +2443,22 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                     )}
                     <button
                       type="button"
+                      id="btn-open-ai-exam-generator"
+                      onClick={() => setShowAiExamGeneratorModal(true)}
+                      className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-800 hover:to-purple-800 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                      title="Generate Sri Lankan Curriculum & Gazette Aligned Questions"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>
+                        {currentAppLanguage === 'ta'
+                          ? '🇱🇰 இலங்கை AI வினா ஆக்கி'
+                          : currentAppLanguage === 'si'
+                          ? '🇱🇰 ශ්‍රී ලංකා AI ප්‍රශ්න සාදනය'
+                          : '🇱🇰 Sri Lankan AI Generator'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
                       id="btn-open-bulk-import"
                       onClick={() => setShowBulkImportModal(true)}
                       className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs"
@@ -2436,16 +2485,30 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                       </p>
                       <p className="text-slate-500 text-[11px] mt-1 max-w-md mx-auto">
                         {currentAppLanguage === 'ta'
-                          ? 'இங்கு வினாக்கள் ஏதும் இல்லை. நீங்கள் புதிதாக வினாவைச் சேர்க்கலாம் அல்லது Excel/Text மூலம் மொத்தமாகப் பதிவேற்றலாம்.'
-                          : 'No pre-filled questions. Add single questions or bulk upload from Excel/Text.'}
+                          ? 'இங்கு வினாக்கள் ஏதும் இல்லை. நீங்கள் புதிதாக வினாவைச் சேர்க்கலாம், AI மூலம் உருவாக்கலாம் அல்லது Excel/Text மூலம் மொத்தமாகப் பதிவேற்றலாம்.'
+                          : 'No pre-filled questions. Generate with Sri Lankan AI, upload from Excel/Text, or add single questions.'}
                       </p>
                     </div>
 
                     <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                       <button
                         type="button"
+                        onClick={() => setShowAiExamGeneratorModal(true)}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-800 hover:to-purple-800 text-white text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer"
+                      >
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        <span>
+                          {currentAppLanguage === 'ta'
+                            ? '🇱🇰 இலங்கை பாடத்திட்ட AI வினா ஆக்கி'
+                            : currentAppLanguage === 'si'
+                            ? '🇱🇰 ශ්‍රී ලංකා විෂය නිර්දේශ AI ප්‍රශ්න සාදනය'
+                            : '🇱🇰 Sri Lankan AI Auto Generator'}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setShowBulkImportModal(true)}
-                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-2 shadow-xs"
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer"
                       >
                         <FileSpreadsheet className="w-4 h-4" />
                         <span>
@@ -2457,7 +2520,7 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleAddQuestion('multiple_choice')}
-                        className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-2xs"
+                        className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>
@@ -2558,6 +2621,19 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
           currentLanguage={language === 'Tamil' ? 'ta' : language === 'Sinhala' ? 'si' : 'en'}
           defaultMarks={5}
           competitionType={competitionType}
+        />
+      )}
+
+      {/* Sri Lankan AI Exam & Quiz Generator Modal */}
+      {showAiExamGeneratorModal && (
+        <SriLankanAiExamGeneratorModal
+          isOpen={showAiExamGeneratorModal}
+          onClose={() => setShowAiExamGeneratorModal(false)}
+          onImportQuestions={handleAiImportQuestions}
+          existingCount={questions.length}
+          initialGrade={grade || 'Grade 10'}
+          initialSubject={category || 'Mathematics'}
+          initialLanguage={language || 'Tamil'}
         />
       )}
     </>

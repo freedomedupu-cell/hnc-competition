@@ -36,7 +36,7 @@ import {
   registerStudentAccount,
   resetUserPasswordByLookup,
 } from '../../services/firebaseService';
-import { AVAILABLE_GRADES } from '../../lib/gradeUtils';
+import { AVAILABLE_GRADES, detectStudentCurriculumPath } from '../../lib/gradeUtils';
 import { ShareModal } from '../common/ShareModal';
 
 const SRI_LANKA_DISTRICTS = [
@@ -879,6 +879,35 @@ export const AuthView: React.FC = () => {
                       ))}
                     </datalist>
                   </div>
+
+                  {/* Automatic Grade Detection & Single Curriculum Path Preview */}
+                  {(() => {
+                    const detectedPath = detectStudentCurriculumPath(studentForm.grade);
+                    return (
+                      <div className="mt-2 p-2.5 rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/90 via-blue-50/60 to-purple-50/50 text-[11px] space-y-1.5 shadow-2xs">
+                        <div className="flex items-center justify-between gap-1 flex-wrap">
+                          <span className="font-extrabold text-indigo-900 flex items-center gap-1">
+                            <span>{detectedPath.icon}</span>
+                            <span>{language === 'ta' ? detectedPath.titleTa : detectedPath.titleEn}</span>
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white shadow-2xs">
+                            {language === 'ta' ? detectedPath.stageBadgeTa : detectedPath.stageBadgeEn}
+                          </span>
+                        </div>
+                        <div className="text-slate-600 leading-snug">
+                          {language === 'ta' ? detectedPath.descriptionTa : detectedPath.descriptionEn}
+                        </div>
+                        <div className="pt-1 border-t border-indigo-100 flex items-center justify-between text-[10px] font-semibold text-slate-500 flex-wrap gap-1">
+                          <span className="text-indigo-700">
+                            🎯 {detectedPath.mcqOptionCount} MCQ தெரிவுகள் ({detectedPath.mcqOptionCount}-Option Format)
+                          </span>
+                          <span className="text-emerald-700 font-bold">
+                            ✓ {language === 'ta' ? 'தேவையற்ற பிற தரங்கள் மறைக்கப்படும்' : 'Irrelevant grade tiers hidden'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* 3. Date of birth */}

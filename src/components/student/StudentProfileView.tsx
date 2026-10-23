@@ -33,16 +33,33 @@ import {
   ExternalLink,
   Pencil,
   Save,
+  Bell,
+  Volume2,
+  VolumeX,
+  BookOpen,
+  Settings,
 } from 'lucide-react';
 import { StudentMembershipModal } from './StudentMembershipModal';
 import { StudentAchievements } from './StudentAchievements';
+import { EnrolledSubjectsModal } from './EnrolledSubjectsModal';
 import { SavePulseIndicator, SaveStatus } from '../common/SavePulseIndicator';
 import { SRI_LANKA_25_DISTRICTS } from '../../data/sriLankaDistricts';
+import { detectStudentCurriculumPath, AVAILABLE_GRADES } from '../../lib/gradeUtils';
+import {
+  getStoredSubjectPushSettings,
+  saveSubjectPushSettings,
+  requestSubjectPushPermission,
+  sendSubjectPublicationBrowserPush,
+  playSubjectPublicationChime,
+  SRI_LANKAN_ACADEMIC_SUBJECTS,
+} from '../../utils/subjectNotificationUtils';
 
 export const StudentProfileView: React.FC = () => {
   const {
     currentStudent,
     updateStudentProfile,
+    studentEnrolledSubjects,
+    competitions,
     setStudentNav,
     language,
     currentMembership,
@@ -50,10 +67,12 @@ export const StudentProfileView: React.FC = () => {
   } = useApp();
   const [showMembershipModal, setShowMembershipModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showSubjectsModal, setShowSubjectsModal] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [avatarToast, setAvatarToast] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [localAvatar, setLocalAvatar] = useState<string>(() => currentStudent.avatarUrl || '');
+  const [pushSettings, setPushSettings] = useState(getStoredSubjectPushSettings);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // Real-time save status for student profile changes
@@ -83,6 +102,45 @@ export const StudentProfileView: React.FC = () => {
       setLocalAvatar(currentStudent.avatarUrl);
     }
   }, [currentStudent.avatarUrl]);
+
+  // Grade edit & curriculum path adaptation state
+  const [isEditingGrade, setIsEditingGrade] = useState(false);
+  const [selectedNewGrade, setSelectedNewGrade] = useState(currentStudent.gradeLevel || 'Grade 11 (O/L)');
+  const [isSavingGrade, setIsSavingGrade] = useState(false);
+  const [gradeSaveToast, setGradeSaveToast] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (currentStudent.gradeLevel) {
+      setSelectedNewGrade(currentStudent.gradeLevel);
+    }
+  }, [currentStudent.gradeLevel]);
+
+  const handleSaveGrade = async () => {
+    if (!selectedNewGrade || selectedNewGrade.trim() === (currentStudent.gradeLevel || '').trim()) {
+      setIsEditingGrade(false);
+      return;
+    }
+    setIsSavingGrade(true);
+    setProfileSaveStatus('saving');
+    try {
+      await updateStudentProfile({ gradeLevel: selectedNewGrade.trim() });
+      setProfileLastSavedAt(new Date());
+      setProfileSaveStatus('saved');
+      setIsEditingGrade(false);
+      const newPath = detectStudentCurriculumPath(selectedNewGrade);
+      setGradeSaveToast(
+        language === 'ta'
+          ? `வகுப்பு ${selectedNewGrade} ஆக வெற்றிகரமாக புதுப்பிக்கப்பட்டது! "${newPath.titleTa}" பாடத்திட்டப் பாதை செயல்படுத்தப்பட்டுள்ளது.`
+          : `Grade updated to ${selectedNewGrade}! "${newPath.titleEn}" path activated.`
+      );
+      setTimeout(() => setGradeSaveToast(null), 5000);
+    } catch (err) {
+      console.error('Failed to update student grade:', err);
+      setProfileSaveStatus('idle');
+    } finally {
+      setIsSavingGrade(false);
+    }
+  };
 
   const activeAvatar = localAvatar || currentStudent.avatarUrl || '';
 
@@ -763,9 +821,19 @@ export const StudentProfileView: React.FC = () => {
             </div>
 
             <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/60 space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                {language === 'ta' ? 'வகுப்பு / தரம்' : language === 'si' ? 'ශ්‍රේණිය' : 'Grade Level'}
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  {language === 'ta' ? 'வகுப்பு / தரம்' : language === 'si' ? 'ශ්‍රේණිය' : 'Grade Level'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingGrade(!isEditingGrade)}
+                  className="text-[10px] font-extrabold text-blue-600 hover:text-blue-800 underline flex items-center gap-0.5 cursor-pointer"
+                >
+                  <Pencil className="w-2.5 h-2.5" />
+                  <span>{isEditingGrade ? (language === 'ta' ? 'மூடு' : 'Close') : (language === 'ta' ? 'மாற்று' : 'Change')}</span>
+                </button>
+              </div>
               <p className="font-bold text-indigo-900 flex items-center gap-1.5">
                 <GraduationCap className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                 <span>{currentStudent.gradeLevel}</span>
@@ -834,6 +902,327 @@ export const StudentProfileView: React.FC = () => {
                 <p className="text-slate-700 italic">"{currentStudent.bio}"</p>
               </div>
             )}
+          </div>
+
+          {/* Grade Change Feedback Toast */}
+          {gradeSaveToast && (
+            <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-900 font-bold flex items-center gap-2 animate-in fade-in shadow-xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{gradeSaveToast}</span>
+            </div>
+          )}
+
+          {/* Grade Edit & Curriculum Path Re-mapping Modal/Panel */}
+          {isEditingGrade && (
+            <div className="p-4 sm:p-5 rounded-2xl border-2 border-indigo-400 bg-gradient-to-br from-indigo-50/90 via-blue-50/70 to-slate-50 space-y-3.5 shadow-sm animate-in fade-in">
+              <div className="flex items-center justify-between border-b border-indigo-200 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="w-4 h-4 text-indigo-700" />
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-900">
+                    {language === 'ta' ? 'கல்வி வகுப்பு / தரம் புதுப்பித்தல் (Change Grade)' : 'Update Academic Grade Level'}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingGrade(false)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-1.5 text-xs">
+                <label className="font-bold text-slate-700 block text-[11px]">
+                  {language === 'ta' ? 'புதிய வகுப்பைத் தேர்ந்தெடுக்கவும் (Select New Grade):' : 'Select New Grade:'}
+                </label>
+                <select
+                  value={selectedNewGrade}
+                  onChange={(e) => setSelectedNewGrade(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-medium text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                >
+                  {AVAILABLE_GRADES.filter(
+                    (g) =>
+                      !g.toLowerCase().includes('open') &&
+                      !g.toLowerCase().includes('all grades') &&
+                      !g.toLowerCase().includes('அனைத்து')
+                  ).map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Live Preview of Newly Mapped Curriculum Path */}
+              {(() => {
+                const previewPath = detectStudentCurriculumPath(selectedNewGrade);
+                return (
+                  <div className="p-3 rounded-xl border border-indigo-200 bg-white/80 space-y-1.5 text-[11px]">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="font-bold text-indigo-900 flex items-center gap-1.5">
+                        <span>{previewPath.icon}</span>
+                        <span>{language === 'ta' ? previewPath.titleTa : previewPath.titleEn}</span>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-600 text-white shadow-2xs">
+                        {previewPath.stageBadgeTa}
+                      </span>
+                    </div>
+                    <p className="text-slate-600 leading-snug">
+                      {language === 'ta' ? previewPath.descriptionTa : previewPath.descriptionEn}
+                    </p>
+                    <div className="pt-1 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 flex-wrap gap-1">
+                      <span className="font-semibold text-indigo-700">
+                        🎯 {previewPath.mcqOptionCount} MCQ தெரிவுகள் ({previewPath.mcqOptionCount}-Option Standard)
+                      </span>
+                      <span className="text-emerald-700 font-bold">
+                        🔒 பொருத்தமற்ற பிற தரங்கள் தானாக மறைக்கப்படும்
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingGrade(false)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+                >
+                  {language === 'ta' ? 'ரத்து செய்' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingGrade || selectedNewGrade === currentStudent.gradeLevel}
+                  onClick={handleSaveGrade}
+                  className="px-4 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingGrade ? (
+                    <span>{language === 'ta' ? 'சேமிக்கப்படுகிறது...' : 'Saving...'}</span>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{language === 'ta' ? 'வகுப்பை உறுதிசெய் & சேமி' : 'Confirm & Save Grade'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ACTIVE SRI LANKAN SINGLE CURRICULUM PATH SPECIFICATION CARD */}
+          {(() => {
+            const currentPath = detectStudentCurriculumPath(currentStudent.gradeLevel);
+            return (
+              <div className="p-4 sm:p-5 rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-950 via-slate-900 to-blue-950 text-white space-y-3.5 shadow-md">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-indigo-800/80 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center text-xl shadow-md shrink-0 border border-indigo-400/30">
+                      {currentPath.icon}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full shadow-2xs">
+                          {language === 'ta' ? 'ஒற்றைப் பாடத்திட்டப் பாதை' : 'Single Curriculum Path Active'}
+                        </span>
+                        <span className="text-[11px] font-bold text-indigo-200">
+                          {currentPath.stageBadgeTa}
+                        </span>
+                      </div>
+                      <h3 className="text-sm sm:text-base font-extrabold text-white mt-0.5">
+                        {language === 'ta' ? currentPath.titleTa : currentPath.titleEn}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingGrade(true)}
+                    className="self-start sm:self-auto px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    <Pencil className="w-3.5 h-3.5 text-amber-300" />
+                    <span>{language === 'ta' ? 'வகுப்பு மாற்றம்' : 'Change Grade'}</span>
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  {language === 'ta' ? currentPath.descriptionTa : currentPath.descriptionEn}
+                </p>
+
+                {/* Core subjects for this specific single curriculum path */}
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    {language === 'ta' ? 'முக்கிய பாடப் பிரிவுகள் (Core Syllabus Subjects):' : 'Core Syllabus Subjects:'}
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(language === 'ta' ? currentPath.coreSubjectsTa : currentPath.coreSubjectsEn).map((subj) => (
+                      <span
+                        key={subj}
+                        className="px-2.5 py-1 rounded-lg bg-white/10 border border-white/10 text-slate-200 text-[11px] font-semibold"
+                      >
+                        {subj}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Rules & Isolation Guarantee */}
+                <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">🎯</span>
+                    <span className="text-indigo-200 font-bold">
+                      {currentPath.mcqOptionCount} MCQ தெரிவுகள் ({currentPath.mcqOptionCount}-Option Standard)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[11px]">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>
+                      {language === 'ta'
+                        ? 'பொருத்தமற்ற பிற தரங்கள் மற்றும் தேர்வுகள் அனைத்தும் தானாக மறைக்கப்பட்டுள்ளன'
+                        : 'All irrelevant grade tiers & non-applicable contests automatically hidden'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ENROLLED SUBJECTS & REAL-TIME PUSH NOTIFICATION ALERTS CARD */}
+          <div className="p-4 sm:p-5 rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/90 via-purple-50/60 to-slate-50 space-y-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 text-white flex items-center justify-center text-lg shadow-sm shrink-0">
+                  🔔
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      {language === 'ta'
+                        ? 'பதிவு செய்யப்பட்ட பாடங்கள் & புஷ் அறிவிப்புகள்'
+                        : 'Enrolled Subjects & Push Notification Alerts'}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
+                      {studentEnrolledSubjects.length} {language === 'ta' ? 'பாடங்கள்' : 'Subjects'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {language === 'ta'
+                      ? 'உங்கள் பாடங்களில் புதிய போட்டி அல்லது வினாடி வினா வெளியிடப்படும் போது உடனடி உலாவி மற்றும் ஒலி அறிவிப்புகளைப் பெறுங்கள்.'
+                      : 'Receive instant browser & in-app push notifications whenever a new competition or quiz is published in your enrolled subjects.'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowSubjectsModal(true)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition flex items-center gap-1.5 self-start sm:self-auto shrink-0"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>{language === 'ta' ? 'பாடங்களை மாற்றுக' : 'Manage Subjects'}</span>
+              </button>
+            </div>
+
+            {/* Active Enrolled Subjects Chips */}
+            <div className="space-y-2">
+              <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                <span>{language === 'ta' ? 'தற்போது கண்காணிக்கப்படும் பாடங்கள்' : 'Actively Tracked Subjects'}:</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {studentEnrolledSubjects.map((subjectName) => {
+                  const meta = SRI_LANKAN_ACADEMIC_SUBJECTS.find(
+                    (s) => s.nameEn.toLowerCase() === subjectName.toLowerCase() || s.nameTa === subjectName
+                  );
+                  return (
+                    <div
+                      key={subjectName}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-indigo-200 text-slate-800 shadow-2xs flex items-center gap-2"
+                    >
+                      <span>{meta?.icon || '📚'}</span>
+                      <span>{subjectName}</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Controls Bar: Browser Push Permission, Sound Chime, and Instant Test Button */}
+            <div className="pt-2 border-t border-indigo-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-slate-600">
+                  {language === 'ta' ? 'அறிவிப்பு நிலை' : 'Browser Alert Status'}:
+                </span>
+                {pushSettings.permission === 'granted' ? (
+                  <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    <span>{language === 'ta' ? 'உலாவி புஷ் தயார்' : 'Desktop Push Active'}</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const res = await requestSubjectPushPermission();
+                      setPushSettings(getStoredSubjectPushSettings());
+                      if (res.granted) {
+                        setAvatarToast(language === 'ta' ? '🔔 உலாவி அறிவிப்பு இயக்கப்பட்டது!' : '🔔 Push notifications enabled!');
+                        setTimeout(() => setAvatarToast(null), 3000);
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 transition flex items-center gap-1"
+                  >
+                    <Bell className="w-3 h-3" />
+                    <span>{language === 'ta' ? 'உலாவி புஷ் அனுமதிக்க' : 'Allow Desktop Push'}</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextVal = !pushSettings.soundEnabled;
+                    const updated = saveSubjectPushSettings({ soundEnabled: nextVal });
+                    setPushSettings(updated);
+                    if (nextVal) playSubjectPublicationChime();
+                  }}
+                  className={`p-1.5 rounded-lg border transition ${
+                    pushSettings.soundEnabled
+                      ? 'bg-blue-50 border-blue-200 text-blue-700'
+                      : 'bg-slate-100 border-slate-200 text-slate-400'
+                  }`}
+                  title={pushSettings.soundEnabled ? 'Mute Chime' : 'Enable Chime'}
+                >
+                  {pushSettings.soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const targetComp = competitions[0] || {
+                    id: 'comp-profile-test',
+                    title: 'National Mathematics & Science Challenge 2026',
+                    competitionType: 'Quiz',
+                    category: studentEnrolledSubjects[0] || 'Mathematics',
+                  };
+                  playSubjectPublicationChime();
+                  const sent = sendSubjectPublicationBrowserPush(
+                    targetComp as any,
+                    studentEnrolledSubjects[0] || 'Mathematics',
+                    language
+                  );
+                  setAvatarToast(
+                    sent
+                      ? (language === 'ta' ? '🔔 சோதனை அறிவிப்பு உங்கள் திரைக்கு அனுப்பப்பட்டது!' : '🔔 Test notification & chime sent to your screen!')
+                      : (language === 'ta' ? '🔔 ஒலி ஒலித்தது! உலாவி அறிவிப்புக்கு Allow அழுத்தவும்.' : '🔔 Audio chime played! Click Allow for desktop push.')
+                  );
+                  setTimeout(() => setAvatarToast(null), 3500);
+                }}
+                className="px-3 py-1.5 rounded-xl text-[11px] font-semibold bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 transition flex items-center gap-1.5 self-start sm:self-auto shrink-0"
+              >
+                <span>🔔</span>
+                <span>{language === 'ta' ? 'சோதனை அறிவிப்பு அனுப்புக' : 'Test Push Notification'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Official Higher Novas College Support & Social Channels Card */}
@@ -1071,6 +1460,12 @@ export const StudentProfileView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Enrolled Subjects & Push Notification Preferences Modal */}
+      <EnrolledSubjectsModal
+        isOpen={showSubjectsModal}
+        onClose={() => setShowSubjectsModal(false)}
+      />
     </div>
   );
 };

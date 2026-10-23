@@ -34,7 +34,8 @@ import { APP_LOGO } from '../../assets/logo';
 import { StudentMembershipModal } from './StudentMembershipModal';
 import { DynamicAdBillboard } from '../common/DynamicAdBillboard';
 import { LiveExamLeaderboard } from './LiveExamLeaderboard';
-import { isGradeEligible } from '../../lib/gradeUtils';
+import { isGradeEligible, detectStudentCurriculumPath } from '../../lib/gradeUtils';
+import { isCompetitionInEnrolledSubjects } from '../../utils/subjectNotificationUtils';
 
 export const StudentCompetitionsView: React.FC = () => {
   const {
@@ -42,6 +43,7 @@ export const StudentCompetitionsView: React.FC = () => {
     results,
     currentAuthUser,
     currentStudent,
+    studentEnrolledSubjects,
     registerStudentForCompetition,
     isStudentRegistered,
     hasStudentSubmitted,
@@ -101,7 +103,17 @@ export const StudentCompetitionsView: React.FC = () => {
   const visibleCompetitions = competitions.filter((comp) => {
     if (!comp) return false;
     const s = (comp.status || '').toLowerCase().trim();
-    if (s.includes('draft') || s === 'closed' || s === 'inactive' || s === 'unpublished') {
+    const appStatus = (comp.approvalStatus || '').toLowerCase().trim();
+    if (
+      s.includes('draft') ||
+      s.includes('pending') ||
+      s.includes('reject') ||
+      s === 'closed' ||
+      s === 'inactive' ||
+      s === 'unpublished' ||
+      appStatus === 'pending_approval' ||
+      appStatus === 'rejected'
+    ) {
       return false;
     }
 
@@ -128,7 +140,11 @@ export const StudentCompetitionsView: React.FC = () => {
 
     // 2. Category Filter
     const matchesCategory =
-      categoryFilter === 'all' ? true : comp.category.toLowerCase() === categoryFilter.toLowerCase();
+      categoryFilter === 'all'
+        ? true
+        : categoryFilter === 'enrolled'
+        ? isCompetitionInEnrolledSubjects(comp, studentEnrolledSubjects).matches
+        : comp.category.toLowerCase() === categoryFilter.toLowerCase();
 
     // 3. Type Filter
     const matchesType =
@@ -278,6 +294,45 @@ export const StudentCompetitionsView: React.FC = () => {
         </div>
       )}
 
+      {/* Student's Single Curriculum Path & Automatic Grade Level Badge */}
+      {(() => {
+        const studentPath = detectStudentCurriculumPath(studentGrade);
+        return (
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-3.5 sm:p-4 rounded-2xl border border-indigo-700/60 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-xl bg-indigo-600/80 border border-indigo-400/30 flex items-center justify-center text-lg shadow-2xs shrink-0">
+                {studentPath.icon}
+              </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
+                    {studentGrade}
+                  </span>
+                  <span className="font-extrabold text-blue-200 text-xs">
+                    {language === 'ta' ? studentPath.stageBadgeTa : studentPath.stageBadgeEn}
+                  </span>
+                  <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-emerald-300 font-mono font-bold">
+                    {studentPath.mcqOptionCount} Options Rule
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 mt-0.5">
+                  {language === 'ta'
+                    ? `உங்கள் கல்வி நிலைக்குரிய போட்டிகள் மட்டுமே பட்டியலிடப்பட்டுள்ளன. பிற தரங்கள் தானாக மறைக்கப்பட்டுள்ளன.`
+                    : `Showing competitions strictly mapped to your curriculum path. Other grade tiers are hidden.`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+              <span className="text-[11px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{language === 'ta' ? 'அங்கீகரிக்கப்பட்ட பாடத்திட்டம்' : 'Verified Path Active'}</span>
+              </span>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Filter and Search Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="relative w-full md:w-80">
@@ -312,6 +367,19 @@ export const StudentCompetitionsView: React.FC = () => {
               : language === 'si'
               ? 'සියලු විෂයයන්'
               : 'All Subjects'}
+          </button>
+
+          <button
+            onClick={() => setCategoryFilter('enrolled')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+              categoryFilter === 'enrolled'
+                ? 'bg-purple-700 text-white font-bold shadow-xs'
+                : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
+            }`}
+            title="Competitions matching your enrolled subjects"
+          >
+            <span>🎯</span>
+            <span>{language === 'ta' ? 'என் விருப்பப் பாடங்கள்' : 'My Enrolled Subjects'}</span>
           </button>
           {categories.map((cat) => (
             <button

@@ -21,6 +21,7 @@ import {
   Gift,
   Megaphone,
   Bell,
+  Calendar,
   Video,
   Activity,
   MessageCircle,
@@ -398,6 +399,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
           : '🏆 Leaderboards Hub',
       icon: <Medal className="w-5 h-5 text-amber-500" />,
       badge: '🔥 Live',
+    },
+    {
+      id: 'AI Study Timetable',
+      label:
+        language === 'ta'
+          ? '📅 AI படிப்பு அட்டவணை'
+          : language === 'si'
+          ? '📅 AI අධ්‍යයන කාලසටහන'
+          : '📅 AI Study Timetable',
+      icon: <Calendar className="w-5 h-5 text-indigo-500" />,
+      badge: '✨ Gemini',
     },
     {
       id: 'My Results',

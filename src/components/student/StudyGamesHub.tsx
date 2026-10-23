@@ -518,11 +518,52 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
   const studentId = currentAuthUser?.studentId || currentStudent?.studentId || '';
   const todayKey = getLocalTodayKey();
 
-  // Student Enrolled Grade Tier (Defaults to student's enrolled grade, allows toggle)
-  const studentEnrolledGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 6';
+  // Student Enrolled Grade Tier (Strictly tied to the student's registered grade)
+  const studentEnrolledGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 2';
   const [selectedGradeTier, setSelectedGradeTier] = useState<GradeTier>(() =>
     parseGradeToTier(studentEnrolledGrade)
   );
+
+  useEffect(() => {
+    const tier = parseGradeToTier(studentEnrolledGrade);
+    setSelectedGradeTier(tier);
+    generateMathQuestion(tier);
+  }, [studentEnrolledGrade]);
+
+  // Synchronized live reward points state
+  const [hubPoints, setHubPoints] = useState<number>(() => {
+    return (
+      currentStudent?.referralPoints ??
+      currentAuthUser?.referralPoints ??
+      (typeof window !== 'undefined'
+        ? parseInt(
+            localStorage.getItem(`hnc_student_points_${studentUid}`) ||
+            localStorage.getItem('hnc_student_points_active') ||
+            '0',
+            10
+          )
+        : 0)
+    );
+  });
+
+  useEffect(() => {
+    const handlePointsUpdate = (e: any) => {
+      if (e?.detail?.points !== undefined) {
+        setHubPoints(e.detail.points);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('hnc_points_updated', handlePointsUpdate);
+      return () => window.removeEventListener('hnc_points_updated', handlePointsUpdate);
+    }
+  }, []);
+
+  useEffect(() => {
+    const pts = currentStudent?.referralPoints ?? currentAuthUser?.referralPoints;
+    if (pts !== undefined && pts !== null) {
+      setHubPoints(pts);
+    }
+  }, [currentStudent?.referralPoints, currentAuthUser?.referralPoints]);
 
   // ----------------------------------------------------
   // 1. LUCKY SPIN WHEEL STATE & AIRTIGHT 24-HOUR LOCKOUT
@@ -652,7 +693,15 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
         origin: { y: 0.6 },
       });
 
-      const updatedPoints = (currentStudent?.referralPoints ?? currentAuthUser?.referralPoints ?? 0) + sector.points;
+      const updatedPoints = (hubPoints || 0) + sector.points;
+      setHubPoints(updatedPoints);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`hnc_student_points_${studentUid}`, String(updatedPoints));
+        localStorage.setItem('hnc_student_points_active', String(updatedPoints));
+        try {
+          window.dispatchEvent(new CustomEvent('hnc_points_updated', { detail: { points: updatedPoints } }));
+        } catch {}
+      }
       setSpinToast(
         language === 'ta'
           ? `🎉 வெற்றி! +${sector.points} புள்ளிகள் உங்கள் டாஷ்போர்டில் சேர்க்கப்பட்டது! (மொத்த புள்ளிகள்: ${updatedPoints} PTS)`
@@ -1043,34 +1092,10 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
 
   const handleMathSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!mathPlaying) return;
     const val = parseInt(mathInput.trim(), 10);
     if (isNaN(val)) return;
     submitNumericAnswer(val);
-  };
-
-  const handleMathSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!mathPlaying) return;
-
-    const val = parseInt(mathInput.trim(), 10);
-    if (isNaN(val)) return;
-
-    if (val === mathQuestion.answer) {
-      const newCombo = mathCombo + 1;
-      const pointsAdded = 10 + Math.min(newCombo * 2, 20);
-      setMathScore((prev) => prev + pointsAdded);
-      setMathCombo(newCombo);
-      setMathFeedback('correct');
-      if (soundEnabled) audio.playCorrect();
-      setTimeout(() => setMathFeedback(null), 300);
-      generateMathQuestion();
-    } else {
-      setMathCombo(0);
-      setMathFeedback('wrong');
-      if (soundEnabled) audio.playIncorrect();
-      setTimeout(() => setMathFeedback(null), 300);
-      setMathInput('');
-    }
   };
 
   // ----------------------------------------------------
@@ -1195,9 +1220,15 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+          {/* Student's Enrolled Grade Badge (Automatic, no manual tier switcher needed) */}
+          <div className="px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-700 text-amber-300 font-extrabold text-xs flex items-center gap-1.5 shadow-xs">
+            <span>{GRADE_TIERS_META[selectedGradeTier]?.icon || '🌱'}</span>
+            <span>{studentEnrolledGrade}</span>
+          </div>
+
           <div className="px-3.5 py-2 rounded-xl bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-xs border border-amber-300">
             <Coins className="w-4 h-4 text-slate-950 shrink-0" />
-            <span>{currentStudent.referralPoints ?? currentAuthUser?.referralPoints ?? 0} PTS</span>
+            <span className="font-mono">{hubPoints} PTS</span>
           </div>
 
           <button
@@ -1620,20 +1651,25 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
             {workoutStarted && !workoutCompleted && (
               <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-2xs">
                 <div className="flex items-center justify-between text-xs text-slate-500 pb-2 border-b border-slate-100">
-                  <span>Question {currentQuestionIndex + 1} of {DAILY_QUESTIONS.length}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-700">Question {currentQuestionIndex + 1} of {activeQuestions.length}</span>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                      {GRADE_TIERS_META[selectedGradeTier].icon} {GRADE_TIERS_META[selectedGradeTier].nameTa}
+                    </span>
+                  </div>
                   <span className="font-bold text-blue-700">60s Sprint</span>
                 </div>
 
                 <div className="space-y-1">
                   <h4 className="text-sm font-bold text-slate-900">
                     {language === 'ta'
-                      ? DAILY_QUESTIONS[currentQuestionIndex].questionTa
-                      : DAILY_QUESTIONS[currentQuestionIndex].questionEn}
+                      ? activeQuestions[currentQuestionIndex]?.questionTa
+                      : activeQuestions[currentQuestionIndex]?.questionEn}
                   </h4>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-                  {DAILY_QUESTIONS[currentQuestionIndex].options.map((opt, oIdx) => (
+                  {activeQuestions[currentQuestionIndex]?.options.map((opt, oIdx) => (
                     <button
                       key={oIdx}
                       onClick={() => handleAnswerWorkout(oIdx)}
@@ -1658,8 +1694,8 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
                   </h4>
                   <p className="text-xs text-slate-600 mt-0.5">
                     {language === 'ta'
-                      ? `நீங்கள் ${DAILY_QUESTIONS.length}-ல் ${workoutScore} கேள்விகளுக்கு சரியான விடை அளித்துள்ளீர்கள்!`
-                      : `You scored ${workoutScore} out of ${DAILY_QUESTIONS.length} correct!`}
+                      ? `நீங்கள் ${activeQuestions.length}-ல் ${workoutScore} கேள்விகளுக்கு சரியான விடை அளித்துள்ளீர்கள்!`
+                      : `You scored ${workoutScore} out of ${activeQuestions.length} correct!`}
                   </p>
                 </div>
 
@@ -1769,7 +1805,7 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
 
               {/* Math Question Arena */}
               <div
-                className={`p-8 text-center rounded-2xl border-2 transition-all ${
+                className={`p-6 sm:p-8 text-center rounded-2xl border-2 transition-all ${
                   mathFeedback === 'correct'
                     ? 'bg-emerald-50 border-emerald-400 scale-[1.02]'
                     : mathFeedback === 'wrong'
@@ -1777,24 +1813,47 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
                     : 'bg-slate-50 border-slate-200'
                 }`}
               >
-                <div className="text-4xl sm:text-5xl font-black text-slate-900 tracking-wider font-mono">
-                  {mathQuestion.num1} {mathQuestion.op} {mathQuestion.num2} = ?
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black shadow-2xs mb-4 bg-white border border-slate-200 text-slate-800">
+                  <span>{GRADE_TIERS_META[selectedGradeTier].icon}</span>
+                  <span>{GRADE_TIERS_META[selectedGradeTier].nameTa}</span>
                 </div>
 
-                <form onSubmit={handleMathSubmit} className="mt-6 max-w-xs mx-auto flex gap-2">
+                <div className="text-3xl sm:text-5xl font-black text-slate-900 tracking-wider font-mono">
+                  {mathQuestion.displayText || `${mathQuestion.num1} ${mathQuestion.op} ${mathQuestion.num2} = ?`}
+                </div>
+
+                {/* 4 Rapid Answer Choice Buttons */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-6 max-w-md mx-auto">
+                  {mathQuestion.options.map((opt, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => submitNumericAnswer(opt)}
+                      className="py-3 px-4 rounded-xl bg-white hover:bg-blue-600 hover:text-white border-2 border-slate-300 hover:border-blue-600 font-mono font-black text-xl text-slate-900 shadow-xs active:scale-95 transition-all cursor-pointer"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-400">
+                  <span>— அல்லது விடையை தட்டச்சு செய்யலாம் —</span>
+                </div>
+
+                <form onSubmit={handleMathSubmit} className="mt-3 max-w-xs mx-auto flex gap-2">
                   <input
                     type="number"
                     autoFocus
-                    placeholder="Answer..."
+                    placeholder="விடை..."
                     value={mathInput}
                     onChange={(e) => setMathInput(e.target.value)}
-                    className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-300 text-center font-mono font-black text-xl text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                    className="flex-1 px-4 py-2.5 rounded-xl border-2 border-slate-300 text-center font-mono font-black text-lg text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                   />
                   <button
                     type="submit"
-                    className="px-6 py-3 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl transition"
+                    className="px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl transition text-xs"
                   >
-                    Submit
+                    சரிபார்
                   </button>
                 </form>
               </div>

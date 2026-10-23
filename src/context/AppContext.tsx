@@ -27,7 +27,16 @@ import {
   DbAdvertisement,
   DbStudentFeedback,
   FeedbackCategory,
+  SubjectNotificationAlert,
 } from '../types';
+import {
+  getDefaultSubjectsForGrade,
+  isCompetitionInEnrolledSubjects,
+  sendSubjectPublicationBrowserPush,
+  isCompetitionAlreadyNotified,
+  markCompetitionAsNotified,
+  playSubjectPublicationChime,
+} from '../utils/subjectNotificationUtils';
 import {
   initialSuperAdmin,
   initialAdmins,
@@ -40,6 +49,7 @@ import {
 import { getCompetitionQuestions } from '../data/questionPool';
 import { getCompetitionScheduleStatus } from '../utils/competitionTimeUtils';
 import { Language, translations } from '../i18n/translations';
+import { StudentCurriculumPath, detectStudentCurriculumPath } from '../lib/gradeUtils';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
@@ -149,6 +159,7 @@ export type StudentNav =
   | 'Edu-Arena Quest'
   | 'Study Games Hub'
   | 'Leaderboards'
+  | 'AI Study Timetable'
   | 'My Results' 
   | 'My Profile'
   | 'Referral & Points'
@@ -190,6 +201,7 @@ interface AppContextType {
   superAdminUser: SuperAdminUser;
   currentAdmin: AdminUser;
   currentStudent: StudentUser;
+  studentCurriculumPath: StudentCurriculumPath;
 
   // Data collections (Synced with Firebase Firestore)
   admins: AdminUser[];
@@ -222,6 +234,8 @@ interface AppContextType {
   saveCompetition: (compData: Partial<Competition> & { title: string }) => Promise<string>;
   deleteCompetition: (competitionId: string) => Promise<void>;
   updateCompetitionStatus: (id: string, status: CompetitionStatus) => Promise<void>;
+  approveCompetitionBySuperAdmin: (competitionId: string, comment?: string) => Promise<void>;
+  rejectCompetitionBySuperAdmin: (competitionId: string, reason: string) => Promise<void>;
   registerStudentForCompetition: (competitionId: string) => boolean;
   isStudentRegistered: (competitionId: string) => boolean;
   toggleResultPublish: (resultId: string) => Promise<void>;
@@ -229,6 +243,11 @@ interface AppContextType {
   deleteResult: (resultId: string) => Promise<void>;
   updateSettings: (newSettings: Partial<PlatformSettings>) => void;
   updateStudentProfile: (profile: Partial<StudentUser>) => void;
+  studentEnrolledSubjects: string[];
+  updateStudentEnrolledSubjects: (subjects: string[]) => Promise<void>;
+  subjectPublicationAlerts: SubjectNotificationAlert[];
+  dismissSubjectPublicationAlert: (alertId: string) => void;
+  triggerManualSubjectPushTest: () => Promise<boolean>;
   deleteStudentAccount: (studentUid: string) => Promise<void>;
   updateStudentPassword: (studentUid: string, newPassword: string) => Promise<void>;
   updateStudentByAdmin: (
@@ -487,6 +506,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [feedbacks, setFeedbacks] = useState<DbStudentFeedback[]>([]);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState<boolean>(false);
 
+  // Enrolled Subjects & Publication Push Alerts State
+  const [studentEnrolledSubjectsState, setStudentEnrolledSubjectsState] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('hnc_student_enrolled_subjects_active');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
+    }
+    return ['Mathematics', 'Science', 'English', 'Information Technology (ICT)'];
+  });
+  const [subjectPublicationAlerts, setSubjectPublicationAlerts] = useState<SubjectNotificationAlert[]>([]);
+
   // Districts Quest & Study Gaming Studio State
   const [isDistrictsStudioOpen, setIsDistrictsStudioOpen] = useState<boolean>(false);
   const [districtsStudioInitialAction, setDistrictsStudioInitialAction] = useState<'list' | 'create'>('list');
@@ -559,28 +593,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (fbUser) {
           let resolvedUser: DbUser | null = null;
 
-          // 1. Direct fetch by fbUser.uid in 'users' collection (with 2.5s network timeout protection)
-          try {
-            const fetchPromise = getDoc(doc(db, 'users', fbUser.uid));
-            const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
-            const userDoc: any = await Promise.race([fetchPromise, timeoutPromise]);
-            if (userDoc && typeof userDoc.exists === 'function' && userDoc.exists()) {
-              resolvedUser = userDoc.data() as DbUser;
-            }
-          } catch (fetchErr) {
-            console.warn('Doc fetch by fbUser.uid warning:', fetchErr);
+          // 1. FAST-PATH: If saved user in localStorage matches fbUser, restore instantly with zero network delay!
+          if (
+            saved &&
+            (saved.uid === fbUser.uid ||
+              (fbUser.email &&
+                (saved.email?.toLowerCase() === fbUser.email.toLowerCase() ||
+                  saved.authEmail?.toLowerCase() === fbUser.email.toLowerCase())))
+          ) {
+            resolvedUser = saved;
           }
 
-          // 2. If not found by fbUser.uid, check if saved active user matches fbUser
-          if (!resolvedUser && saved) {
-            const fbEmail = (fbUser.email || '').toLowerCase();
-            const savedEmail = (saved.email || '').toLowerCase();
-            const savedAuthEmail = (saved.authEmail || '').toLowerCase();
-            if (
-              (fbEmail && (savedEmail === fbEmail || savedAuthEmail === fbEmail)) ||
-              saved.uid === fbUser.uid
-            ) {
-              resolvedUser = saved;
+          // 2. Direct fetch by fbUser.uid in 'users' collection if not resolved
+          if (!resolvedUser) {
+            try {
+              const fetchPromise = getDoc(doc(db, 'users', fbUser.uid));
+              const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500));
+              const userDoc: any = await Promise.race([fetchPromise, timeoutPromise]);
+              if (userDoc && typeof userDoc.exists === 'function' && userDoc.exists()) {
+                resolvedUser = userDoc.data() as DbUser;
+              }
+            } catch (fetchErr) {
+              console.warn('Doc fetch by fbUser.uid warning:', fetchErr);
             }
           }
 
@@ -649,13 +683,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                           ...prev,
                           grade: stuData.grade || prev.grade || 'Grade 6',
                           school: stuData.school || prev.school,
-                          referralPoints: stuData.referralPoints !== undefined ? stuData.referralPoints : (prev.referralPoints ?? 0),
+                          referralPoints: Math.max(
+                            stuData.referralPoints !== undefined ? stuData.referralPoints : 0,
+                            prev.referralPoints ?? 0
+                          ),
                           totalReferrals: stuData.totalReferrals !== undefined ? stuData.totalReferrals : (prev.totalReferrals ?? 0),
                           sharesCount: stuData.sharesCount !== undefined ? stuData.sharesCount : (prev.sharesCount ?? 0),
                           redeemedPerks: stuData.redeemedPerks || prev.redeemedPerks || [],
                           referralCode: stuData.referralCode || prev.referralCode,
                           avatarUrl: stuData.avatarUrl || prev.avatarUrl || '',
-                          lastSpinDate: stuData.lastSpinDate || prev.lastSpinDate || '',
+                          lastSpinDate:
+                            stuData.lastSpinDate ||
+                            prev.lastSpinDate ||
+                            (typeof window !== 'undefined'
+                              ? localStorage.getItem(`hnc_spin_date_${prev.uid}`) ||
+                                localStorage.getItem(`hnc_spin_date_${prev.studentId}`) ||
+                                localStorage.getItem('hnc_spin_date_last') ||
+                                ''
+                              : ''),
                         };
                         saveActiveUser(merged);
                         return merged;
@@ -832,10 +877,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           membershipRequired: c.membershipRequired,
           roundsCount: c.roundsCount || 1,
           createdAt: c.createdAt,
+          district: c.district,
+          province: c.province,
+          scope: c.scope,
+          gamingMode: c.gamingMode,
+          approvalStatus: (c as any).approvalStatus || ((c.status === 'Draft' || (c.status as string) === 'Pending Approval') ? ((c as any).approvalStatus || 'pending_approval') : 'approved'),
+          approvalComment: (c as any).approvalComment,
+          approvedBy: (c as any).approvedBy,
+          approvedByName: (c as any).approvedByName,
+          approvedAt: (c as any).approvedAt,
+          isAiGenerated: (c as any).isAiGenerated,
+          aiMode: (c as any).aiMode,
         };
       });
 
       setCompetitions(mapped);
+
+      // Trigger browser and in-app push notifications if a competition/quiz was published in student's enrolled subjects
+      if (currentAuthUser && (currentAuthUser.role === 'student' || currentPortal === 'student')) {
+        const studentSubjects = currentAuthUser.enrolledSubjects && currentAuthUser.enrolledSubjects.length > 0
+          ? currentAuthUser.enrolledSubjects
+          : (studentEnrolledSubjectsState && studentEnrolledSubjectsState.length > 0
+              ? studentEnrolledSubjectsState
+              : getDefaultSubjectsForGrade(currentAuthUser.grade || 'Grade 6'));
+
+        const newAlerts: SubjectNotificationAlert[] = [];
+
+        mapped.forEach((c) => {
+          const s = (c.status || '').toLowerCase();
+          const isPending = c.approvalStatus === 'pending_approval' || (c.status as string) === 'Pending Approval' || c.approvalStatus === 'rejected';
+          const isLive = !isPending && (s.includes('publish') || s.includes('open') || s.includes('ongoing'));
+          if (isLive) {
+            const { matches, matchedSubject } = isCompetitionInEnrolledSubjects(c, studentSubjects);
+            if (matches) {
+              const alreadyNotified = isCompetitionAlreadyNotified(currentAuthUser.uid, c.id);
+              if (!alreadyNotified) {
+                markCompetitionAsNotified(currentAuthUser.uid, c.id);
+                sendSubjectPublicationBrowserPush(c, matchedSubject, language);
+
+                newAlerts.push({
+                  id: `alert-sub-${c.id}`,
+                  competitionId: c.id,
+                  competitionTitle: c.title,
+                  competitionType: c.competitionType || 'Quiz',
+                  subject: matchedSubject,
+                  grade: c.grade || 'Open',
+                  publishedAt: c.createdAt || new Date().toISOString(),
+                  read: false,
+                  entryType: c.entryType,
+                  entryFee: c.entryFee,
+                  duration: c.duration,
+                  code: c.code,
+                });
+              }
+            }
+          }
+        });
+
+        if (newAlerts.length > 0) {
+          setSubjectPublicationAlerts((prev) => {
+            const existingIds = new Set(prev.map((a) => a.competitionId));
+            const filteredNew = newAlerts.filter((a) => !existingIds.has(a.competitionId));
+            return [...filteredNew, ...prev];
+          });
+        }
+      }
     });
 
     // 2. Results subscription (Students only receive their own results as per rules)
@@ -1112,6 +1218,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     competitions,
   ]);
 
+  const studentEnrolledGrade = currentAuthUser?.grade || (currentAuthUser as any)?.gradeLevel || 'Grade 11 (O/L)';
+
+  const studentCurriculumPath = useMemo(() => {
+    return detectStudentCurriculumPath(studentEnrolledGrade);
+  }, [studentEnrolledGrade]);
+
   const currentStudent: StudentUser = useMemo(() => ({
     id: currentAuthUser?.uid || '',
     avatarUrl:
@@ -1128,7 +1240,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     studentId: currentAuthUser?.studentId || (currentAuthUser?.uid ? `HNC-STD-${currentAuthUser.uid.slice(0, 5).toUpperCase()}` : 'HNC-STD-0000'),
     username: currentAuthUser?.username || '',
     institution: currentAuthUser?.school || 'Participating Institution',
-    gradeLevel: currentAuthUser?.grade || 'Grade 11 (O/L)',
+    gradeLevel: studentEnrolledGrade,
+    curriculumPathId: studentCurriculumPath.id,
+    curriculumPathTitle: studentCurriculumPath.titleTa,
     district: currentAuthUser?.district || '',
     address: currentAuthUser?.address || '',
     dateOfBirth: currentAuthUser?.dateOfBirth || '',
@@ -1172,6 +1286,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           localStorage.getItem('hnc_spin_date_last') ||
           ''
         : ''),
+    enrolledSubjects:
+      currentAuthUser?.enrolledSubjects ||
+      (typeof window !== 'undefined'
+        ? (() => {
+            try {
+              const raw =
+                localStorage.getItem(`hnc_student_enrolled_subjects_${currentAuthUser?.uid}`) ||
+                localStorage.getItem('hnc_student_enrolled_subjects_active');
+              return raw ? JSON.parse(raw) : undefined;
+            } catch {
+              return undefined;
+            }
+          })()
+        : undefined) ||
+      studentCurriculumPath.coreSubjectsEn,
   }), [
     currentAuthUser?.uid,
     currentAuthUser?.avatarUrl,
@@ -1194,9 +1323,79 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     currentAuthUser?.sharesCount,
     currentAuthUser?.redeemedPerks,
     currentAuthUser?.lastSpinDate,
+    currentAuthUser?.enrolledSubjects,
     studentRegistrations.length,
     results,
+    studentCurriculumPath.coreSubjectsEn,
   ]);
+
+  const studentEnrolledSubjects = useMemo(() => {
+    if (currentAuthUser?.enrolledSubjects && currentAuthUser.enrolledSubjects.length > 0) {
+      return currentAuthUser.enrolledSubjects;
+    }
+    if (studentEnrolledSubjectsState && studentEnrolledSubjectsState.length > 0) {
+      return studentEnrolledSubjectsState;
+    }
+    return getDefaultSubjectsForGrade(currentStudent?.gradeLevel || 'Grade 6');
+  }, [currentAuthUser?.enrolledSubjects, currentStudent?.gradeLevel, studentEnrolledSubjectsState]);
+
+  const updateStudentEnrolledSubjects = async (subjects: string[]) => {
+    setStudentEnrolledSubjectsState(subjects);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('hnc_student_enrolled_subjects_active', JSON.stringify(subjects));
+        if (currentAuthUser?.uid) {
+          localStorage.setItem(`hnc_student_enrolled_subjects_${currentAuthUser.uid}`, JSON.stringify(subjects));
+        }
+      } catch {}
+    }
+
+    if (currentAuthUser) {
+      const updatedUser: DbUser = {
+        ...currentAuthUser,
+        enrolledSubjects: subjects,
+      };
+      setCurrentAuthUser(updatedUser);
+      saveActiveUser(updatedUser);
+
+      try {
+        await setDoc(doc(db, 'users', currentAuthUser.uid), { enrolledSubjects: subjects }, { merge: true });
+        await setDoc(doc(db, 'students', currentAuthUser.uid), { enrolledSubjects: subjects }, { merge: true });
+      } catch (err) {
+        console.warn('Firestore enrolledSubjects sync note:', err);
+      }
+    }
+  };
+
+  const dismissSubjectPublicationAlert = (alertId: string) => {
+    setSubjectPublicationAlerts((prev) => prev.filter((a) => a.id !== alertId));
+  };
+
+  const triggerManualSubjectPushTest = async (): Promise<boolean> => {
+    const targetComp = competitions[0] || {
+      id: 'comp-test-manual',
+      title: 'Sri Lanka Junior Science & Mathematics Contest 2026',
+      competitionType: 'Quiz',
+      category: studentEnrolledSubjects[0] || 'Mathematics',
+    };
+    const targetSubject = studentEnrolledSubjects[0] || 'Mathematics';
+    playSubjectPublicationChime();
+    const sent = sendSubjectPublicationBrowserPush(targetComp as any, targetSubject, language);
+    setSubjectPublicationAlerts((prev) => [
+      {
+        id: `alert-test-${Date.now()}`,
+        competitionId: targetComp.id,
+        competitionTitle: targetComp.title,
+        competitionType: targetComp.competitionType || 'Quiz',
+        subject: targetSubject,
+        grade: 'Grade 6 - 11',
+        publishedAt: new Date().toISOString(),
+        read: false,
+      },
+      ...prev,
+    ]);
+    return sent;
+  };
 
   const logout = useCallback(async () => {
     await logoutUserSession();
@@ -1392,6 +1591,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       membershipRequired: compData.membershipRequired !== undefined ? compData.membershipRequired : existing?.membershipRequired,
       roundsCount: compData.roundsCount || existing?.roundsCount || 1,
       createdAt: existing?.createdAt || now,
+      district: compData.district ?? existing?.district ?? '',
+      province: compData.province ?? existing?.province ?? '',
+      scope: compData.scope ?? existing?.scope ?? 'all_island',
+      gamingMode: compData.gamingMode ?? existing?.gamingMode ?? 'standard',
+      approvalStatus: compData.approvalStatus ?? existing?.approvalStatus ?? ((compData.status === 'Draft' || compData.status === 'Pending Approval') ? 'pending_approval' : 'approved'),
+      approvalComment: compData.approvalComment ?? existing?.approvalComment ?? '',
+      approvedBy: compData.approvedBy ?? existing?.approvedBy ?? '',
+      approvedByName: compData.approvedByName ?? existing?.approvedByName ?? '',
+      approvedAt: compData.approvedAt ?? existing?.approvedAt ?? '',
+      isAiGenerated: compData.isAiGenerated ?? existing?.isAiGenerated ?? false,
+      aiMode: compData.aiMode ?? existing?.aiMode ?? 'quiz',
     };
 
     setCompetitions((prev) => {
@@ -1443,6 +1653,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         requireCameraVerification: updatedComp.requireCameraVerification,
         membershipRequired: updatedComp.membershipRequired,
         roundsCount: updatedComp.roundsCount,
+        district: updatedComp.district,
+        province: updatedComp.province,
+        scope: updatedComp.scope,
+        gamingMode: updatedComp.gamingMode,
+        approvalStatus: updatedComp.approvalStatus,
+        approvalComment: updatedComp.approvalComment,
+        approvedBy: updatedComp.approvedBy,
+        approvedByName: updatedComp.approvedByName,
+        approvedAt: updatedComp.approvedAt,
+        isAiGenerated: updatedComp.isAiGenerated,
+        aiMode: updatedComp.aiMode,
       });
     } catch (err) {
       console.warn('Firestore competition sync notice:', err);
@@ -1501,6 +1722,100 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err) {
       console.warn('Firestore competition status sync note:', err);
     }
+  };
+
+  const approveCompetitionBySuperAdmin = async (competitionId: string, comment?: string) => {
+    if (!competitionId) return;
+    const now = new Date().toISOString();
+    const adminName = currentAuthUser?.fullName || superAdminUser.name || 'Super Admin';
+    const adminUid = currentAuthUser?.uid || 'super-admin-uid';
+
+    let approvedTitle = '';
+    setCompetitions((prev) =>
+      prev.map((c) => {
+        if (c.id === competitionId || (c as any).competitionId === competitionId) {
+          approvedTitle = c.title;
+          return {
+            ...c,
+            approvalStatus: 'approved',
+            status: 'Registration Open',
+            approvedBy: adminUid,
+            approvedByName: adminName,
+            approvedAt: now,
+            approvalComment: comment || 'Approved by Super Admin',
+          };
+        }
+        return c;
+      })
+    );
+
+    try {
+      await saveCompetitionToFirestore({
+        competitionId,
+        approvalStatus: 'approved',
+        status: 'Registration Open',
+        approvedBy: adminUid,
+        approvedByName: adminName,
+        approvedAt: now,
+        approvalComment: comment || 'Approved by Super Admin',
+      });
+    } catch (err) {
+      console.warn('Firestore competition approval sync note:', err);
+    }
+
+    const log: SystemAuditLog = {
+      id: `log-${Date.now()}`,
+      actorName: adminName,
+      actorRole: 'Super Admin',
+      action: `Approved & Published competition to National Arena: ${approvedTitle || competitionId}`,
+      target: `ID: ${competitionId}`,
+      timestamp: 'Just now',
+      ipAddress: '192.168.1.104',
+    };
+    setAuditLogs((prev) => [log, ...prev]);
+  };
+
+  const rejectCompetitionBySuperAdmin = async (competitionId: string, reason: string) => {
+    if (!competitionId) return;
+    const adminName = currentAuthUser?.fullName || superAdminUser.name || 'Super Admin';
+    let rejectedTitle = '';
+
+    setCompetitions((prev) =>
+      prev.map((c) => {
+        if (c.id === competitionId || (c as any).competitionId === competitionId) {
+          rejectedTitle = c.title;
+          return {
+            ...c,
+            approvalStatus: 'rejected',
+            status: 'Rejected',
+            approvalComment: reason,
+          };
+        }
+        return c;
+      })
+    );
+
+    try {
+      await saveCompetitionToFirestore({
+        competitionId,
+        approvalStatus: 'rejected',
+        status: 'Rejected',
+        approvalComment: reason,
+      });
+    } catch (err) {
+      console.warn('Firestore competition rejection sync note:', err);
+    }
+
+    const log: SystemAuditLog = {
+      id: `log-${Date.now()}`,
+      actorName: adminName,
+      actorRole: 'Super Admin',
+      action: `Rejected competition: ${rejectedTitle || competitionId} - Reason: ${reason}`,
+      target: `ID: ${competitionId}`,
+      timestamp: 'Just now',
+      ipAddress: '192.168.1.104',
+    };
+    setAuditLogs((prev) => [log, ...prev]);
   };
 
   const isStudentRegistered = (competitionId: string) => {
@@ -1674,33 +1989,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Resilient Firestore persistence
     if (targetUid) {
+      const firestorePayload: any = { avatarUrl: newAvatar };
+      if (profile.name) firestorePayload.fullName = profile.name;
+      if (profile.gradeLevel) firestorePayload.grade = profile.gradeLevel;
+      if (profile.institution) firestorePayload.school = profile.institution;
+      if (profile.phone !== undefined) firestorePayload.phone = profile.phone;
+      if (profile.district !== undefined) firestorePayload.district = profile.district;
+      if (profile.address !== undefined) firestorePayload.address = profile.address;
+      if (profile.dateOfBirth !== undefined) firestorePayload.dateOfBirth = profile.dateOfBirth;
+      if (profile.bio !== undefined) firestorePayload.bio = profile.bio;
+      if (profile.enrolledSubjects !== undefined) firestorePayload.enrolledSubjects = profile.enrolledSubjects;
+
       try {
-        await setDoc(
-          doc(db, 'users', targetUid),
-          { avatarUrl: newAvatar },
-          { merge: true }
-        );
+        await setDoc(doc(db, 'users', targetUid), firestorePayload, { merge: true });
       } catch (e) {
-        console.warn('User doc avatar sync note:', e);
+        console.warn('User doc profile sync note:', e);
       }
       try {
-        await setDoc(
-          doc(db, 'students', targetUid),
-          { avatarUrl: newAvatar },
-          { merge: true }
-        );
+        await setDoc(doc(db, 'students', targetUid), firestorePayload, { merge: true });
       } catch (e) {
-        console.warn('Student doc avatar sync note:', e);
+        console.warn('Student doc profile sync note:', e);
       }
       if (currentStudent.studentId && currentStudent.studentId !== targetUid) {
         try {
-          await setDoc(
-            doc(db, 'students', currentStudent.studentId),
-            { avatarUrl: newAvatar },
-            { merge: true }
-          );
+          await setDoc(doc(db, 'students', currentStudent.studentId), firestorePayload, { merge: true });
         } catch (e) {
-          console.warn('Student ID doc avatar sync note:', e);
+          console.warn('Student ID doc profile sync note:', e);
         }
       }
     }
@@ -2810,6 +3124,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         superAdminUser,
         currentAdmin,
         currentStudent,
+        studentCurriculumPath,
         admins,
         students,
         competitions,
@@ -2825,6 +3140,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         saveCompetition,
         deleteCompetition,
         updateCompetitionStatus,
+        approveCompetitionBySuperAdmin,
+        rejectCompetitionBySuperAdmin,
         registerStudentForCompetition,
         isStudentRegistered,
         toggleResultPublish,
@@ -2832,6 +3149,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteResult,
         updateSettings,
         updateStudentProfile,
+        studentEnrolledSubjects,
+        updateStudentEnrolledSubjects,
+        subjectPublicationAlerts,
+        dismissSubjectPublicationAlert,
+        triggerManualSubjectPushTest,
         deleteStudentAccount,
         updateStudentPassword,
         updateStudentByAdmin,

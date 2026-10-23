@@ -38,6 +38,9 @@ export interface DbUser {
   guardianName?: string;
   bio?: string;
   lastSpinDate?: string;
+  curriculumPathId?: 'primary_early' | 'primary_late' | 'junior' | 'senior' | 'advanced' | 'career_competitive';
+  curriculumPathTitle?: string;
+  enrolledSubjects?: string[];
 }
 
 export interface DbStudent {
@@ -63,6 +66,7 @@ export interface DbStudent {
   sharesCount?: number;
   redeemedPerks?: string[];
   lastSpinDate?: string;
+  enrolledSubjects?: string[];
 }
 
 export interface DbAdmin {
@@ -82,7 +86,7 @@ export interface DbAdmin {
   createdAt: string;
 }
 
-export type CompetitionType = 'Quiz' | 'Exam' | 'Competition';
+export type CompetitionType = 'Quiz' | 'Exam' | 'Competition' | 'Island Quest' | 'Edu Arena' | 'District Quiz' | string;
 export type SupportedLanguage = 'English' | 'Tamil' | 'Sinhala';
 
 export type QuestionType =
@@ -101,6 +105,21 @@ export interface QuestionItem {
   marks: number;
   order: number;
   explanation?: string;
+  // Sri Lankan Curriculum & Examination Alignment Metadata
+  gradeOrExam?: string;
+  subject?: string;
+  medium?: 'Tamil' | 'Sinhala' | 'English' | string;
+  unitTopic?: string;
+  curriculumVersion?: string;
+  curriculumSource?: 'e_thaksalawa' | 'nie' | 'gazette' | 'past_paper' | 'teacher_guide' | 'custom_upload';
+  sourceUrl?: string;
+  referenceSource?: string;
+  referencePage?: string;
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
+  verificationStatus?: 'verified' | 'admin_review_required' | 'approved';
+  examCategory?: 'school_syllabus' | 'competitive_exam' | 'public_service';
+  learningOutcome?: string;
+  gazetteRef?: string;
 }
 
 export interface CompetitionPrizeDetails {
@@ -127,6 +146,7 @@ export interface DbCompetition {
   description: string;
   competitionType: 'Quiz' | 'Exam' | string;
   category: string;
+  subject?: string;
   grade: string;
   language: 'English' | 'Tamil' | 'Sinhala' | string;
   duration?: number; // In minutes
@@ -166,6 +186,25 @@ export interface DbCompetition {
   province?: string;
   scope?: 'all_island' | 'district' | 'province';
   gamingMode?: StudyGamingMode;
+  // Sri Lankan Curriculum & Examination Alignment Metadata
+  examCategory?: 'school_syllabus' | 'competitive_exam' | 'public_service';
+  curriculumVersion?: string;
+  curriculumSource?: 'e_thaksalawa' | 'nie' | 'gazette' | 'custom_upload';
+  term?: string;
+  unitTopic?: string;
+  learningOutcome?: string;
+  gazetteNumber?: string;
+  gazetteDate?: string;
+  referenceDocumentName?: string;
+  referenceTextSnippet?: string;
+  // Super Admin Approval & AI Generation Metadata
+  approvalStatus?: 'pending_approval' | 'approved' | 'rejected';
+  approvalComment?: string;
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  isAiGenerated?: boolean;
+  aiMode?: 'quiz' | 'exam' | 'competition' | 'island_quest' | 'edu_arena' | 'district_quiz';
 }
 
 export interface DbResult {
@@ -344,6 +383,9 @@ export interface StudentUser extends BaseUser {
   redeemedPerks?: string[];
   initialPassword?: string;
   lastSpinDate?: string;
+  curriculumPathId?: 'primary_early' | 'primary_late' | 'junior' | 'senior' | 'advanced' | 'career_competitive';
+  curriculumPathTitle?: string;
+  enrolledSubjects?: string[];
 }
 
 export interface ReferralPerk {
@@ -416,6 +458,8 @@ export type CompetitionStatus =
   | 'Ongoing' 
   | 'Completed' 
   | 'Closed'
+  | 'Pending Approval'
+  | 'Rejected'
   | 'draft' 
   | 'upcoming' 
   | 'ongoing' 
@@ -428,7 +472,7 @@ export interface Competition {
   code?: string;
   category: CompetitionCategory;
   description: string;
-  competitionType?: 'Quiz' | 'Exam' | string;
+  competitionType?: 'Quiz' | 'Exam' | 'Competition' | 'Island Quest' | 'Edu Arena' | 'District Quiz' | string;
   grade?: string;
   language?: 'English' | 'Tamil' | 'Sinhala' | string;
   duration?: number; // In minutes
@@ -466,6 +510,25 @@ export interface Competition {
   province?: string;
   scope?: 'all_island' | 'district' | 'province';
   gamingMode?: StudyGamingMode;
+  // Sri Lankan Curriculum & Examination Alignment Metadata
+  examCategory?: 'school_syllabus' | 'competitive_exam' | 'public_service';
+  curriculumVersion?: string;
+  curriculumSource?: 'e_thaksalawa' | 'nie' | 'gazette' | 'custom_upload';
+  term?: string;
+  unitTopic?: string;
+  learningOutcome?: string;
+  gazetteNumber?: string;
+  gazetteDate?: string;
+  referenceDocumentName?: string;
+  referenceTextSnippet?: string;
+  // Super Admin Approval & AI Generation Metadata
+  approvalStatus?: 'pending_approval' | 'approved' | 'rejected';
+  approvalComment?: string;
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  isAiGenerated?: boolean;
+  aiMode?: 'quiz' | 'exam' | 'competition' | 'island_quest' | 'edu_arena' | 'district_quiz';
 }
 
 export interface CompetitionResult {
@@ -633,5 +696,28 @@ export interface DbStudentFeedback {
   adminRepliedBy?: string;
   createdAt: string;
   repliedAt?: string;
+}
+
+export interface SubjectNotificationAlert {
+  id: string;
+  competitionId: string;
+  competitionTitle: string;
+  competitionType: 'Quiz' | 'Exam' | 'Competition' | string;
+  subject: string;
+  grade: string;
+  publishedAt: string;
+  read: boolean;
+  entryType?: 'Free' | 'Paid';
+  entryFee?: number;
+  duration?: number;
+  code?: string;
+}
+
+export interface PushNotificationPreferenceSettings {
+  enabled: boolean;
+  soundEnabled: boolean;
+  permission: NotificationPermission | 'unsupported';
+  enrolledSubjectsOnly: boolean;
+  lastNotifiedCompIds: string[];
 }
 

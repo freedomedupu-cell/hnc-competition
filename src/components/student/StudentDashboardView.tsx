@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Competition, DbAttempt } from '../../types';
 import { getCompetitionScheduleStatus, parseDateTime } from '../../utils/competitionTimeUtils';
@@ -54,6 +54,11 @@ import { DynamicAdBillboard } from '../common/DynamicAdBillboard';
 import { AnimatedHeroLeaderboard } from '../leaderboard/AnimatedHeroLeaderboard';
 import { SmartDailyTips } from './SmartDailyTips';
 import { StudentDeadlineAlertsBanner } from './StudentDeadlineAlertsBanner';
+import { SubjectPublicationAlertBanner } from './SubjectPublicationAlertBanner';
+import { EnrolledSubjectsModal } from './EnrolledSubjectsModal';
+import { identifyWeakSubjectsFromResults } from '../../services/studyTimetableService';
+import { NextEnrolledCompetitionCountdown } from './NextEnrolledCompetitionCountdown';
+import { OfflineStudyMaterialsHub } from './OfflineStudyMaterialsHub';
 
 interface StudentDashboardViewProps {
   onNavigate: (tab: any) => void;
@@ -77,6 +82,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
     awardSharePoints,
     isMembershipActiveForStudent,
     membershipSettings,
+    studentCurriculumPath,
     language,
     t,
   } = useApp();
@@ -93,6 +99,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
   const [verificationComp, setVerificationComp] = useState<Competition | null>(null);
   const [membershipPromptComp, setMembershipPromptComp] = useState<Competition | null>(null);
   const [showMembershipModal, setShowMembershipModal] = useState<boolean>(false);
+  const [showSubjectsModal, setShowSubjectsModal] = useState<boolean>(false);
   const [viewingReceipt, setViewingReceipt] = useState<{
     attempt: DbAttempt;
     competition: Competition;
@@ -172,6 +179,22 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
     // Matches student's enrolled grade OR competition is marked as Open (All Grades)
     return isGradeEligible(comp.grade, studentGrade);
   });
+
+  const studentResults = React.useMemo(() => {
+    const sId = currentAuthUser?.uid || currentStudent?.id;
+    const sName = currentAuthUser?.fullName || currentStudent?.name;
+    return results.filter(
+      (r) =>
+        r.studentId === sId ||
+        r.studentId === currentStudent?.id ||
+        r.studentName === sName ||
+        r.studentName === currentStudent?.name
+    );
+  }, [results, currentAuthUser, currentStudent]);
+
+  const { weakSubjects } = React.useMemo(() => {
+    return identifyWeakSubjectsFromResults(studentResults, competitions);
+  }, [studentResults, competitions]);
 
   const combinedCompetitions = visibleCompetitions.map((c) => {
     let iconComp: React.ReactNode = <Math3DIcon />;
@@ -388,8 +411,59 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
       {/* TOP BAR கீழ், WELCOME CARD மேலேயும்: ANIMATED NATIONAL LEADERBOARD */}
       <AnimatedHeroLeaderboard onNavigate={onNavigate} />
 
+      {/* 0.4 ENROLLED SUBJECTS REAL-TIME PUBLICATION NOTIFICATIONS */}
+      <SubjectPublicationAlertBanner
+        onViewDetails={(comp) => setDetailsComp(comp)}
+        onJoinCompetition={handleJoinCompetition}
+        onOpenSubjectsModal={() => setShowSubjectsModal(true)}
+      />
+
       {/* 0.5 URGENT COMPETITION DEADLINES & LOCAL PUSH NOTIFICATION SYSTEM */}
       <StudentDeadlineAlertsBanner
+        onJoinCompetition={handleJoinCompetition}
+        onViewDetails={(comp) => setDetailsComp(comp)}
+      />
+
+      {/* SRI LANKAN SINGLE CURRICULUM PATH SPECIFICATION BANNER */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 p-4 sm:p-5 text-white border border-indigo-700/60 shadow-md">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center text-xl shadow-md shrink-0 border border-indigo-300/30">
+              {studentCurriculumPath.icon}
+            </div>
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow-xs">
+                  {language === 'ta' ? 'ஒற்றைப் பாடத்திட்டப் பாதை' : language === 'si' ? 'තනි විෂය නිර්දේශ මාවත' : 'Single Curriculum Path Active'}
+                </span>
+                <span className="text-[11px] font-bold text-blue-200">
+                  {studentCurriculumPath.stageBadgeTa}
+                </span>
+                <span className="text-[10px] font-mono font-bold bg-white/10 px-2 py-0.5 rounded border border-white/15 text-emerald-300">
+                  {studentCurriculumPath.mcqOptionCount} Options Strict
+                </span>
+              </div>
+              <h2 className="text-sm sm:text-base font-extrabold text-white tracking-tight truncate">
+                {studentCurriculumPath.titleTa}
+              </h2>
+              <p className="text-[11px] text-slate-300 leading-tight">
+                {language === 'ta'
+                  ? `பதிவு செய்யப்பட்ட வகுப்பு: ${studentGrade}. உங்கள் கல்வி நிலைக்குரிய வினாக்கள் மற்றும் போட்டிகள் மட்டுமே இங்கு காட்டப்படும்; பிற வகுப்புகள் தானாக மறைக்கப்பட்டுள்ளன.`
+                  : `Enrolled Grade: ${studentGrade}. Only content aligned with your single curriculum path is displayed; irrelevant tiers are hidden.`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start md:self-auto shrink-0 flex-wrap">
+            <span className="text-[10px] font-semibold text-slate-300 bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-xl flex items-center gap-1.5">
+              <span>🏛️ {studentCurriculumPath.curriculumStandard.split('(')[0].trim()}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 0.8 LIVE COUNTDOWN TIMER UNTIL NEXT ENROLLED COMPETITION */}
+      <NextEnrolledCompetitionCountdown
         onJoinCompetition={handleJoinCompetition}
         onViewDetails={(comp) => setDetailsComp(comp)}
       />
@@ -664,6 +738,59 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
       {/* 2. SMART DAILY TIPS & EXAM TRICKS (AI-POWERED) */}
       <SmartDailyTips />
 
+      {/* 2.5 GEMINI AI PERSONALIZED STUDY TIMETABLE BANNER / WIDGET */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white rounded-3xl p-5 sm:p-6 shadow-md border border-indigo-700/60 relative overflow-hidden">
+        <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 flex items-center gap-1 shadow-xs">
+                <Sparkles className="w-3 h-3 text-slate-950" />
+                <span>Gemini 3.8 Flash AI Coach</span>
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-blue-200 border border-white/15">
+                {language === 'ta' ? 'தனிப்பயனாக்கப்பட்ட படிப்பு அட்டவணை' : 'Personalized AI Timetable'}
+              </span>
+              {weakSubjects.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/30 text-rose-300 border border-rose-400/30">
+                  {weakSubjects.length} {language === 'ta' ? 'பலவீனமான பாடங்கள் இலக்கு' : 'Weak Subjects Targeted'}
+                </span>
+              )}
+            </div>
+
+            <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
+              {language === 'ta'
+                ? 'உங்கள் பலவீனமான பாடங்கள் & போட்டித் தேதிகளுக்கான AI படிப்பு அட்டவணை'
+                : 'AI Study Timetable: Targeted for Weak Subjects & Upcoming Contests'}
+            </h3>
+
+            <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+              {language === 'ta'
+                ? `கடந்த பரீட்சைகளின் அடிப்படையில் கண்டறியப்பட்ட ${weakSubjects.slice(0, 2).join(', ')} போன்ற பலவீனமான பாடங்களை பலப்படுத்தவும், ${visibleCompetitions.length} எதிர்வரும் போட்டிகளில் அதிக புள்ளிகளை பெறவும் 7-நாள் தனிப்பயனாக்கப்பட்ட அட்டவணை.`
+                : `Targeted revision for weak areas (${weakSubjects.slice(0, 2).join(', ')}) combined with strategic prep for your ${visibleCompetitions.length} eligible upcoming contests.`}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 self-start md:self-auto shrink-0 flex-wrap">
+            <button
+              type="button"
+              onClick={() => onNavigate('AI Study Timetable')}
+              className="px-4.5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 hover:brightness-105 active:scale-95 text-slate-950 font-black text-xs transition flex items-center gap-2 shadow-md shadow-amber-400/20 cursor-pointer"
+            >
+              <Calendar className="w-4 h-4 text-slate-950" />
+              <span>{language === 'ta' ? 'படிப்பு அட்டவணையைத் திறக்க →' : 'Open AI Timetable →'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 2.8 OFFLINE STUDY MATERIALS & DOWNLOADS HUB (SERVICE WORKER CACHED) */}
+      <OfflineStudyMaterialsHub
+        studentGrade={currentAuthUser?.grade || currentStudent?.gradeLevel || 'Grade 10'}
+        onNavigate={onNavigate}
+      />
+
       {/* 3. FORMAT / CATEGORY CARDS (4 in a Row) (COMPACT) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
         {/* Card 1: Quiz ( MCQ ) */}
@@ -772,8 +899,8 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-200">
                 {language === 'ta' ? 'புள்ளிகள் & வெகுமதிகள்' : 'Earn Points'}
               </span>
-              <span className="text-xs font-bold text-slate-800">
-                {currentStudent.referralPoints ?? currentAuthUser?.referralPoints ?? 0} PTS
+              <span className="text-xs font-bold text-slate-800 font-mono">
+                {livePoints} PTS
               </span>
             </div>
             <h3 className="text-sm sm:text-base font-extrabold text-slate-900 mt-1">
@@ -1386,6 +1513,12 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
       <StudentMembershipModal
         isOpen={showMembershipModal}
         onClose={() => setShowMembershipModal(false)}
+      />
+
+      {/* Student Enrolled Subjects & Notification Preferences Modal */}
+      <EnrolledSubjectsModal
+        isOpen={showSubjectsModal}
+        onClose={() => setShowSubjectsModal(false)}
       />
     </div>
   );

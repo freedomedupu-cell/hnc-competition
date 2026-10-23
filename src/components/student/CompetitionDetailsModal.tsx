@@ -13,6 +13,8 @@ import {
   Lock,
   Camera,
   Shield,
+  FileCheck,
+  Building2,
 } from 'lucide-react';
 import { Competition } from '../../types';
 import { useApp } from '../../context/AppContext';
@@ -224,6 +226,99 @@ export const CompetitionDetailsModal: React.FC<CompetitionDetailsModalProps> = (
                   : competition.competitionType === 'Exam')
                   ? (language === 'ta' ? 'தொடக்க முன் செல்ஃபி' : language === 'si' ? 'ආරම්භයට පෙර සෙල්ෆි' : 'Pre-exam selfie check')
                   : (language === 'ta' ? 'உடனடி நுழைவு' : language === 'si' ? 'ක්ෂණික ප්‍රවේශය' : 'Direct start')}
+              </span>
+            </div>
+          </div>
+
+          {/* Sri Lankan Curriculum & Official Examination Alignment Card */}
+          <div className="rounded-xl border border-blue-200/90 bg-gradient-to-br from-blue-50/70 to-indigo-50/50 p-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+                <FileCheck className="h-4 w-4 text-blue-700" />
+                <span>
+                  {language === 'ta'
+                    ? 'இலங்கை உத்தியோகபூர்வ பாடத்திட்ட & பரீட்சை விபரங்கள்'
+                    : language === 'si'
+                    ? 'ශ්‍රී ලංකා නිල විෂය නිර්දේශ සහ විභාග විස්තර'
+                    : 'Sri Lankan Curriculum & Examination Framework'}
+                </span>
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-200">
+                {competition.grade &&
+                (competition.grade.toLowerCase().includes('grade 1') ||
+                  competition.grade.toLowerCase().includes('grade 2') ||
+                  competition.grade.toLowerCase().includes('grade 3') ||
+                  competition.grade.toLowerCase().includes('grade 4') ||
+                  competition.grade.toLowerCase().includes('grade 5') ||
+                  competition.grade.toLowerCase().includes('primary') ||
+                  competition.grade.toLowerCase().includes('scholarship') ||
+                  competition.grade.includes('புலமைப்பரிசில்'))
+                  ? '3 Options (A, B, C)'
+                  : '4 Options (A, B, C, D)'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div className="bg-white/80 p-2.5 rounded-lg border border-blue-100 shadow-2xs">
+                <span className="text-slate-500 font-semibold block text-[11px]">
+                  {language === 'ta' ? 'பாடத்திட்ட பதிப்பு (Curriculum Version):' : 'Curriculum Framework:'}
+                </span>
+                <span className="font-bold text-slate-800">
+                  {competition.curriculumVersion || 'National Curriculum Framework (NIE / e-Thaksalawa Standard)'}
+                </span>
+              </div>
+
+              <div className="bg-white/80 p-2.5 rounded-lg border border-blue-100 shadow-2xs">
+                <span className="text-slate-500 font-semibold block text-[11px]">
+                  {language === 'ta' ? 'பரீட்சைப் பிரிவு (Category & Term):' : 'Category & Term:'}
+                </span>
+                <span className="font-bold text-slate-800">
+                  {competition.examCategory === 'public_service'
+                    ? language === 'ta'
+                      ? 'அரச சேவை போட்டிப் பரீட்சை (Gazette)'
+                      : 'Public Service Competitive Exam'
+                    : competition.examCategory === 'competitive_exam'
+                    ? language === 'ta'
+                      ? 'தேசிய கல்விப் போட்டி / ஒலிம்பியாட்'
+                      : 'National Olympiad / Championship'
+                    : language === 'ta'
+                    ? `பாடசாலை பாடத்திட்டம் • ${competition.term || 'முழு பாடத்திட்டம்'}`
+                    : `School Syllabus • ${competition.term || 'All Terms'}`}
+                </span>
+              </div>
+
+              {competition.gazetteNumber && (
+                <div className="sm:col-span-2 bg-amber-50/90 p-2.5 rounded-lg border border-amber-200 shadow-2xs flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-amber-700 shrink-0" />
+                    <div>
+                      <span className="text-amber-900 font-bold block">
+                        {language === 'ta' ? 'வர்த்தமானி அறிவித்தல் (Official Gazette):' : 'Government Gazette:'}
+                      </span>
+                      <span className="text-amber-800 font-mono text-[11px]">
+                        Gazette No: {competition.gazetteNumber}{' '}
+                        {competition.gazetteDate ? `• Date: ${competition.gazetteDate}` : ''}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black bg-amber-200 text-amber-950 px-2 py-0.5 rounded-full">
+                    Verified Gazette
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-1 flex items-center justify-between text-[11px] text-slate-600 border-t border-blue-100">
+              <span className="flex items-center gap-1 text-emerald-700 font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>
+                  {language === 'ta'
+                    ? 'தேசிய கல்வி நிறுவகம் (NIE) & e-Thaksalawa தரநிர்ணயம்'
+                    : 'Aligned with NIE & e-Thaksalawa Standards'}
+                </span>
+              </span>
+              <span className="text-slate-500 font-mono">
+                LKR Currency • SL Dep of Examinations Standard
               </span>
             </div>
           </div>

@@ -38,6 +38,7 @@ import { GameQuest } from './components/student/GameQuest';
 import { StudyGamesHub } from './components/student/StudyGamesHub';
 import { StudentFeedbackView } from './components/student/StudentFeedbackView';
 import { LeaderboardsHubView } from './components/leaderboard/LeaderboardsHubView';
+import { StudentTimetableView } from './components/student/StudentTimetableView';
 
 import { AnnouncementsManagementView } from './components/common/AnnouncementsManagementView';
 import { SponsorsAndAdsView } from './components/admin/SponsorsAndAdsView';
@@ -256,6 +257,8 @@ const MainPortalArea: React.FC = () => {
             return <StudyGamesHub onNavigate={setStudentNav} />;
           case 'Leaderboards':
             return <LeaderboardsHubView />;
+          case 'AI Study Timetable':
+            return <StudentTimetableView onNavigate={setStudentNav} />;
           case 'My Results':
             return <StudentResultsView />;
           case 'My Profile':

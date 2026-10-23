@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { StudentUser } from '../../types';
 import { Badge } from '../common/Badge';
@@ -34,6 +34,8 @@ import {
   FileText,
   Calendar,
   Medal,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { EditStudentModal } from './EditStudentModal';
 
@@ -59,6 +61,15 @@ export const StudentManagement: React.FC = () => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [editSuccessToast, setEditSuccessToast] = useState<string | null>(null);
+
+  // Pagination states for high-performance rendering of any number of candidates
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
+
+  // Automatically reset to page 1 whenever any search or filter criteria changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, gradeFilter, duplicateFilter, sortBy, pageSize]);
 
   // Password change state in modal
   const [newPasswordInput, setNewPasswordInput] = useState('');
@@ -303,61 +314,98 @@ export const StudentManagement: React.FC = () => {
     };
   };
 
-  const filteredStudents = students
-    .filter((std) => {
-      const dup = getDuplicateStatus(std);
+  // Pre-index exam results and honors by student identifiers for instant O(1) lookups
+  const studentResultsStatsMap = useMemo(() => {
+    const map = new Map<string, { examCount: number; medalsWon: number; avgPct: number }>();
 
-      // Apply duplicate filtering
-      if (duplicateFilter === 'any_dup' && !dup.isAnyDup) return false;
-      if (duplicateFilter === 'email_dup' && !dup.isEmailDup) return false;
-      if (duplicateFilter === 'phone_dup' && !dup.isPhoneDup) return false;
+    results.forEach((r) => {
+      const keys: string[] = [];
+      if (r.studentId) keys.push(r.studentId);
+      if (r.studentName) keys.push(r.studentName.toLowerCase().trim());
 
-      const term = searchTerm.toLowerCase();
-      const matchesSearch =
-        std.name.toLowerCase().includes(term) ||
-        std.studentId.toLowerCase().includes(term) ||
-        (std.username && std.username.toLowerCase().includes(term)) ||
-        (std.district && std.district.toLowerCase().includes(term)) ||
-        std.institution.toLowerCase().includes(term) ||
-        std.email.toLowerCase().includes(term) ||
-        (std.phone && std.phone.toLowerCase().includes(term)) ||
-        (std.referralCode && std.referralCode.toLowerCase().includes(term));
+      const isMedal = r.award && r.award !== 'Participation';
+      const pct = r.percentile || r.score || 0;
 
-      const matchesGrade =
-        gradeFilter === 'all' ? true : std.gradeLevel.includes(gradeFilter);
-
-      return matchesSearch && matchesGrade;
-    })
-    .sort((a, b) => {
-      // If filtering by duplicates, group identical emails or phones directly adjacent to each other!
-      if (duplicateFilter !== 'all') {
-        const aVal =
-          duplicateFilter === 'email_dup'
-            ? (a.email || '').toLowerCase()
-            : (a.phone || a.email || '').toLowerCase();
-        const bVal =
-          duplicateFilter === 'email_dup'
-            ? (b.email || '').toLowerCase()
-            : (b.phone || b.email || '').toLowerCase();
-        if (aVal !== bVal) return aVal.localeCompare(bVal);
-      }
-
-      if (sortBy === 'points_desc') {
-        const ptsA = a.referralPoints !== undefined ? a.referralPoints : 25;
-        const ptsB = b.referralPoints !== undefined ? b.referralPoints : 25;
-        return ptsB - ptsA;
-      }
-      if (sortBy === 'referrals_desc') {
-        return (b.totalReferrals || 0) - (a.totalReferrals || 0);
-      }
-      if (sortBy === 'awards_desc') {
-        return (b.awardsCount || 0) - (a.awardsCount || 0);
-      }
-      if (sortBy === 'name') {
-        return a.name.localeCompare(b.name);
-      }
-      return 0;
+      keys.forEach((key) => {
+        const existing = map.get(key) || { examCount: 0, medalsWon: 0, totalPct: 0 } as any;
+        existing.examCount += 1;
+        if (isMedal) existing.medalsWon += 1;
+        existing.totalPct = (existing.totalPct || 0) + pct;
+        existing.avgPct = Math.round(existing.totalPct / existing.examCount);
+        map.set(key, existing);
+      });
     });
+
+    return map;
+  }, [results]);
+
+  const filteredStudents = useMemo(() => {
+    return students
+      .filter((std) => {
+        const dup = getDuplicateStatus(std);
+
+        // Apply duplicate filtering
+        if (duplicateFilter === 'any_dup' && !dup.isAnyDup) return false;
+        if (duplicateFilter === 'email_dup' && !dup.isEmailDup) return false;
+        if (duplicateFilter === 'phone_dup' && !dup.isPhoneDup) return false;
+
+        const term = searchTerm.toLowerCase().trim();
+        if (!term && gradeFilter === 'all') return true;
+
+        const matchesSearch =
+          !term ||
+          std.name.toLowerCase().includes(term) ||
+          std.studentId.toLowerCase().includes(term) ||
+          (std.username && std.username.toLowerCase().includes(term)) ||
+          (std.district && std.district.toLowerCase().includes(term)) ||
+          std.institution.toLowerCase().includes(term) ||
+          std.email.toLowerCase().includes(term) ||
+          (std.phone && std.phone.toLowerCase().includes(term)) ||
+          (std.referralCode && std.referralCode.toLowerCase().includes(term));
+
+        const matchesGrade =
+          gradeFilter === 'all' ? true : std.gradeLevel.includes(gradeFilter);
+
+        return matchesSearch && matchesGrade;
+      })
+      .sort((a, b) => {
+        // If filtering by duplicates, group identical emails or phones directly adjacent to each other!
+        if (duplicateFilter !== 'all') {
+          const aVal =
+            duplicateFilter === 'email_dup'
+              ? (a.email || '').toLowerCase()
+              : (a.phone || a.email || '').toLowerCase();
+          const bVal =
+            duplicateFilter === 'email_dup'
+              ? (b.email || '').toLowerCase()
+              : (b.phone || b.email || '').toLowerCase();
+          if (aVal !== bVal) return aVal.localeCompare(bVal);
+        }
+
+        if (sortBy === 'points_desc') {
+          const ptsA = a.referralPoints !== undefined ? a.referralPoints : 25;
+          const ptsB = b.referralPoints !== undefined ? b.referralPoints : 25;
+          return ptsB - ptsA;
+        }
+        if (sortBy === 'referrals_desc') {
+          return (b.totalReferrals || 0) - (a.totalReferrals || 0);
+        }
+        if (sortBy === 'awards_desc') {
+          return (b.awardsCount || 0) - (a.awardsCount || 0);
+        }
+        if (sortBy === 'name') {
+          return a.name.localeCompare(b.name);
+        }
+        return 0;
+      });
+  }, [students, duplicateFilter, searchTerm, gradeFilter, sortBy, emailMap, phoneMap]);
+
+  // Compute pagination slices
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
+  const paginatedStudents = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredStudents.slice(startIndex, startIndex + pageSize);
+  }, [filteredStudents, currentPage, pageSize]);
 
   return (
     <div className="space-y-6">
@@ -650,7 +698,7 @@ export const StudentManagement: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((std) => {
+                paginatedStudents.map((std) => {
                   const points = std.referralPoints !== undefined ? std.referralPoints : 25;
                   const dup = getDuplicateStatus(std);
 
@@ -766,22 +814,16 @@ export const StudentManagement: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* Live Auto-Counted Exam Submissions & Medals */}
+                      {/* Live Auto-Counted Exam Submissions & Medals via Pre-Indexed Map */}
                       {(() => {
-                        const stdCompletedResults = results.filter(
-                          (r) =>
-                            r.studentId === std.id ||
-                            r.studentId === std.studentId ||
-                            (r.studentName && r.studentName.toLowerCase() === std.name?.toLowerCase())
-                        );
-                        const examCount = stdCompletedResults.length;
-                        const medalsWon = stdCompletedResults.filter((r) => r.award && r.award !== 'Participation').length;
-                        const avgPct =
-                          examCount > 0
-                            ? Math.round(
-                                stdCompletedResults.reduce((acc, r) => acc + (r.percentage || 0), 0) / examCount
-                              )
-                            : 0;
+                        const stats =
+                          studentResultsStatsMap.get(std.id) ||
+                          studentResultsStatsMap.get(std.studentId) ||
+                          (std.name ? studentResultsStatsMap.get(std.name.toLowerCase().trim()) : null) ||
+                          { examCount: 0, medalsWon: 0, avgPct: 0 };
+                        const examCount = stats.examCount;
+                        const medalsWon = stats.medalsWon;
+                        const avgPct = stats.avgPct;
 
                         return (
                           <>
@@ -885,6 +927,96 @@ export const StudentManagement: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* High-Performance Pagination & Range Controls */}
+        <div className="bg-slate-50 border-t border-slate-200 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span>
+              {language === 'ta' ? 'காண்பிக்கப்படுகிறது: ' : 'Showing: '}
+              <span className="font-bold text-slate-900">
+                {filteredStudents.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
+              </span>
+              {' - '}
+              <span className="font-bold text-slate-900">
+                {Math.min(currentPage * pageSize, filteredStudents.length)}
+              </span>
+              {' of '}
+              <span className="font-bold text-slate-900">{filteredStudents.length}</span>
+              {language === 'ta' ? ' மாணவர்கள்' : ' candidates'}
+            </span>
+
+            {filteredStudents.length > 10 && (
+              <div className="flex items-center gap-1.5 sm:ml-3 sm:pl-3 sm:border-l sm:border-slate-200">
+                <span className="text-[11px] text-slate-500">
+                  {language === 'ta' ? 'பக்கத்திற்கு:' : 'Per page:'}
+                </span>
+                <select
+                  aria-label="Candidates per page"
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-xs text-slate-800 font-medium focus:ring-1 focus:ring-blue-600 focus:outline-none cursor-pointer"
+                >
+                  <option value={10}>10</option>
+                  <option value={15}>15</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none transition flex items-center gap-1 font-semibold text-slate-700 cursor-pointer shadow-2xs"
+                title="Previous Page"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{language === 'ta' ? 'முந்தைய' : 'Prev'}</span>
+              </button>
+
+              <div className="flex items-center gap-1 px-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                  .map((p, idx, arr) => {
+                    const prevVal = arr[idx - 1];
+                    const showEllipsis = prevVal && p - prevVal > 1;
+                    return (
+                      <React.Fragment key={p}>
+                        {showEllipsis && <span className="px-1 text-slate-400">...</span>}
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(p)}
+                          className={`w-7 h-7 rounded-lg text-xs font-bold transition cursor-pointer ${
+                            currentPage === p
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none transition flex items-center gap-1 font-semibold text-slate-700 cursor-pointer shadow-2xs"
+                title="Next Page"
+              >
+                <span className="hidden sm:inline">{language === 'ta' ? 'அடுத்த' : 'Next'}</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
