@@ -48,9 +48,23 @@ function apiDevServerPlugin() {
               const reqOptionCount = params.optionsCount && Number(params.optionsCount) >= 2 && Number(params.optionsCount) <= 6
                 ? Number(params.optionsCount)
                 : isPrimary ? 3 : 4;
+              const customOptE = params.customOptionE?.trim();
+              const customOptF = params.customOptionF?.trim();
+
               const optionLetters = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, reqOptionCount);
-              const sampleOptionsJson = JSON.stringify(optionLetters.map(l => `Option ${l}`));
-              const optionRule = `Each MCQ MUST HAVE EXACTLY ${reqOptionCount} OPTIONS (${optionLetters.join(', ')}). No more and no fewer.`;
+              const sampleOptions = optionLetters.map((l, idx) => {
+                if (idx === 4 && customOptE) return customOptE;
+                if (idx === 5 && customOptF) return customOptF;
+                return `Option ${l}`;
+              });
+              const sampleOptionsJson = JSON.stringify(sampleOptions);
+              let optionRule = `Each MCQ MUST HAVE EXACTLY ${reqOptionCount} OPTIONS (${optionLetters.join(', ')}). No more and no fewer. Every question's options array MUST have length ${reqOptionCount}.`;
+              if (reqOptionCount >= 5 && customOptE) {
+                optionRule += `\n- Option E (5th option) requirement: Use "${customOptE}" as the text for Option E across questions where applicable.`;
+              }
+              if (reqOptionCount >= 6 && customOptF) {
+                optionRule += `\n- Option F (6th option) requirement: Use "${customOptF}" as the text for Option F across questions where applicable.`;
+              }
 
               const prompt = `
 You are a Senior Sri Lankan Curriculum & Examination Specialist for the National Institute of Education (NIE) and Department of Examinations Sri Lanka.
@@ -102,8 +116,40 @@ Strict Constraints:
 
               const text = response.text || '';
               const parsed = JSON.parse(text);
+              const sanitizedQuestions = (parsed.questions || []).map((q: any) => {
+                let opts: string[] = Array.isArray(q.options) ? [...q.options] : [];
+                if (opts.length < reqOptionCount) {
+                  if (opts.length === 4 && reqOptionCount >= 5 && customOptE) {
+                    opts.push(customOptE);
+                  }
+                  if (opts.length === 5 && reqOptionCount >= 6 && customOptF) {
+                    opts.push(customOptF);
+                  }
+                  while (opts.length < reqOptionCount) {
+                    opts.push(`Option ${String.fromCharCode(65 + opts.length)}`);
+                  }
+                } else if (opts.length > reqOptionCount) {
+                  if (!opts.slice(0, reqOptionCount).includes(q.correctAnswer)) {
+                    opts = [...opts.slice(0, reqOptionCount - 1), q.correctAnswer];
+                  } else {
+                    opts = opts.slice(0, reqOptionCount);
+                  }
+                }
+                if (reqOptionCount >= 5 && customOptE && opts[4] !== customOptE) {
+                  opts[4] = customOptE;
+                }
+                if (reqOptionCount >= 6 && customOptF && opts[5] !== customOptF) {
+                  opts[5] = customOptF;
+                }
+                return {
+                  ...q,
+                  options: opts,
+                  correctAnswer: q.correctAnswer || opts[0] || 'Option A',
+                };
+              });
+
               res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ success: true, questions: parsed.questions || [] }));
+              res.end(JSON.stringify({ success: true, questions: sanitizedQuestions }));
             } catch (err: any) {
               console.warn('Dev server Gemini generate questions warning:', err.message);
               res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -270,26 +316,32 @@ Output strictly valid JSON matching this schema:
               const isUpperPrimary = gradeStr.includes('grade 4') || gradeStr.includes('grade 5') || gradeStr.includes('scholarship') || gradeStr.includes('புலமைப்பரிசில்');
 
               let expectedOptionsCount = 4;
-              let sampleOptionsJson = '["Option A", "Option B", "Option C", "Option D"]';
-              let optionRule = 'SECONDARY & G.C.E. O/L RULE (Grades 6–11): Each MCQ MUST HAVE EXACTLY 4 OPTIONS: A, B, C, and D.';
+              const customOptE = params.customOptionE?.trim();
+              const customOptF = params.customOptionF?.trim();
 
               if (params.optionsCount && Number(params.optionsCount) >= 2 && Number(params.optionsCount) <= 6) {
                 expectedOptionsCount = Number(params.optionsCount);
-                const letters = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, expectedOptionsCount);
-                sampleOptionsJson = JSON.stringify(letters.map(l => `Option ${l}`));
-                optionRule = `EXPLICIT CONFIGURATION RULE: Each MCQ MUST HAVE EXACTLY ${expectedOptionsCount} OPTIONS (${letters.join(', ')}). The options array MUST contain exactly ${expectedOptionsCount} items.`;
               } else if (isAdvancedLevel) {
                 expectedOptionsCount = 5;
-                sampleOptionsJson = '["Option A", "Option B", "Option C", "Option D", "Option E"]';
-                optionRule = 'G.C.E. ADVANCED LEVEL (A/L) NATIONAL RULE (Grades 12–13): Strictly according to Sri Lankan Department of Examinations G.C.E. A/L Paper 1 standards, EACH MCQ MUST HAVE EXACTLY 5 OPTIONS: A, B, C, D, and E (Option 1, 2, 3, 4, 5).';
               } else if (isEarlyPrimary) {
                 expectedOptionsCount = 3;
-                sampleOptionsJson = '["Option A", "Option B", "Option C"]';
-                optionRule = 'EARLY PRIMARY RULE (Grades 1–3): Each MCQ MUST HAVE EXACTLY 3 OPTIONS: A, B, and C.';
               } else if (isUpperPrimary) {
                 expectedOptionsCount = 4;
-                sampleOptionsJson = '["Option A", "Option B", "Option C", "Option D"]';
-                optionRule = 'UPPER PRIMARY & SCHOLARSHIP RULE (Grades 4–5): Each MCQ MUST HAVE EXACTLY 4 OPTIONS: A, B, C, and D.';
+              }
+
+              const letters = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, expectedOptionsCount);
+              const sampleOpts = letters.map((l, idx) => {
+                if (idx === 4 && customOptE) return customOptE;
+                if (idx === 5 && customOptF) return customOptF;
+                return `Option ${l}`;
+              });
+              const sampleOptionsJson = JSON.stringify(sampleOpts);
+              let optionRule = `EXPLICIT DYNAMIC OPTION RULE: Each MCQ MUST HAVE EXACTLY ${expectedOptionsCount} OPTIONS (${letters.join(', ')}). The options array MUST contain exactly ${expectedOptionsCount} items.`;
+              if (expectedOptionsCount >= 5 && customOptE) {
+                optionRule += `\n- Option E (the 5th option) custom text directive: Use "${customOptE}" as the text for Option E across questions where applicable.`;
+              }
+              if (expectedOptionsCount >= 6 && customOptF) {
+                optionRule += `\n- Option F (the 6th option) custom text directive: Use "${customOptF}" as the text for Option F across questions where applicable.`;
               }
 
               const modeContextMap: Record<string, string> = {
@@ -384,6 +436,38 @@ Strict Rules:
               }
 
               if (parsed && parsed.questions && parsed.questions.length > 0) {
+                parsed.questions = parsed.questions.map((q: any) => {
+                  let opts: string[] = Array.isArray(q.options) ? [...q.options] : [];
+                  if (opts.length < expectedOptionsCount) {
+                    if (opts.length === 4 && expectedOptionsCount >= 5 && customOptE) {
+                      opts.push(customOptE);
+                    }
+                    if (opts.length === 5 && expectedOptionsCount >= 6 && customOptF) {
+                      opts.push(customOptF);
+                    }
+                    while (opts.length < expectedOptionsCount) {
+                      opts.push(`Option ${String.fromCharCode(65 + opts.length)}`);
+                    }
+                  } else if (opts.length > expectedOptionsCount) {
+                    if (!opts.slice(0, expectedOptionsCount).includes(q.correctAnswer)) {
+                      opts = [...opts.slice(0, expectedOptionsCount - 1), q.correctAnswer];
+                    } else {
+                      opts = opts.slice(0, expectedOptionsCount);
+                    }
+                  }
+                  if (expectedOptionsCount >= 5 && customOptE && opts[4] !== customOptE) {
+                    opts[4] = customOptE;
+                  }
+                  if (expectedOptionsCount >= 6 && customOptF && opts[5] !== customOptF) {
+                    opts[5] = customOptF;
+                  }
+                  return {
+                    ...q,
+                    options: opts,
+                    correctAnswer: q.correctAnswer || opts[0] || 'Option A',
+                  };
+                });
+
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, competition: parsed, source: 'gemini' }));
                 return;
@@ -454,7 +538,36 @@ Strict Rules:
                   learningOutcome: 'Sri Lankan hydraulic heritage and history',
                   difficulty: params.difficulty || 'Medium',
                 },
-              ].slice(0, qCount);
+              ];
+
+              const totalNeeded = Math.min(100, Math.max(1, qCount));
+              const expandedQuestions = [];
+              for (let i = 0; i < totalNeeded; i++) {
+                const base = fallbackQuestions[i % fallbackQuestions.length];
+                const section = i >= fallbackQuestions.length
+                  ? (medium === 'Tamil' ? ` (பிரிவு ${Math.floor(i / fallbackQuestions.length) + 1} - வினா ${i + 1})` : ` (Section ${Math.floor(i / fallbackQuestions.length) + 1} - Q${i + 1})`)
+                  : '';
+                let opts = [...base.options];
+                if (opts.length < expectedOptionsCount) {
+                  if (opts.length === 4 && expectedOptionsCount >= 5 && customOptE) {
+                    opts.push(customOptE);
+                  }
+                  if (opts.length === 5 && expectedOptionsCount >= 6 && customOptF) {
+                    opts.push(customOptF);
+                  }
+                  while (opts.length < expectedOptionsCount) {
+                    opts.push(`Option ${String.fromCharCode(65 + opts.length)}`);
+                  }
+                } else if (opts.length > expectedOptionsCount) {
+                  opts = opts.slice(0, expectedOptionsCount);
+                }
+                expandedQuestions.push({
+                  ...base,
+                  id: `q_${Date.now()}_${i + 1}`,
+                  questionText: `${base.questionText}${section}`,
+                  options: opts,
+                });
+              }
 
               const fallbackComp = {
                 title: medium === 'Tamil' ? `${subject} • தேசிய கல்விச் சவால் (${grade})` : `${subject} • National Curriculum Challenge (${grade})`,
@@ -464,7 +577,7 @@ Strict Rules:
                 subject: subject,
                 grade: grade,
                 language: medium,
-                duration: params.duration || 30,
+                duration: params.duration || Math.max(15, Math.ceil(totalNeeded * 1.5)),
                 district: district,
                 scope: district ? 'district' : 'all_island',
                 prizeDetails: {
@@ -473,7 +586,7 @@ Strict Rules:
                   thirdPrize: '3rd Prize Bronze Medal',
                   participationCertificate: 'Digital Merit Certificate of Participation',
                 },
-                questions: fallbackQuestions,
+                questions: expandedQuestions,
               };
 
               res.writeHead(200, { 'Content-Type': 'application/json' });

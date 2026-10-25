@@ -45,6 +45,7 @@ export const AnnouncementsManagementView: React.FC = () => {
   const [formContentSi, setFormContentSi] = useState('');
   const [formCategory, setFormCategory] = useState<AnnouncementCategory>('general');
   const [formAudience, setFormAudience] = useState<'all' | 'students' | 'admins'>('all');
+  const [formGrade, setFormGrade] = useState('all');
   const [formPoints, setFormPoints] = useState<string>('');
   const [formBadgeText, setFormBadgeText] = useState('');
   const [formActionUrl, setFormActionUrl] = useState('');
@@ -61,6 +62,7 @@ export const AnnouncementsManagementView: React.FC = () => {
     setFormContentSi('');
     setFormCategory('general');
     setFormAudience('all');
+    setFormGrade('all');
     setFormPoints('');
     setFormBadgeText('');
     setFormActionUrl('');
@@ -83,6 +85,7 @@ export const AnnouncementsManagementView: React.FC = () => {
     setFormContentSi(ann.contentSi || '');
     setFormCategory(ann.category);
     setFormAudience(ann.targetAudience);
+    setFormGrade(ann.targetGrade || 'all');
     setFormPoints(ann.pointsReward ? String(ann.pointsReward) : '');
     setFormBadgeText(ann.badgeText || '');
     setFormActionUrl(ann.actionUrl || '');
@@ -106,6 +109,7 @@ export const AnnouncementsManagementView: React.FC = () => {
         contentSi: formContentSi.trim() || undefined,
         category: formCategory,
         targetAudience: formAudience,
+        targetGrade: formGrade === 'all' ? undefined : formGrade,
         pointsReward: formPoints ? parseInt(formPoints, 10) : undefined,
         badgeText: formBadgeText.trim() || undefined,
         actionUrl: formActionUrl.trim() || undefined,
@@ -333,6 +337,14 @@ export const AnnouncementsManagementView: React.FC = () => {
                         Audience: {ann.targetAudience}
                       </span>
 
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        ann.targetGrade
+                          ? 'bg-purple-100 text-purple-900 border border-purple-300'
+                          : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                      }`}>
+                        {ann.targetGrade ? `🎯 ${ann.targetGrade}` : '🌐 All Grades'}
+                      </span>
+
                       <span className="text-[11px] text-slate-400 flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
                         <span>{ann.publishedAt?.split('T')[0] || 'Recent'}</span>
@@ -407,8 +419,8 @@ export const AnnouncementsManagementView: React.FC = () => {
           subtitle="Publish platform notices, examination circulars, or competition updates"
         >
           <form onSubmit={handleSaveAnnouncement} className="space-y-4 text-xs">
-            {/* Category & Audience */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Category, Audience & Target Grade */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
                   Category (பிரிவு) *
@@ -438,6 +450,32 @@ export const AnnouncementsManagementView: React.FC = () => {
                   <option value="all">Everyone (Students & Admins)</option>
                   <option value="students">Students Only</option>
                   <option value="admins">Admins Only</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Target Grade (இலக்கு வகுப்பு)
+                </label>
+                <select
+                  value={formGrade}
+                  onChange={(e) => setFormGrade(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium"
+                >
+                  <option value="all">🌐 All Grades / பொதுவானது (Open)</option>
+                  <option value="Grade 1">Grade 1 (தரம் 1)</option>
+                  <option value="Grade 2">Grade 2 (தரம் 2)</option>
+                  <option value="Grade 3">Grade 3 (தரம் 3)</option>
+                  <option value="Grade 4">Grade 4 (தரம் 4)</option>
+                  <option value="Grade 5 (Scholarship)">Grade 5 (புலமைப்பரிசில்)</option>
+                  <option value="Grade 6">Grade 6 (தரம் 6)</option>
+                  <option value="Grade 7">Grade 7 (தரம் 7)</option>
+                  <option value="Grade 8">Grade 8 (தரம் 8)</option>
+                  <option value="Grade 9">Grade 9 (தரம் 9)</option>
+                  <option value="Grade 10">Grade 10 (தரம் 10)</option>
+                  <option value="Grade 11 (O/L)">Grade 11 (O/L)</option>
+                  <option value="Grade 12 (A/L)">Grade 12 (A/L)</option>
+                  <option value="Grade 13 (A/L)">Grade 13 (A/L)</option>
                 </select>
               </div>
             </div>

@@ -90,7 +90,15 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
   onCreateFormalCompetition,
   initialAction = 'list',
 }) => {
-  const { language: appLanguage, setLanguage: setAppLanguage } = useApp();
+  const {
+    language: appLanguage,
+    setLanguage: setAppLanguage,
+    saveCompetition,
+    setAdminNav,
+    setSuperAdminNav,
+    setStudentNav,
+    currentPortal,
+  } = useApp();
 
   // Internal language state for trilingual editing: Tamil, English, Sinhala
   const [activeLang, setActiveLang] = useState<'ta' | 'en' | 'si'>(appLanguage || 'ta');
@@ -100,6 +108,80 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
       setActiveLang(appLanguage);
     }
   }, [appLanguage]);
+
+  // Navigate to Competition Management / Competitions View
+  const navigateToCompetitions = () => {
+    onClose();
+    if (currentPortal === 'super_admin') {
+      setSuperAdminNav('Competition Management');
+    } else if (currentPortal === 'admin') {
+      setAdminNav('Competition Management');
+    } else if (currentPortal === 'student') {
+      setStudentNav('Competitions');
+    }
+  };
+
+  // Synchronize a District Quest with the global Competitions store & Firestore
+  const syncDistrictToCompetition = async (district: DistrictState, isPublished = true) => {
+    const compId = `comp_dist_${district.id}`;
+    const now = new Date();
+    const nextYear = new Date();
+    nextYear.setFullYear(now.getFullYear() + 1);
+
+    const formattedQuestions = (district.initialQuestions || []).map((q: any, idx: number) => ({
+      id: q.id || `q_${district.id}_${idx + 1}`,
+      questionText: q.questionText || q.questionTextEn || q.questionTextSi || `Question ${idx + 1}`,
+      questionTextEn: q.questionTextEn || q.questionText || '',
+      questionTextSi: q.questionTextSi || q.questionText || '',
+      category: q.category || 'General Knowledge',
+      type: 'multiple_choice' as const,
+      options: (q.options || []).map((o: any) => o.text || o.textEn || o.textSi || 'Option'),
+      correctAnswer:
+        q.options && q.options[q.correctIndex || 0]
+          ? q.options[q.correctIndex || 0].text || q.options[q.correctIndex || 0].textEn || 'Option A'
+          : 'Option A',
+      correctIndex: q.correctIndex || 0,
+      marks: 2,
+      order: idx + 1,
+      explanation: q.explanation || q.explanationEn || q.explanationSi || '',
+      hint: q.hint || q.hintEn || q.hintSi || '',
+    }));
+
+    try {
+      await saveCompetition({
+        id: compId,
+        title: `${district.nameTa} (${district.nameEn}) - HNC Edu-Arena Quest`,
+        description: `HNC Edu-Arena district competition for ${district.nameEn} (${district.provinceEn} Province). Play in ${district.gamingMode || 'Kahoot'} mode.`,
+        competitionType: 'Quiz',
+        category: district.gradeSubject || 'General Knowledge',
+        grade: 'Grade 10',
+        language: 'Tamil',
+        duration: district.questionTimerSeconds
+          ? Math.ceil((district.questionTimerSeconds * (district.initialQuestions?.length || 10)) / 60)
+          : 20,
+        entryType: 'Free',
+        entryFee: 0,
+        status: isPublished ? 'Published' : 'Draft',
+        approvalStatus: 'approved',
+        registrationStart: now.toISOString().split('T')[0],
+        registrationEnd: nextYear.toISOString().split('T')[0],
+        competitionStart: now.toISOString().split('T')[0],
+        competitionEnd: nextYear.toISOString().split('T')[0],
+        competitionStartTime: '00:00',
+        competitionEndTime: '23:59',
+        questions: formattedQuestions,
+        questionsCount: formattedQuestions.length,
+        totalMarks: district.defaultPoints || formattedQuestions.length * 2,
+        district: district.nameEn,
+        districtId: district.id,
+        province: district.provinceEn,
+        scope: 'district',
+        gamingMode: district.gamingMode || 'kahoot',
+      });
+    } catch (err) {
+      console.warn('Syncing district to competition failed:', err);
+    }
+  };
 
   // Load district settings from storage or initialize
   const [districts, setDistricts] = useState<DistrictState[]>(() => {
@@ -276,21 +358,43 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
   });
 
   // Toggle publish status for a district
-  const handleTogglePublish = (districtId: string, e?: React.MouseEvent) => {
+  const handleTogglePublish = async (districtId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    let targetUpdated: DistrictState | null = null;
     const updated = districts.map((d) => {
       if (d.id === districtId) {
         const nextState = !d.isPublished;
+        targetUpdated = { ...d, isPublished: nextState };
         showToast(
           nextState
             ? `🟢 ${d.nameTa} (${d.nameEn}) போட்டி நேரலையில் பிரசுரிக்கப்பட்டது!`
             : `🟡 ${d.nameTa} (${d.nameEn}) போட்டி வரைவுக்கு மாற்றப்பட்டது.`
         );
-        return { ...d, isPublished: nextState };
+        return targetUpdated;
       }
       return d;
     });
     saveDistrictsProgress(updated);
+    if (targetUpdated) {
+      await syncDistrictToCompetition(targetUpdated, (targetUpdated as DistrictState).isPublished);
+    }
+  };
+
+  // Publish all 25 districts and automatically navigate to Competition Management
+  const handlePublishAllDistricts = async () => {
+    const allPub = districts.map((d) => ({ ...d, isPublished: true }));
+    saveDistrictsProgress(allPub);
+
+    showToast('🚀 25 மாவட்டப் போட்டிகளும் பிரசுரிக்கப்பட்டு சேமிக்கப்படுகின்றன...');
+
+    for (const d of allPub) {
+      await syncDistrictToCompetition(d, true);
+    }
+
+    showToast('🚀 அனைத்து 25 மாவட்டப் போட்டிகளும் மாணவர்களுக்குப் பிரசுரிக்கப்பட்டன! போட்டி நிர்வாகப் பக்கத்திற்கு மாற்றப்படுகிறது...');
+    setTimeout(() => {
+      navigateToCompetitions();
+    }, 600);
   };
 
   // Change Gaming Mode for a district
@@ -304,12 +408,15 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
   };
 
   // Save district edits
-  const handleSaveDistrictEdits = () => {
+  const handleSaveDistrictEdits = async () => {
     if (!activeEditingDistrict) return;
     const updated = districts.map((d) =>
       d.id === activeEditingDistrict.id ? activeEditingDistrict : d
     );
     saveDistrictsProgress(updated);
+    if (activeEditingDistrict.isPublished) {
+      await syncDistrictToCompetition(activeEditingDistrict, true);
+    }
     showToast(`✅ ${activeEditingDistrict.nameTa} விவரங்கள் மற்றும் வினாக்கள் சேமிக்கப்பட்டன!`);
     setActiveEditingDistrict(null);
   };
@@ -346,7 +453,7 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
   };
 
   // Handle New Island Quest Creation
-  const handleCreateNewQuestSubmit = (e: React.FormEvent) => {
+  const handleCreateNewQuestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const targetDistrict = districts.find((d) => d.id === newQuestDistrictId);
     if (!targetDistrict) return;
@@ -358,9 +465,10 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
 
     const finalQuestions = validQuestions.length > 0 ? newQuestQuestions : targetDistrict.initialQuestions;
 
+    let questDistrictUpdated: DistrictState | null = null;
     const updated = districts.map((d) => {
       if (d.id === newQuestDistrictId) {
-        return {
+        questDistrictUpdated = {
           ...d,
           gamingMode: newQuestGamingMode,
           gradeSubject: newQuestGradeSubject,
@@ -373,13 +481,22 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
           initialQuestions: finalQuestions,
           isPublished: true,
         };
+        return questDistrictUpdated;
       }
       return d;
     });
 
     saveDistrictsProgress(updated);
+    if (questDistrictUpdated) {
+      await syncDistrictToCompetition(questDistrictUpdated, true);
+    }
+
     showToast(`🎉 "${newQuestTitleTa}" (${targetDistrict.nameTa}) புதிய தீவுப் போட்டி உருவாக்கப்பட்டு பிரசுரிக்கப்பட்டது!`);
     setShowCreateQuestModal(false);
+
+    setTimeout(() => {
+      navigateToCompetitions();
+    }, 600);
   };
 
   // Add new question to editing district
@@ -584,7 +701,7 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             {/* Create Island Quest Action Button */}
             <button
               type="button"
@@ -597,15 +714,27 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
 
             <button
               type="button"
-              onClick={() => {
-                const allPub = districts.map((d) => ({ ...d, isPublished: true }));
-                saveDistrictsProgress(allPub);
-                showToast('🚀 அனைத்து 25 மாவட்டப் போட்டிகளும் மாணவர்களுக்குப் பிரசுரிக்கப்பட்டன!');
-              }}
+              onClick={handlePublishAllDistricts}
               className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
             >
-              <CheckCircle2 className="w-3.5 h-3.5" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-100" />
               <span>{uiText.publishAll[activeLang]}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={navigateToCompetitions}
+              className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              title="Go to Competition Management page"
+            >
+              <ArrowRight className="w-3.5 h-3.5" />
+              <span>
+                {activeLang === 'ta'
+                  ? 'போட்டிகள் பக்கம் செல்'
+                  : activeLang === 'si'
+                  ? 'තරඟ පිටුවට යන්න'
+                  : 'Go to Competitions'}
+              </span>
             </button>
           </div>
         </div>
@@ -771,20 +900,21 @@ export const DistrictsCompetitionStudioModal: React.FC<DistrictsCompetitionStudi
                       <span>{uiText.editQuestions[activeLang]}</span>
                     </button>
 
-                    {onCreateFormalCompetition && (
-                      <button
-                        type="button"
-                        onClick={() => {
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await syncDistrictToCompetition(district, true);
+                        if (onCreateFormalCompetition) {
                           onCreateFormalCompetition(district);
-                          onClose();
-                        }}
-                        className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                        title="இந்த மாவட்டத்தை மையமாகக் கொண்டு முழுமையான போட்டியை உருவாக்கு"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>{uiText.makeCompetition[activeLang]}</span>
-                      </button>
-                    )}
+                        }
+                        navigateToCompetitions();
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                      title="இந்த மாவட்டத்தைப் பிரசுரித்து போட்டி நிர்வாகப் பக்கத்திற்குச் செல் (Publish & View Competitions)"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>{uiText.makeCompetition[activeLang]}</span>
+                    </button>
                   </div>
                 </div>
               );

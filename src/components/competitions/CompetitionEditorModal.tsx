@@ -1869,37 +1869,55 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                           </p>
                         </div>
 
-                        {/* Stepper Input */}
-                        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200 self-start sm:self-auto">
-                          <button
-                            type="button"
-                            onClick={() => handleSetTargetQuestionCount(questions.length - 1)}
-                            disabled={questions.length <= 1}
-                            className="w-7 h-7 rounded-md bg-white text-slate-800 font-bold hover:bg-slate-200 disabled:opacity-40 transition flex items-center justify-center text-sm shadow-2xs"
-                            title="Remove 1 question"
-                          >
-                            -
-                          </button>
-                          <input
-                            type="number"
-                            min="1"
-                            max="100"
-                            value={questions.length}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              if (!isNaN(val)) handleSetTargetQuestionCount(val);
-                            }}
-                            className="w-14 text-center font-bold text-sm bg-white border border-slate-300 rounded px-1.5 py-0.5 text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleSetTargetQuestionCount(questions.length + 1)}
-                            disabled={questions.length >= 100}
-                            className="w-7 h-7 rounded-md bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-40 transition flex items-center justify-center text-sm shadow-2xs"
-                            title="Add 1 question"
-                          >
-                            +
-                          </button>
+                        {/* Stepper Input & Quick Presets */}
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 self-start sm:self-auto">
+                          <div className="flex flex-wrap items-center gap-1">
+                            {[10, 20, 25, 40, 50, 75, 100].map((num) => (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => handleSetTargetQuestionCount(num)}
+                                className={`px-2 py-0.5 rounded text-[11px] font-bold border transition cursor-pointer ${
+                                  questions.length === num
+                                    ? 'bg-blue-600 text-white border-blue-700 shadow-2xs'
+                                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                                }`}
+                              >
+                                {num} {num === 100 ? '🔥' : ''}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                            <button
+                              type="button"
+                              onClick={() => handleSetTargetQuestionCount(questions.length - 1)}
+                              disabled={questions.length <= 1}
+                              className="w-7 h-7 rounded-md bg-white text-slate-800 font-bold hover:bg-slate-200 disabled:opacity-40 transition flex items-center justify-center text-sm shadow-2xs cursor-pointer"
+                              title="Remove 1 question"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={questions.length}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                if (!isNaN(val)) handleSetTargetQuestionCount(val);
+                              }}
+                              className="w-14 text-center font-bold text-sm bg-white border border-slate-300 rounded px-1.5 py-0.5 text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSetTargetQuestionCount(questions.length + 1)}
+                              disabled={questions.length >= 100}
+                              className="w-7 h-7 rounded-md bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-40 transition flex items-center justify-center text-sm shadow-2xs cursor-pointer"
+                              title="Add 1 question"
+                            >
+                              +
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2360,12 +2378,28 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
 
                   {/* Stepper and Quick Presets */}
                   <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1">
+                      {[10, 20, 25, 40, 50, 75, 100].map((num) => (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => handleSetTargetQuestionCount(num)}
+                          className={`px-2 py-0.5 rounded text-[11px] font-bold border transition cursor-pointer ${
+                            questions.length === num
+                              ? 'bg-blue-600 text-white border-blue-700 shadow-2xs'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                          }`}
+                        >
+                          {num} {num === 100 ? '🔥' : ''}
+                        </button>
+                      ))}
+                    </div>
                     <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-300 shadow-2xs">
                       <button
                         type="button"
                         onClick={() => handleSetTargetQuestionCount(questions.length - 1)}
                         disabled={questions.length <= 1}
-                        className="w-6 h-6 rounded bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 disabled:opacity-40 transition flex items-center justify-center text-xs"
+                        className="w-6 h-6 rounded bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 disabled:opacity-40 transition flex items-center justify-center text-xs cursor-pointer"
                         title="Reduce 1 question"
                       >
                         -
@@ -2385,7 +2419,7 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                         type="button"
                         onClick={() => handleSetTargetQuestionCount(questions.length + 1)}
                         disabled={questions.length >= 100}
-                        className="w-6 h-6 rounded bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-40 transition flex items-center justify-center text-xs"
+                        className="w-6 h-6 rounded bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-40 transition flex items-center justify-center text-xs cursor-pointer"
                         title="Add 1 question"
                       >
                         +

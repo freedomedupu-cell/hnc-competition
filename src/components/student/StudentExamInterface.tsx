@@ -725,7 +725,7 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
               {/* Type 3: Short Answer with Voice Typing */}
               {currentQuestion.type === 'short_answer' && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <label
                       htmlFor={`short-answer-${currentQuestion.id}`}
                       className="block text-xs font-semibold uppercase tracking-wider text-slate-500"
@@ -736,8 +736,18 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
                         ? 'ඔබේ පිළිතුර (Your Answer)'
                         : 'Your Answer'}
                     </label>
-                    <span className="text-[11px] text-blue-600 font-semibold flex items-center gap-1">
-                      <span>🎙️ Voice Typing Supported</span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-xs">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                      <span>
+                        {language === 'ta'
+                          ? '🎙️ குரல் தட்டச்சு பெறப்படுகிறது (தமிழ் / Sinhala / English)'
+                          : language === 'si'
+                          ? '🎙️ හඬ ටයිප් කිරීම සහය දක්වයි (தமிழ் / සිංහල / English)'
+                          : '🎙️ Voice Typing Supported (Tamil / Sinhala / English)'}
+                      </span>
                     </span>
                   </div>
 
@@ -747,6 +757,8 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
                     onChange={(val) => handleSelectAnswer(currentQuestion.id, val)}
                     disabled={isLocked}
                     portalLanguage={language}
+                    multiline={true}
+                    rows={3}
                     placeholder={
                       language === 'ta'
                         ? 'உங்கள் விடையைத் தட்டச்சு செய்யவும் அல்லது மைக்ரோஃபோனை அழுத்திப் பேசவும்...'
@@ -770,7 +782,7 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
               {currentQuestion.type === 'picture_question' &&
                 (!currentQuestion.options || currentQuestion.options.length === 0) && (
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <label
                         htmlFor={`picture-answer-${currentQuestion.id}`}
                         className="block text-xs font-semibold uppercase tracking-wider text-slate-500"
@@ -781,8 +793,18 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
                           ? 'ඔබේ පිළිතුර (Your Analysis)'
                           : 'Your Analysis / Identification'}
                       </label>
-                      <span className="text-[11px] text-blue-600 font-semibold flex items-center gap-1">
-                        <span>🎙️ Voice Typing Supported</span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-xs">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <span>
+                          {language === 'ta'
+                            ? '🎙️ குரல் தட்டச்சு பெறப்படுகிறது (தமிழ் / Sinhala / English)'
+                            : language === 'si'
+                            ? '🎙️ හඬ ටයිප් කිරීම සහය දක්වයි (தமிழ் / සිංහල / English)'
+                            : '🎙️ Voice Typing Supported (Tamil / Sinhala / English)'}
+                        </span>
                       </span>
                     </div>
 
@@ -792,6 +814,8 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
                       onChange={(val) => handleSelectAnswer(currentQuestion.id, val)}
                       disabled={isLocked}
                       portalLanguage={language}
+                      multiline={true}
+                      rows={3}
                       placeholder={
                         language === 'ta'
                           ? 'படத்தின் அடிப்படையில் விடையைத் தட்டச்சு செய்யவும் அல்லது பேசவும்...'

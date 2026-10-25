@@ -521,6 +521,8 @@ export interface GenerateSriLankanQuestionsParams {
   curriculumVersion: string;
   questionCount: number;
   optionsCount?: number;
+  customOptionE?: string;
+  customOptionF?: string;
   questionType: QuestionType | 'mixed';
   difficulty: 'Easy' | 'Medium' | 'Hard' | 'Mixed';
   referenceTextSnippet?: string;
@@ -571,16 +573,31 @@ export async function generateSriLankanQuestions(
       ? 'Use authentic Sri Lankan Sinhala academic terminology conforming to NIE textbooks (ශ්‍රී ලංකා විෂය නිර්දේශය).'
       : 'Use Sri Lankan English curriculum conventions, Metric system (km, m, cm, kg), and Sri Lankan currency (LKR / Rs.).';
 
+  const customOptionE = params.customOptionE?.trim();
+  const customOptionF = params.customOptionF?.trim();
+
   const optionLetters = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, reqOptionCount);
-  const sampleOptionsJson = JSON.stringify(optionLetters.map(l => `Option ${l}`));
-  let optionRuleInstruction = `Each Multiple Choice Question MUST HAVE EXACTLY ${reqOptionCount} OPTIONS (${optionLetters.join(', ')}).`;
+  const sampleOptionsList = optionLetters.map((l, idx) => {
+    if (idx === 4 && customOptionE) return customOptionE;
+    if (idx === 5 && customOptionF) return customOptionF;
+    return `Option ${l}`;
+  });
+  const sampleOptionsJson = JSON.stringify(sampleOptionsList);
+  let optionRuleInstruction = `Each Multiple Choice Question MUST HAVE EXACTLY ${reqOptionCount} OPTIONS (${optionLetters.join(', ')}). No more and no fewer.`;
+
+  if (reqOptionCount >= 5 && customOptionE) {
+    optionRuleInstruction += `\n- Option E (the 5th option) must have or incorporate this custom text: "${customOptionE}".`;
+  }
+  if (reqOptionCount >= 6 && customOptionF) {
+    optionRuleInstruction += `\n- Option F (the 6th option) must have or incorporate this custom text: "${customOptionF}".`;
+  }
 
   if (!explicitCount) {
     if (reqOptionCount === 5) {
-      optionRuleInstruction = `COLLEGIATE / G.C.E. ADVANCED LEVEL (A/L) NATIONAL STANDARD RULE:
+      optionRuleInstruction += `\nCOLLEGIATE / G.C.E. ADVANCED LEVEL (A/L) NATIONAL STANDARD RULE:
 Each Multiple Choice Question MUST HAVE EXACTLY FIVE OPTIONS: A, B, C, D, and E (Option 1, 2, 3, 4, 5) per official Department of Examinations Sri Lanka Paper 1 specifications.`;
     } else if (reqOptionCount === 3) {
-      optionRuleInstruction = `EARLY PRIMARY SCHOOL RULE (Grades 1–3):
+      optionRuleInstruction += `\nEARLY PRIMARY SCHOOL RULE (Grades 1–3):
 Each Multiple Choice Question MUST HAVE EXACTLY THREE OPTIONS: A, B, and C.
 Do NOT generate 4 or 5 options. Sri Lankan early primary assessments strictly provide 3 options.`;
     }
@@ -706,24 +723,56 @@ QUALITY ASSURANCE & LOCALIZATION CONSTRAINTS:
   const processedQuestions: QuestionItem[] = generatedRawQuestions.map((q, idx) => {
     let finalOptions = Array.isArray(q.options) ? [...q.options] : [];
 
-    // Enforce 3 options for Primary, 4 options for Secondary
-    if (isPrimary) {
-      if (finalOptions.length > 3) {
-        // Keep the correct answer and take only 3 options total
-        if (!finalOptions.slice(0, 3).includes(q.correctAnswer)) {
-          finalOptions = [finalOptions[0], finalOptions[1], q.correctAnswer];
-        } else {
-          finalOptions = finalOptions.slice(0, 3);
+    // Enforce dynamic reqOptionCount (2 to 6 options) and apply customOptionE/customOptionF
+    if (q.type === 'multiple_choice' || !q.type) {
+      if (finalOptions.length < reqOptionCount) {
+        if (finalOptions.length === 4 && reqOptionCount >= 5 && customOptionE) {
+          finalOptions.push(customOptionE);
         }
-      } else if (finalOptions.length < 3) {
-        finalOptions.push('மேற்கூறிய எதுவுமில்லை (None of the above)');
+        if (finalOptions.length === 5 && reqOptionCount >= 6 && customOptionF) {
+          finalOptions.push(customOptionF);
+        }
+        while (finalOptions.length < reqOptionCount) {
+          const pool = [
+            'மேற்கூறிய எதுவுமில்லை (None of the above)',
+            'மேற்கூறிய அனைத்தும் சரி (All of the above)',
+            'கூற்றுக்கள் A மற்றும் B இரண்டும் சரியானவை',
+            'விடை தீர்மானிக்க தகவல் போதாது',
+          ];
+          const cand = pool[finalOptions.length % pool.length];
+          if (!finalOptions.includes(cand)) {
+            finalOptions.push(cand);
+          } else {
+            finalOptions.push(`Option ${String.fromCharCode(65 + finalOptions.length)}`);
+          }
+        }
+      } else if (finalOptions.length > reqOptionCount) {
+        if (!finalOptions.slice(0, reqOptionCount).includes(q.correctAnswer)) {
+          finalOptions = [...finalOptions.slice(0, reqOptionCount - 1), q.correctAnswer];
+        } else {
+          finalOptions = finalOptions.slice(0, reqOptionCount);
+        }
       }
-    } else {
-      if (finalOptions.length < 4 && q.type === 'multiple_choice') {
-        finalOptions.push('மேற்கூறிய அனைத்தும் சரி (All of the above)');
+
+      // If user specified custom text for option E (5th) and question has >= 5 options
+      if (reqOptionCount >= 5 && customOptionE && finalOptions[4] && !finalOptions.includes(customOptionE)) {
+        if (q.correctAnswer === finalOptions[4]) {
+          // If option E was correct, keep consistency or update
+          finalOptions[4] = customOptionE;
+          q.correctAnswer = customOptionE;
+        } else {
+          finalOptions[4] = customOptionE;
+        }
       }
-      if (finalOptions.length > 4) {
-        finalOptions = finalOptions.slice(0, 4);
+
+      // If user specified custom text for option F (6th) and question has 6 options
+      if (reqOptionCount >= 6 && customOptionF && finalOptions[5] && !finalOptions.includes(customOptionF)) {
+        if (q.correctAnswer === finalOptions[5]) {
+          finalOptions[5] = customOptionF;
+          q.correctAnswer = customOptionF;
+        } else {
+          finalOptions[5] = customOptionF;
+        }
       }
     }
 

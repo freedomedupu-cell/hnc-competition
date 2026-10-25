@@ -86,6 +86,8 @@ export const SriLankanAiExamGeneratorModal: React.FC<SriLankanAiExamGeneratorMod
   const [customQuestionCount, setCustomQuestionCount] = useState<string>('5');
   const [optionsCount, setOptionsCount] = useState<number>(() => getRequiredOptionCountForGrade(initialGrade));
   const [customOptionsCount, setCustomOptionsCount] = useState<string>(() => String(getRequiredOptionCountForGrade(initialGrade)));
+  const [customOptionE, setCustomOptionE] = useState<string>('');
+  const [customOptionF, setCustomOptionF] = useState<string>('');
   const [questionType, setQuestionType] = useState<QuestionType | 'mixed'>('multiple_choice');
   const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard' | 'Mixed'>('Medium');
   const [defaultMarks, setDefaultMarks] = useState<number>(2);
@@ -178,6 +180,8 @@ export const SriLankanAiExamGeneratorModal: React.FC<SriLankanAiExamGeneratorMod
         curriculumVersion,
         questionCount,
         optionsCount,
+        customOptionE: customOptionE.trim() || undefined,
+        customOptionF: customOptionF.trim() || undefined,
         questionType,
         difficulty,
         referenceTextSnippet: referenceTextSnippet.trim() || undefined,
@@ -660,7 +664,7 @@ export const SriLankanAiExamGeneratorModal: React.FC<SriLankanAiExamGeneratorMod
                 className="w-16 px-2 py-1 rounded-md border border-blue-300 text-center font-bold text-slate-900 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Count"
               />
-              <span className="text-[10px] text-slate-400">1 முதல் 100+ வரை</span>
+              <span className="text-[10px] text-slate-500 font-medium">1 முதல் 100 வினாக்கள் வரை (தவணைப் பரீட்சை / Term Exam: Up to 100 questions)</span>
             </div>
           </div>
 
@@ -718,6 +722,112 @@ export const SriLankanAiExamGeneratorModal: React.FC<SriLankanAiExamGeneratorMod
                 {optionsCount === 3 ? 'A, B, C' : optionsCount === 4 ? 'A, B, C, D' : optionsCount === 5 ? 'A, B, C, D, E' : 'A, B, C, D, E, F'}
               </span>
             </div>
+
+            {/* Custom Text Specification for Options E and F */}
+            {optionsCount >= 5 && (
+              <div className="pt-2 mt-2 border-t border-amber-200/90 space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black text-amber-950 flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded bg-amber-300 text-amber-950 font-black text-[10px] tracking-wide border border-amber-400">
+                      E & F
+                    </span>
+                    <span>5வது & 6வது தெரிவுகளுக்கான தனிப்பயன் உரை (Custom Text for Options E & F)</span>
+                  </span>
+                  <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                    ⚡ Gemini AI Directive
+                  </span>
+                </div>
+
+                {/* Option E custom input */}
+                <div className="p-2.5 rounded-xl bg-white border border-amber-200 shadow-2xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded bg-purple-700 text-white font-black text-[10px] flex items-center justify-center">E</span>
+                      <span>Option E (5வது தெரிவு உரை):</span>
+                    </label>
+                    {customOptionE && (
+                      <button
+                        type="button"
+                        onClick={() => setCustomOptionE('')}
+                        className="text-[10px] text-slate-400 hover:text-red-600 font-semibold cursor-pointer"
+                      >
+                        மீட்டமை (Clear)
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={customOptionE}
+                    onChange={(e) => setCustomOptionE(e.target.value)}
+                    placeholder="e.g. மேற்கூறிய அனைத்தும் / All of the above / கூற்றுக்கள் 1, 2 சரியானவை"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 text-xs text-slate-800 bg-amber-50/20 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                    <span className="text-[10px] text-slate-500 font-medium">பரிந்துரைகள் (Presets):</span>
+                    {[
+                      medium === 'Tamil' ? 'மேற்கூறிய அனைத்தும்' : medium === 'Sinhala' ? 'ඉහත සියල්ල' : 'All of the above',
+                      medium === 'Tamil' ? 'மேற்கூறிய எதுவுமில்லை' : medium === 'Sinhala' ? 'ඉහත කිසිවක් නොවේ' : 'None of the above',
+                      medium === 'Tamil' ? 'கூற்றுக்கள் A மற்றும் B இரண்டும் சரி' : 'Both A and B are correct',
+                      medium === 'Tamil' ? 'விடை தீர்மானிக்க தகவல் போதாது' : 'Insufficient data to determine',
+                    ].map((txt, pIdx) => (
+                      <button
+                        key={pIdx}
+                        type="button"
+                        onClick={() => setCustomOptionE(txt)}
+                        className="text-[10px] px-2 py-0.5 rounded-md bg-amber-100/90 hover:bg-amber-200 text-amber-950 border border-amber-300 transition cursor-pointer font-semibold shadow-2xs"
+                      >
+                        + {txt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Option F custom input (for 6 options) */}
+                {optionsCount >= 6 && (
+                  <div className="p-2.5 rounded-xl bg-white border border-indigo-200 shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                        <span className="w-4 h-4 rounded bg-indigo-700 text-white font-black text-[10px] flex items-center justify-center">F</span>
+                        <span>Option F (6வது தெரிவு உரை):</span>
+                      </label>
+                      {customOptionF && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomOptionF('')}
+                          className="text-[10px] text-slate-400 hover:text-red-600 font-semibold cursor-pointer"
+                        >
+                          மீட்டமை (Clear)
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={customOptionF}
+                      onChange={(e) => setCustomOptionF(e.target.value)}
+                      placeholder="e.g. A மற்றும் C ஆகிய இரண்டும் சரி / Both A and C are correct"
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 text-xs text-slate-800 bg-indigo-50/20 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                      <span className="text-[10px] text-slate-500 font-medium">பரிந்துரைகள் (Presets):</span>
+                      {[
+                        medium === 'Tamil' ? 'A மற்றும் C ஆகிய இரண்டும் சரியானவை' : 'Both A and C are correct',
+                        medium === 'Tamil' ? 'விடை தீர்மானிக்க போதிய தகவல் இல்லை' : 'Insufficient data to determine',
+                        medium === 'Tamil' ? 'மேற்கூறிய எதுவுமில்லை' : 'None of the above',
+                      ].map((txt, pIdx) => (
+                        <button
+                          key={pIdx}
+                          type="button"
+                          onClick={() => setCustomOptionF(txt)}
+                          className="text-[10px] px-2 py-0.5 rounded-md bg-indigo-100/90 hover:bg-indigo-200 text-indigo-950 border border-indigo-300 transition cursor-pointer font-semibold shadow-2xs"
+                        >
+                          + {txt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="md:col-span-6 space-y-1">

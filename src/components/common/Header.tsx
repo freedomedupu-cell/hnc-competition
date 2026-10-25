@@ -18,6 +18,7 @@ import {
 import { ShareModal } from './ShareModal';
 import { getStudentDeadlineAlerts } from '../../utils/deadlineNotificationUtils';
 import { isCompetitionInEnrolledSubjects } from '../../utils/subjectNotificationUtils';
+import { isGradeEligible } from '../../lib/gradeUtils';
 import { NetworkStatusIndicator } from './NetworkStatusIndicator';
 import { PWAInstallButton } from './PWAInstallButton';
 
@@ -159,30 +160,36 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
 
   const notificationsList: HeaderNotificationItem[] = [];
 
-  // If student portal, prioritize enrolled subject alerts and deadline alerts
-  if (effectivePortal === 'student') {
-    // 1. Pending alerts for published competitions in enrolled subjects
-    subjectPublicationAlerts.forEach((spa) => {
-      notificationsList.push({
-        id: `spa-${spa.id}`,
-        title:
-          language === 'ta'
-            ? `🎯 உங்கள் பாடம்: ${spa.subject}`
-            : `🎯 Enrolled Subject: ${spa.subject}`,
-        subtitle: `${spa.competitionTitle} (${spa.competitionType || 'Quiz'})`,
-        time: spa.publishedAt ? spa.publishedAt.split('T')[0] : (language === 'ta' ? 'இப்போது' : 'Just now'),
-        read: spa.read,
-        isEnrolledSubject: true,
-        subjectName: spa.subject,
-        competitionId: spa.competitionId,
-      });
-    });
+  // If student portal, prioritize enrolled subject alerts and deadline alerts (strictly filtered by student grade)
+  const isStudentPortal = effectivePortal === 'student';
+  const studentGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 6';
 
-    // 2. Also check all active competitions published in enrolled subjects
+  if (isStudentPortal) {
+    // 1. Pending alerts for published competitions in enrolled subjects (Filtered strictly by student grade)
+    subjectPublicationAlerts
+      .filter((spa) => isGradeEligible(spa.grade, studentGrade))
+      .forEach((spa) => {
+        notificationsList.push({
+          id: `spa-${spa.id}`,
+          title:
+            language === 'ta'
+              ? `🎯 உங்கள் பாடம்: ${spa.subject}`
+              : `🎯 Enrolled Subject: ${spa.subject}`,
+          subtitle: `${spa.competitionTitle} (${spa.competitionType || 'Quiz'})`,
+          time: spa.publishedAt ? spa.publishedAt.split('T')[0] : (language === 'ta' ? 'இப்போது' : 'Just now'),
+          read: spa.read,
+          isEnrolledSubject: true,
+          subjectName: spa.subject,
+          competitionId: spa.competitionId,
+        });
+      });
+
+    // 2. Also check all active competitions published in enrolled subjects (Filtered strictly by student grade)
     competitions
       .filter((c) => {
         const s = (c.status || '').toLowerCase();
-        return s.includes('publish') || s.includes('open') || s.includes('ongoing');
+        const isLive = s.includes('publish') || s.includes('open') || s.includes('ongoing');
+        return isLive && isGradeEligible(c.grade, studentGrade);
       })
       .forEach((c) => {
         const { matches, matchedSubject } = isCompetitionInEnrolledSubjects(c, studentEnrolledSubjects);
@@ -204,7 +211,6 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
       });
 
     // 3. Deadline alerts for their eligible competitions
-    const studentGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 6';
     const deadlineAlerts = getStudentDeadlineAlerts(competitions, studentGrade, {
       isRegistered: (id) => isStudentRegistered(id),
       hasSubmitted: (id) => hasStudentSubmitted(id),
@@ -227,11 +233,14 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
   }
 
   // Dynamic notifications from actual active competitions (general)
+  // For student portal: strictly check isGradeEligible so Grade 6 never sees Grade 12 or Grade 2 notifications
   competitions
     .filter((c) => {
       const s = (c.status || '').toLowerCase();
-      return (s.includes('publish') || s.includes('open') || s.includes('ongoing')) &&
-        !notificationsList.some((n) => n.competitionId === c.id);
+      const isLive = s.includes('publish') || s.includes('open') || s.includes('ongoing');
+      if (!isLive) return false;
+      if (isStudentPortal && !isGradeEligible(c.grade, studentGrade)) return false;
+      return !notificationsList.some((n) => n.competitionId === c.id);
     })
     .slice(0, 3)
     .forEach((c) => {

@@ -341,6 +341,9 @@ export async function loginWithEmailPassword(
   }
 
   // 3. Authenticate candidate credentials
+  // Save active user profile immediately to localStorage & sessionStorage so onAuthStateChanged detects active session instantly!
+  saveActiveUser(targetUserDoc);
+
   // Deterministic internal auth email for Firebase Auth
   const authEmailToUse =
     targetUserDoc.authEmail ||

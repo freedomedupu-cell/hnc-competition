@@ -11,6 +11,8 @@ export interface FallbackParams {
   district?: string;
   questionCount?: number;
   optionsCount?: number;
+  customOptionE?: string;
+  customOptionF?: string;
   duration?: number;
   difficulty?: string;
   customTopic?: string;
@@ -394,11 +396,11 @@ export function generateSriLankanCurriculumCompetition(params: FallbackParams) {
   );
   const targetGradeBand = isPrimary ? 'primary' : 'secondary';
   const medium = (params.medium || 'Tamil') as 'Tamil' | 'English' | 'Sinhala';
-  const targetCount = Math.max(3, Math.min(20, params.questionCount || 5));
+  const totalQuestionsNeeded = Math.max(1, Math.min(100, params.questionCount || 15));
   const district = params.district || '';
   const mode = params.mode || 'quiz';
   const subject = params.subject || 'Mathematics';
-  const duration = params.duration || (targetCount * 3);
+  const duration = params.duration || Math.max(15, Math.ceil(totalQuestionsNeeded * 1.5));
 
   // Normalize subject key
   const sLower = subject.toLowerCase();
@@ -416,7 +418,7 @@ export function generateSriLankanCurriculumCompetition(params: FallbackParams) {
 
   // Generate questions list
   const questions: any[] = [];
-  for (let i = 0; i < targetCount; i++) {
+  for (let i = 0; i < totalQuestionsNeeded; i++) {
     const template = matched[i % matched.length];
     const qId = `q_nie_${Date.now()}_${i + 1}`;
 
@@ -445,17 +447,26 @@ export function generateSriLankanCurriculumCompetition(params: FallbackParams) {
     const isEarlyPrimary = gradeStr.includes('grade 1') || gradeStr.includes('grade 2') || gradeStr.includes('grade 3');
 
     // Configurable Option Scaling (3, 4, 5, அல்லது 6 விடைத் தெரிவுகள்)
-    const targetCount = params.optionsCount && params.optionsCount >= 2 && params.optionsCount <= 6
+    const targetOptCount = params.optionsCount && params.optionsCount >= 2 && params.optionsCount <= 6
       ? params.optionsCount
       : (isEarlyPrimary ? 3 : isAdvancedLevel ? 5 : 4);
 
-    if (opts.length > targetCount) {
-      const trimmed = opts.slice(0, targetCount);
+    if (opts.length > targetOptCount) {
+      const trimmed = opts.slice(0, targetOptCount);
       if (!trimmed.includes(correct)) {
         trimmed[trimmed.length - 1] = correct;
       }
       opts = trimmed;
-    } else if (opts.length < targetCount) {
+    } else if (opts.length < targetOptCount) {
+      if (opts.length === 4 && targetOptCount >= 5 && params.customOptionE?.trim()) {
+        const valE = params.customOptionE.trim();
+        if (!opts.includes(valE)) opts.push(valE);
+      }
+      if (opts.length === 5 && targetOptCount >= 6 && params.customOptionF?.trim()) {
+        const valF = params.customOptionF.trim();
+        if (!opts.includes(valF)) opts.push(valF);
+      }
+
       const extraDistractorsTa = [
         'மேற்கூறிய எதுவுமில்லை',
         'கூற்றுக்கள் அனைத்தும் சரியானவை',
@@ -476,7 +487,7 @@ export function generateSriLankanCurriculumCompetition(params: FallbackParams) {
       ];
       const pool = medium === 'Tamil' ? extraDistractorsTa : medium === 'Sinhala' ? extraDistractorsSi : extraDistractorsEn;
       let pIdx = 0;
-      while (opts.length < targetCount) {
+      while (opts.length < targetOptCount) {
         const candidate = pool[pIdx % pool.length];
         if (!opts.includes(candidate) && candidate !== correct) {
           opts.push(candidate);
@@ -488,7 +499,9 @@ export function generateSriLankanCurriculumCompetition(params: FallbackParams) {
     }
 
     // If more questions needed than templates, customize with item numbers
-    const suffix = i >= matched.length ? ` (பகுதி ${Math.floor(i / matched.length) + 1})` : '';
+    const suffix = i >= matched.length
+      ? (medium === 'Tamil' ? ` (பிரிவு ${Math.floor(i / matched.length) + 1} - வினா ${i + 1})` : ` (Section ${Math.floor(i / matched.length) + 1} - Q${i + 1})`)
+      : '';
 
     questions.push({
       id: qId,

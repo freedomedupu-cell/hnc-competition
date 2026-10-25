@@ -17,14 +17,23 @@ import {
   Bell,
 } from 'lucide-react';
 
+import { isGradeEligible } from '../../lib/gradeUtils';
+
 export const StudentAnnouncementsView: React.FC = () => {
-  const { announcements, setStudentNav, currentStudent, language } = useApp();
+  const { announcements, setStudentNav, currentStudent, currentAuthUser, language } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  // Filter only announcements intended for students or everyone
-  const studentAnnouncements = announcements.filter(
-    (a) => a.targetAudience === 'all' || a.targetAudience === 'students'
-  );
+  const studentGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 6';
+
+  // Filter only announcements intended for students or everyone, AND strictly matching student's grade
+  const studentAnnouncements = announcements.filter((a) => {
+    const audienceMatches = a.targetAudience === 'all' || a.targetAudience === 'students';
+    if (!audienceMatches) return false;
+    if (a.targetGrade && !isGradeEligible(a.targetGrade, studentGrade)) {
+      return false;
+    }
+    return true;
+  });
 
   const filteredAnnouncements = studentAnnouncements.filter((a) => {
     if (selectedCategory === 'all') return true;
@@ -280,6 +289,14 @@ export const StudentAnnouncementsView: React.FC = () => {
                         <span>{ann.badgeText || `🎁 +${ann.pointsReward || 25} Points Bonus`}</span>
                       </span>
                     )}
+
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      ann.targetGrade
+                        ? 'bg-purple-100 text-purple-900 border border-purple-300'
+                        : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                    }`}>
+                      {ann.targetGrade ? `🎯 ${ann.targetGrade}` : '🌐 All Grades'}
+                    </span>
 
                     <span className="text-[11px] text-slate-400 flex items-center gap-1 ml-auto">
                       <Calendar className="w-3 h-3" />

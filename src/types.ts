@@ -183,6 +183,7 @@ export interface DbCompetition {
   requireVideoVerification?: boolean;
   membershipRequired?: boolean;
   district?: string;
+  districtId?: string;
   province?: string;
   scope?: 'all_island' | 'district' | 'province';
   gamingMode?: StudyGamingMode;
@@ -418,6 +419,7 @@ export interface DbAnnouncement {
   contentSi?: string;
   category: AnnouncementCategory;
   targetAudience: 'all' | 'students' | 'admins';
+  targetGrade?: string;
   pointsReward?: number;
   badgeText?: string;
   badgeTextTa?: string;
@@ -507,6 +509,7 @@ export interface Competition {
   roundsCount?: number;
   createdAt?: string;
   district?: string;
+  districtId?: string;
   province?: string;
   scope?: 'all_island' | 'district' | 'province';
   gamingMode?: StudyGamingMode;

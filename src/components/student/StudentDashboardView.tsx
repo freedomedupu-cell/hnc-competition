@@ -55,6 +55,8 @@ import { AnimatedHeroLeaderboard } from '../leaderboard/AnimatedHeroLeaderboard'
 import { SmartDailyTips } from './SmartDailyTips';
 import { StudentDeadlineAlertsBanner } from './StudentDeadlineAlertsBanner';
 import { SubjectPublicationAlertBanner } from './SubjectPublicationAlertBanner';
+import { PreExam15MinAlertBanner } from './PreExam15MinAlertBanner';
+import { WhatsappSmsAlertModal } from './WhatsappSmsAlertModal';
 import { EnrolledSubjectsModal } from './EnrolledSubjectsModal';
 import { identifyWeakSubjectsFromResults } from '../../services/studyTimetableService';
 import { NextEnrolledCompetitionCountdown } from './NextEnrolledCompetitionCountdown';
@@ -100,6 +102,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
   const [membershipPromptComp, setMembershipPromptComp] = useState<Competition | null>(null);
   const [showMembershipModal, setShowMembershipModal] = useState<boolean>(false);
   const [showSubjectsModal, setShowSubjectsModal] = useState<boolean>(false);
+  const [showWhatsappModal, setShowWhatsappModal] = useState<boolean>(false);
   const [viewingReceipt, setViewingReceipt] = useState<{
     attempt: DbAttempt;
     competition: Competition;
@@ -410,6 +413,12 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
 
       {/* TOP BAR கீழ், WELCOME CARD மேலேயும்: ANIMATED NATIONAL LEADERBOARD */}
       <AnimatedHeroLeaderboard onNavigate={onNavigate} />
+
+      {/* 0.3 AUTOMATED WHATSAPP & SMS 15-MIN PRE-EXAM ALERT BANNER */}
+      <PreExam15MinAlertBanner
+        onJoinCompetition={handleJoinCompetition}
+        onOpenWhatsappSettings={() => setShowWhatsappModal(true)}
+      />
 
       {/* 0.4 ENROLLED SUBJECTS REAL-TIME PUBLICATION NOTIFICATIONS */}
       <SubjectPublicationAlertBanner
@@ -1519,6 +1528,12 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
       <EnrolledSubjectsModal
         isOpen={showSubjectsModal}
         onClose={() => setShowSubjectsModal(false)}
+      />
+
+      {/* WhatsApp & SMS Automated Alert Center Modal */}
+      <WhatsappSmsAlertModal
+        isOpen={showWhatsappModal}
+        onClose={() => setShowWhatsappModal(false)}
       />
     </div>
   );

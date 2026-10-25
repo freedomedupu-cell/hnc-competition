@@ -35,6 +35,7 @@ import {
   loginWithEmailPassword,
   registerStudentAccount,
   resetUserPasswordByLookup,
+  saveActiveUser,
 } from '../../services/firebaseService';
 import { AVAILABLE_GRADES, detectStudentCurriculumPath } from '../../lib/gradeUtils';
 import { ShareModal } from '../common/ShareModal';
@@ -236,6 +237,7 @@ export const AuthView: React.FC = () => {
     setLoading(true);
     try {
       const { userProfile } = await loginWithEmailPassword(identifier, loginPassword);
+      saveActiveUser(userProfile);
       setCurrentAuthUser(userProfile);
       setCurrentPortal(userProfile.role);
       if (userProfile.role === 'student') {
@@ -244,6 +246,9 @@ export const AuthView: React.FC = () => {
         setAdminNav('Dashboard');
       } else if (userProfile.role === 'super_admin') {
         setSuperAdminNav('Dashboard');
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('hnc_force_ready'));
       }
     } catch (err: any) {
       console.warn('Login attempt notification:', err?.message || err);

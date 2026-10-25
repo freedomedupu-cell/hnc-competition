@@ -23,6 +23,7 @@ import {
   playSubjectPublicationChime,
   SRI_LANKAN_ACADEMIC_SUBJECTS,
 } from '../../utils/subjectNotificationUtils';
+import { isGradeEligible } from '../../lib/gradeUtils';
 
 interface SubjectPublicationAlertBannerProps {
   onViewDetails?: (comp: Competition) => void;
@@ -40,6 +41,8 @@ export const SubjectPublicationAlertBanner: React.FC<SubjectPublicationAlertBann
     studentEnrolledSubjects,
     subjectPublicationAlerts,
     dismissSubjectPublicationAlert,
+    currentStudent,
+    currentAuthUser,
     language,
   } = useApp();
 
@@ -99,14 +102,19 @@ export const SubjectPublicationAlertBanner: React.FC<SubjectPublicationAlertBann
     }
   };
 
+  const studentGrade = currentStudent?.gradeLevel || currentAuthUser?.grade || 'Grade 6';
+
+  // Strict Grade Filter: Only show notifications matching student's enrolled grade (or open to all)
+  const filteredAlerts = subjectPublicationAlerts.filter((a) => isGradeEligible(a.grade, studentGrade));
+
   const handleTestNotification = () => {
-    // Pick the first available competition or create a mock sample to test
-    const targetComp = competitions[0] || {
+    // Pick the first available competition matching student's grade or create a sample
+    const targetComp = competitions.find((c) => isGradeEligible(c.grade, studentGrade)) || competitions[0] || {
       id: 'comp-sample-test',
       title: 'Sri Lankan National Junior Science & STEM Quiz 2026',
       competitionType: 'Quiz',
       category: 'Science',
-      grade: 'Grade 6 - 9',
+      grade: studentGrade,
       duration: 45,
     };
 
@@ -130,7 +138,7 @@ export const SubjectPublicationAlertBanner: React.FC<SubjectPublicationAlertBann
     }
   };
 
-  const currentAlert = subjectPublicationAlerts[activeAlertIndex] || subjectPublicationAlerts[0];
+  const currentAlert = filteredAlerts[activeAlertIndex] || filteredAlerts[0];
 
   return (
     <div className="space-y-2">
@@ -164,9 +172,9 @@ export const SubjectPublicationAlertBanner: React.FC<SubjectPublicationAlertBann
                   <span className="text-[10px] font-mono font-semibold bg-white/10 px-2 py-0.5 rounded text-blue-200">
                     {currentAlert.competitionType || 'Quiz'}
                   </span>
-                  {subjectPublicationAlerts.length > 1 && (
+                  {filteredAlerts.length > 1 && (
                     <span className="text-[10px] bg-indigo-500/40 text-indigo-200 px-2 py-0.5 rounded-full font-bold">
-                      {activeAlertIndex + 1} / {subjectPublicationAlerts.length}
+                      {activeAlertIndex + 1} / {filteredAlerts.length}
                     </span>
                   )}
                 </div>
@@ -201,13 +209,13 @@ export const SubjectPublicationAlertBanner: React.FC<SubjectPublicationAlertBann
                 </button>
               )}
 
-              {subjectPublicationAlerts.length > 1 && (
+              {filteredAlerts.length > 1 && (
                 <button
                   type="button"
-                  onClick={() => setActiveAlertIndex((prev) => (prev + 1) % subjectPublicationAlerts.length)}
+                  onClick={() => setActiveAlertIndex((prev) => (prev + 1) % filteredAlerts.length)}
                   className="px-3 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 text-white transition-colors"
                 >
-                  {language === 'ta' ? 'அடுத்தது' : 'Next'} ({activeAlertIndex + 1}/{subjectPublicationAlerts.length})
+                  {language === 'ta' ? 'அடுத்தது' : 'Next'} ({activeAlertIndex + 1}/{filteredAlerts.length})
                 </button>
               )}
 

@@ -42,6 +42,8 @@ import {
 import { StudentMembershipModal } from './StudentMembershipModal';
 import { StudentAchievements } from './StudentAchievements';
 import { EnrolledSubjectsModal } from './EnrolledSubjectsModal';
+import { WhatsappSmsAlertModal } from './WhatsappSmsAlertModal';
+import { getStoredWhatsappSmsSettings, formatDisplayPhoneNumber } from '../../utils/whatsappSmsNotificationService';
 import { SavePulseIndicator, SaveStatus } from '../common/SavePulseIndicator';
 import { SRI_LANKA_25_DISTRICTS } from '../../data/sriLankaDistricts';
 import { detectStudentCurriculumPath, AVAILABLE_GRADES } from '../../lib/gradeUtils';
@@ -68,6 +70,8 @@ export const StudentProfileView: React.FC = () => {
   const [showMembershipModal, setShowMembershipModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showSubjectsModal, setShowSubjectsModal] = useState(false);
+  const [showWhatsappModal, setShowWhatsappModal] = useState(false);
+  const [whatsappSettings, setWhatsappSettings] = useState(getStoredWhatsappSmsSettings);
   const [copiedCode, setCopiedCode] = useState(false);
   const [avatarToast, setAvatarToast] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -1225,6 +1229,65 @@ export const StudentProfileView: React.FC = () => {
             </div>
           </div>
 
+          {/* WHATSAPP & SMS AUTOMATED 15-MIN PRE-EXAM ALERTS CARD */}
+          <div className="p-4 sm:p-5 rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50/90 via-teal-50/70 to-slate-50 space-y-3.5 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-200/80 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white flex items-center justify-center text-lg shadow-sm shrink-0">
+                  📲
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-extrabold text-emerald-950">
+                      {language === 'ta'
+                        ? 'வாட்ஸ்அப் & SMS 15 நிமிட பரீட்சை நினைவூட்டல்'
+                        : 'WhatsApp & SMS 15-Min Pre-Exam Automated Alert'}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-200 text-emerald-900 border border-emerald-300">
+                      Live Service Active
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    {language === 'ta'
+                      ? 'நீங்கள் பதிவு செய்யும் பரீட்சை தொடங்குவதற்கு 15 நிமிடங்களுக்கு முன் நேரடி வாட்ஸ்அப் செய்தி மற்றும் SMS பெறவும்.'
+                      : 'Receive direct WhatsApp and SMS reminders 15 minutes before your registered exams start.'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowWhatsappModal(true)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition flex items-center gap-1.5 self-start sm:self-auto shrink-0 cursor-pointer"
+              >
+                <Settings className="w-3.5 h-3.5 text-emerald-200" />
+                <span>{language === 'ta' ? 'வாட்ஸ்அப் இலக்கம் / அமைப்புகள்' : 'Configure WhatsApp & SMS'}</span>
+              </button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs bg-white p-3 rounded-xl border border-emerald-200">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🇱🇰</span>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 block uppercase">
+                    {language === 'ta' ? 'பதிவு செய்யப்பட்ட வாட்ஸ்அப் இலக்கம்:' : 'Registered WhatsApp Number:'}
+                  </span>
+                  <span className="font-black text-slate-900">
+                    {formatDisplayPhoneNumber(currentStudent.phone || whatsappSettings.whatsappNumber) || 'Not set yet'}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowWhatsappModal(true)}
+                className="px-3 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-bold text-[11px] transition flex items-center gap-1 self-start sm:self-auto cursor-pointer"
+              >
+                <span>⚡ Test WhatsApp Alert</span>
+              </button>
+            </div>
+          </div>
+
           {/* Official Higher Novas College Support & Social Channels Card */}
           <div className="p-4 sm:p-5 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-slate-50 text-xs space-y-3">
             <div className="flex items-center justify-between border-b border-blue-100 pb-2.5">
@@ -1465,6 +1528,12 @@ export const StudentProfileView: React.FC = () => {
       <EnrolledSubjectsModal
         isOpen={showSubjectsModal}
         onClose={() => setShowSubjectsModal(false)}
+      />
+
+      {/* WhatsApp & SMS Notification Alert Modal */}
+      <WhatsappSmsAlertModal
+        isOpen={showWhatsappModal}
+        onClose={() => setShowWhatsappModal(false)}
       />
     </div>
   );

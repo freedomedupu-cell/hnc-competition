@@ -49,7 +49,7 @@ import {
 import { getCompetitionQuestions } from '../data/questionPool';
 import { getCompetitionScheduleStatus } from '../utils/competitionTimeUtils';
 import { Language, translations } from '../i18n/translations';
-import { StudentCurriculumPath, detectStudentCurriculumPath } from '../lib/gradeUtils';
+import { StudentCurriculumPath, detectStudentCurriculumPath, isGradeEligible } from '../lib/gradeUtils';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
@@ -746,30 +746,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           } else {
             // Neither Firestore nor query resolved this fbUser.
-            if (saved && saved.role && saved.status !== 'inactive') {
-              setCurrentAuthUser(saved);
-              setInternalPortal(saved.role);
+            const freshSaved = getSavedActiveUser() || saved;
+            if (freshSaved && freshSaved.role && freshSaved.status !== 'inactive') {
+              saveActiveUser(freshSaved);
+              setCurrentAuthUser(freshSaved);
+              setInternalPortal(freshSaved.role);
             } else {
-              setCurrentAuthUser(null);
+              setCurrentAuthUserState((prev) => (prev && prev.status !== 'inactive' ? prev : null));
             }
           }
         } else {
           // fbUser is null (e.g. user logged in using Student ID, Username, or Staff ID with offline/direct auth)
-          if (saved && saved.role && saved.status !== 'inactive') {
-            setCurrentAuthUser(saved);
-            setInternalPortal(saved.role);
+          const freshSaved = getSavedActiveUser();
+          if (freshSaved && freshSaved.role && freshSaved.status !== 'inactive') {
+            saveActiveUser(freshSaved);
+            setCurrentAuthUser(freshSaved);
+            setInternalPortal(freshSaved.role);
           } else {
-            setCurrentAuthUser(null);
+            setCurrentAuthUserState((prev) => (prev && prev.status !== 'inactive' ? prev : null));
           }
         }
       } catch (err) {
         console.warn('Auth restoration resilience fallback note:', err);
-        const saved = getSavedActiveUser();
-        if (saved && saved.role && saved.status !== 'inactive') {
-          setCurrentAuthUser(saved);
-          setInternalPortal(saved.role);
+        const freshSaved = getSavedActiveUser();
+        if (freshSaved && freshSaved.role && freshSaved.status !== 'inactive') {
+          saveActiveUser(freshSaved);
+          setCurrentAuthUser(freshSaved);
+          setInternalPortal(freshSaved.role);
         } else {
-          setCurrentAuthUser(null);
+          setCurrentAuthUserState((prev) => (prev && prev.status !== 'inactive' ? prev : null));
         }
       } finally {
         setAuthLoading(false);
@@ -895,11 +900,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Trigger browser and in-app push notifications if a competition/quiz was published in student's enrolled subjects
       if (currentAuthUser && (currentAuthUser.role === 'student' || currentPortal === 'student')) {
+        const studentGrade = currentAuthUser.grade || (currentAuthUser as any).gradeLevel || 'Grade 6';
         const studentSubjects = currentAuthUser.enrolledSubjects && currentAuthUser.enrolledSubjects.length > 0
           ? currentAuthUser.enrolledSubjects
           : (studentEnrolledSubjectsState && studentEnrolledSubjectsState.length > 0
               ? studentEnrolledSubjectsState
-              : getDefaultSubjectsForGrade(currentAuthUser.grade || 'Grade 6'));
+              : getDefaultSubjectsForGrade(studentGrade));
 
         const newAlerts: SubjectNotificationAlert[] = [];
 
@@ -908,6 +914,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const isPending = c.approvalStatus === 'pending_approval' || (c.status as string) === 'Pending Approval' || c.approvalStatus === 'rejected';
           const isLive = !isPending && (s.includes('publish') || s.includes('open') || s.includes('ongoing'));
           if (isLive) {
+            // STRICT GRADE FILTER:
+            // "குறிப்பிட்ட மாணவருடைய தரங்களுக்கு மட்டுமே அவரவர் டாஸ் போர்டுல மற்றும் நோட்டிபிகேஷன்ல பரீட்சைகள் டிஸ்ப்ளே ஆக வேண்டும் ஓபன் அண்ட் கொடுத்தா மட்டும் தான் எல்லா மாணவர்களும் டிஸ்ப்ளே ஆகணும்"
+            if (!isGradeEligible(c.grade, studentGrade)) {
+              return;
+            }
+
             const { matches, matchedSubject } = isCompetitionInEnrolledSubjects(c, studentSubjects);
             if (matches) {
               const alreadyNotified = isCompetitionAlreadyNotified(currentAuthUser.uid, c.id);
@@ -1372,11 +1384,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const triggerManualSubjectPushTest = async (): Promise<boolean> => {
-    const targetComp = competitions[0] || {
+    const studentGrade = currentAuthUser?.grade || (currentAuthUser as any)?.gradeLevel || 'Grade 6';
+    const targetComp = competitions.find((c) => isGradeEligible(c.grade, studentGrade)) || competitions[0] || {
       id: 'comp-test-manual',
       title: 'Sri Lanka Junior Science & Mathematics Contest 2026',
       competitionType: 'Quiz',
       category: studentEnrolledSubjects[0] || 'Mathematics',
+      grade: studentGrade,
     };
     const targetSubject = studentEnrolledSubjects[0] || 'Mathematics';
     playSubjectPublicationChime();
@@ -1388,7 +1402,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         competitionTitle: targetComp.title,
         competitionType: targetComp.competitionType || 'Quiz',
         subject: targetSubject,
-        grade: 'Grade 6 - 11',
+        grade: targetComp.grade || studentGrade,
         publishedAt: new Date().toISOString(),
         read: false,
       },

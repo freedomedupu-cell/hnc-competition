@@ -25,6 +25,8 @@ import {
   ShieldCheck,
   RotateCcw,
   Sliders,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 
 export type AiEventMode =
@@ -73,10 +75,10 @@ const EVENT_MODES: {
     nameEn: 'Term Exam / National Paper',
     nameTa: 'தவணைப் பரீட்சை / தேசிய வினாத்தாள்',
     nameSi: 'වාර විභාගය / ජාතික ප්‍රශ්න පත්‍රය',
-    descEn: 'NIE aligned examination paper with mark schemes, learning outcomes, and explanations.',
-    descTa: 'இலங்கை கல்வி அமைச்சு (NIE) பாடத்திட்ட தவணை அல்லது மாதிரிப் பரீட்சைத் தாள்.',
+    descEn: 'NIE aligned examination paper with mark schemes, learning outcomes, and explanations (up to 100 questions).',
+    descTa: 'இலங்கை கல்வி அமைச்சு (NIE) பாடத்திட்ட தவணைப் பரீட்சை / தேசிய மாதிரித் தாள் (100 வினாக்கள் வரை).',
     icon: <FileText className="w-5 h-5 text-indigo-600" />,
-    badge: 'Curriculum Exam',
+    badge: 'Curriculum Exam (Up to 100 Qs)',
     color: 'from-indigo-600 to-blue-600',
     border: 'border-indigo-200 hover:border-indigo-500',
     bgLight: 'bg-indigo-50/50',
@@ -225,11 +227,11 @@ export function getGradeTierConfig(grade: string): GradeTierConfig {
         { value: 40, labelTa: '40 வினாக்கள் (முன்னோடிப் பரீட்சை)', labelEn: '40 Questions (Pilot Examination)' },
         { value: 50, labelTa: '50 வினாக்கள் (G.C.E. A/L பகுதி 1 முழு வினாத்தாள் - 50 MCQs)', labelEn: '50 Questions (Full G.C.E. A/L Paper 1 Standard)', isStandard: true },
         { value: 75, labelTa: '75 வினாக்கள் (தீவிர வினாத்தாள்)', labelEn: '75 Questions (Intensive Paper)' },
-        { value: 100, labelTa: '100 வினாக்கள் (மெகா வினாத்தாள்)', labelEn: '100 Questions (Mega Paper)' },
+        { value: 100, labelTa: '100 வினாக்கள் (முழுமையான தவணைப் பரீட்சை - 100 MCQs)', labelEn: '100 Questions (Complete Term Exam - 100 MCQs)', isStandard: true },
       ],
       defaultDuration: 45,
-      examPatternDescTa: 'இலங்கை பரீட்சைத் திணைக்களத்தின் A/L முறைமையின்படி 5 விடைத் தெரிவுகள் (A, B, C, D, E) மற்றும் 20 முதல் 50+ வினாக்கள் வரை.',
-      examPatternDescEn: 'Strictly aligned with Sri Lanka Dept of Examinations G.C.E. A/L 5-Option Paper 1 standard (20 to 50+ MCQs).',
+      examPatternDescTa: 'இலங்கை பரீட்சைத் திணைக்களத்தின் A/L முறைமையின்படி 5 விடைத் தெரிவுகள் (A, B, C, D, E) மற்றும் 20 முதல் 100 வினாக்கள் வரை.',
+      examPatternDescEn: 'Strictly aligned with Sri Lanka Dept of Examinations G.C.E. A/L and Term Examination standards (20 to 100 MCQs).',
     };
   }
 
@@ -249,14 +251,14 @@ export function getGradeTierConfig(grade: string): GradeTierConfig {
         { value: 15, labelTa: '15 வினாக்கள் (அலகுத் தேர்வு)', labelEn: '15 Questions (Unit Test)' },
         { value: 20, labelTa: '20 வினாக்கள் (தவணை மாதிரித் தாள்)', labelEn: '20 Questions (Term Model)' },
         { value: 30, labelTa: '30 வினாக்கள் (தீவிர வினாத்தாள்)', labelEn: '30 Questions (Intensive Paper)' },
-        { value: 40, labelTa: '40 வினாக்கள் (G.C.E. O/L பகுதி 1 முழுத் தாள் - 40 MCQs)', labelEn: '40 Questions (Full G.C.E. O/L Paper 1 Standard)', isStandard: true },
+        { value: 40, labelTa: '40 வினாக்கள் (G.C.E. O/L பகுதி 1 தாள் - 40 MCQs)', labelEn: '40 Questions (G.C.E. O/L Paper 1 Standard)' },
         { value: 50, labelTa: '50 வினாக்கள் (விரிவாக்கப்பட்ட மாதிரித் தாள்)', labelEn: '50 Questions (Extended Paper)' },
         { value: 75, labelTa: '75 வினாக்கள் (மெகா அலகுத் தேர்வு)', labelEn: '75 Questions (Mega Unit Paper)' },
-        { value: 100, labelTa: '100 வினாக்கள் (முழுமையான வினாத் தொகுப்பு)', labelEn: '100 Questions (Complete Pool)' },
+        { value: 100, labelTa: '100 வினாக்கள் (முழுமையான தவணைப் பரீட்சை - 100 MCQs)', labelEn: '100 Questions (Complete Long-Form Term Exam Paper - 100 MCQs)', isStandard: true },
       ],
       defaultDuration: 30,
-      examPatternDescTa: 'இலங்கை O/L பாடத்திட்ட தரநிலைக்கு ஏற்ப 4 தெரிவுகள் மற்றும் 10 முதல் 40+ வினாக்கள் வரை.',
-      examPatternDescEn: 'Aligned with G.C.E. O/L Paper 1 40-MCQ 4-Option format with custom scaling.',
+      examPatternDescTa: 'இலங்கை O/L மற்றும் தவணைப் பரீட்சை தரநிலைக்கு ஏற்ப 4 தெரிவுகள் மற்றும் 10 முதல் 100 வினாக்கள் வரை.',
+      examPatternDescEn: 'Aligned with G.C.E. O/L and Long-Form Term Examination formats (10 to 100 questions).',
     };
   }
 
@@ -277,12 +279,14 @@ export function getGradeTierConfig(grade: string): GradeTierConfig {
         { value: 15, labelTa: '15 வினாக்கள் (அலகுப் பரீட்சை)', labelEn: '15 Questions (Unit Exam)' },
         { value: 20, labelTa: '20 வினாக்கள் (தவணைப் பரீட்சை)', labelEn: '20 Questions (Term Exam)' },
         { value: 25, labelTa: '25 வினாக்கள் (மாகாண கல்விப் போட்டி)', labelEn: '25 Questions (Provincial Challenge)' },
-        { value: 40, labelTa: '40 வினாக்கள் (முழுத் தவணைத் தாள்)', labelEn: '40 Questions (Full Term Exam)' },
+        { value: 40, labelTa: '40 வினாக்கள் (மாதிரி வினாத்தாள்)', labelEn: '40 Questions (Model Exam)' },
         { value: 50, labelTa: '50 வினாக்கள் (விரிவாக்கப்பட்ட பயிற்சி)', labelEn: '50 Questions (Extended Paper)' },
+        { value: 75, labelTa: '75 வினாக்கள் (தீவிர வினாத்தாள்)', labelEn: '75 Questions (Intensive Paper)' },
+        { value: 100, labelTa: '100 வினாக்கள் (முழுமையான தவணைப் பரீட்சை - 100 MCQs)', labelEn: '100 Questions (Complete Term Paper - 100 MCQs)', isStandard: true },
       ],
       defaultDuration: 25,
-      examPatternDescTa: 'இடைநிலைப் பாடத்திட்டத்திற்கு அமைவாக 4 விடைத் தெரிவுகள் (A, B, C, D) மற்றும் 5 முதல் 50 வினாக்கள் வரை.',
-      examPatternDescEn: 'Junior secondary standard with 4 options and customizable questions.',
+      examPatternDescTa: 'இடைநிலைப் பாடத்திட்டத்திற்கு அமைவாக 4 விடைத் தெரிவுகள் (A, B, C, D) மற்றும் 5 முதல் 100 வினாக்கள் வரை.',
+      examPatternDescEn: 'Junior secondary standard with 4 options and customizable up to 100 questions for Term Exams.',
     };
   }
 
@@ -304,10 +308,11 @@ export function getGradeTierConfig(grade: string): GradeTierConfig {
         { value: 20, labelTa: '20 வினாக்கள் (முழுப் புலமைப்பரிசில் மாதிரி - 20 MCQs)', labelEn: '20 Questions (Full Scholarship Model)' },
         { value: 30, labelTa: '30 வினாக்கள் (தீவிர மாதிரிப் பரீட்சை)', labelEn: '30 Questions (Intensive Model)' },
         { value: 50, labelTa: '50 வினாக்கள் (மெகா வினாப் பயிற்சி)', labelEn: '50 Questions (Mega Scholarship Paper)' },
+        { value: 100, labelTa: '100 வினாக்கள் (முழுமையான மாதிரித் தவணைத் தாள்)', labelEn: '100 Questions (Complete 100-Question Term Paper)', isStandard: true },
       ],
       defaultDuration: 20,
-      examPatternDescTa: 'தரம் 5 புலமைப்பரிசில் தேசிய வினாத்தாள் முறைக்கு ஏற்ப 4 தெரிவுகள் மற்றும் 5 முதல் 50 வினாக்கள் வரை.',
-      examPatternDescEn: 'Grade 5 scholarship standard with 4 options and customizable question counts.',
+      examPatternDescTa: 'தரம் 5 புலமைப்பரிசில் & தவணை வினாத்தாள் முறைக்கு ஏற்ப 4 தெரிவுகள் மற்றும் 5 முதல் 100 வினாக்கள் வரை.',
+      examPatternDescEn: 'Grade 5 scholarship & term exam standard with 4 options and up to 100 questions.',
     };
   }
 
@@ -328,9 +333,11 @@ export function getGradeTierConfig(grade: string): GradeTierConfig {
         { value: 10, labelTa: '10 வினாக்கள் (முழுப் பரீட்சை)', labelEn: '10 Questions (Complete Test)' },
         { value: 15, labelTa: '15 வினாக்கள் (அலகு மாதிரி)', labelEn: '15 Questions (Unit Model)' },
         { value: 20, labelTa: '20 வினாக்கள் (விரிவு வினாடி வினா)', labelEn: '20 Questions (Extended Quiz)' },
+        { value: 30, labelTa: '30 வினாக்கள் (மாதிரிப் பயிற்சி)', labelEn: '30 Questions (Model Practice)' },
+        { value: 50, labelTa: '50 வினாக்கள் (விரிவான தேர்வு)', labelEn: '50 Questions (Comprehensive Paper)' },
       ],
       defaultDuration: 10,
-      examPatternDescTa: 'சிறு மாணவர்களின் புரிதலுக்கு ஏற்ப எளிமையான 3 விடைத் தெரிவுகள் (A, B, C) மற்றும் 5 முதல் 20 வினாக்கள் வரை.',
+      examPatternDescTa: 'சிறு மாணவர்களின் புரிதலுக்கு ஏற்ப எளிமையான 3 விடைத் தெரிவுகள் (A, B, C) மற்றும் 5 முதல் 50 வினாக்கள் வரை.',
       examPatternDescEn: 'Early childhood cognitive pacing with 3 options and customizable questions.',
     };
   }
@@ -351,13 +358,13 @@ export function getGradeTierConfig(grade: string): GradeTierConfig {
       { value: 15, labelTa: '15 வினாக்கள் (Full Test)', labelEn: '15 Questions (Full Test)' },
       { value: 20, labelTa: '20 வினாக்கள் (Grand Challenge)', labelEn: '20 Questions (Grand Challenge)' },
       { value: 30, labelTa: '30 வினாக்கள் (Mega Exam)', labelEn: '30 Questions (Mega Exam)' },
-      { value: 50, labelTa: '50 வினாக்கள் (50 MCQs Full Paper)', labelEn: '50 Questions (50 MCQs Full Paper)', isStandard: true },
+      { value: 50, labelTa: '50 வினாக்கள் (50 MCQs Full Paper)', labelEn: '50 Questions (50 MCQs Full Paper)' },
       { value: 75, labelTa: '75 வினாக்கள் (75 MCQs Intensive)', labelEn: '75 Questions (75 MCQs Intensive)' },
-      { value: 100, labelTa: '100 வினாக்கள் (100 MCQs Grand Open)', labelEn: '100 Questions (100 MCQs Grand Open)' },
+      { value: 100, labelTa: '100 வினாக்கள் (முழுமையான தவணைப் பரீட்சை - 100 MCQs)', labelEn: '100 Questions (Complete Long-Form Term Exam - 100 MCQs)', isStandard: true },
     ],
     defaultDuration: 30,
-    examPatternDescTa: 'பொதுத் தேவைகளுக்கான தெரிவுகள் மற்றும் விருப்பத்திற்கேற்ற வினாக்கள் எண்ணிக்கை.',
-    examPatternDescEn: 'Standard competition configuration with custom options and question counts.',
+    examPatternDescTa: 'பொது மற்றும் தவணைப் பரீட்சைத் தேவைகளுக்கான தெரிவுகள் மற்றும் 100 வினாக்கள் வரை முழுமையான கட்டமைப்பு.',
+    examPatternDescEn: 'Standard competition configuration with custom options and up to 100 questions for long-form Term Exams.',
   };
 }
 
@@ -407,6 +414,9 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
   const [duration, setDuration] = useState<number>(30);
   const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard' | 'Challenging'>('Medium');
   const [customPromptNote, setCustomPromptNote] = useState('');
+  const [customOptionE, setCustomOptionE] = useState<string>('');
+  const [customOptionF, setCustomOptionF] = useState<string>('');
+  const [editingQuestionIdx, setEditingQuestionIdx] = useState<number | null>(null);
 
   // Generation status
   const [isGenerating, setIsGenerating] = useState(false);
@@ -482,6 +492,8 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
           district: selectedDistrict,
           questionCount,
           optionsCount,
+          customOptionE: customOptionE.trim() || undefined,
+          customOptionF: customOptionF.trim() || undefined,
           duration,
           difficulty,
           customTopic: customPromptNote,
@@ -504,6 +516,8 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
           district: selectedDistrict,
           questionCount,
           optionsCount,
+          customOptionE: customOptionE.trim() || undefined,
+          customOptionF: customOptionF.trim() || undefined,
           duration,
           difficulty,
           customTopic: customPromptNote,
@@ -522,6 +536,8 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
           district: selectedDistrict,
           questionCount,
           optionsCount,
+          customOptionE: customOptionE.trim() || undefined,
+          customOptionF: customOptionF.trim() || undefined,
           duration,
           difficulty,
           customTopic: customPromptNote,
@@ -650,6 +666,56 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
       onImportToEditor(payload as any);
     }
     onClose();
+  };
+
+  const handleUpdateGeneratedQuestion = (qIdx: number, updates: any) => {
+    if (!generatedData || !generatedData.questions) return;
+    const nextQuestions = [...generatedData.questions];
+    nextQuestions[qIdx] = { ...nextQuestions[qIdx], ...updates };
+    setGeneratedData({ ...generatedData, questions: nextQuestions });
+  };
+
+  const handleUpdateGeneratedQuestionOption = (qIdx: number, optIdx: number, val: string) => {
+    if (!generatedData || !generatedData.questions) return;
+    const nextQuestions = [...generatedData.questions];
+    const targetQ = { ...nextQuestions[qIdx] };
+    const nextOpts = [...(targetQ.options || [])];
+    const oldVal = nextOpts[optIdx];
+    nextOpts[optIdx] = val;
+    targetQ.options = nextOpts;
+    if (targetQ.correctAnswer === oldVal) {
+      targetQ.correctAnswer = val;
+    }
+    nextQuestions[qIdx] = targetQ;
+    setGeneratedData({ ...generatedData, questions: nextQuestions });
+  };
+
+  const handleAddOptionToGeneratedQuestion = (qIdx: number) => {
+    if (!generatedData || !generatedData.questions) return;
+    const nextQuestions = [...generatedData.questions];
+    const targetQ = { ...nextQuestions[qIdx] };
+    const curOpts = targetQ.options || [];
+    if (curOpts.length >= 6) return;
+    const nextLetter = String.fromCharCode(65 + curOpts.length);
+    targetQ.options = [...curOpts, `Option ${nextLetter}`];
+    nextQuestions[qIdx] = targetQ;
+    setGeneratedData({ ...generatedData, questions: nextQuestions });
+  };
+
+  const handleRemoveOptionFromGeneratedQuestion = (qIdx: number, optIdx: number) => {
+    if (!generatedData || !generatedData.questions) return;
+    const nextQuestions = [...generatedData.questions];
+    const targetQ = { ...nextQuestions[qIdx] };
+    const curOpts = targetQ.options || [];
+    if (curOpts.length <= 2) return;
+    const removedVal = curOpts[optIdx];
+    const nextOpts = curOpts.filter((_, i) => i !== optIdx);
+    targetQ.options = nextOpts;
+    if (targetQ.correctAnswer === removedVal) {
+      targetQ.correctAnswer = nextOpts[0] || '';
+    }
+    nextQuestions[qIdx] = targetQ;
+    setGeneratedData({ ...generatedData, questions: nextQuestions });
   };
 
   return (
@@ -959,6 +1025,112 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
                       : 'விரிவான 6 தெரிவுகள் (A–F)'}
                   </span>
                 </div>
+
+                {/* Custom Text for Options E and F (5-6 Options) */}
+                {optionsCount >= 5 && (
+                  <div className="pt-2.5 mt-2 border-t border-amber-200/90 space-y-2.5 animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black text-amber-950 flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 rounded bg-amber-300 text-amber-950 font-black text-[10px] tracking-wide border border-amber-400">
+                          E & F CUSTOM
+                        </span>
+                        <span>5வது & 6வது தெரிவுகளுக்கான தனிப்பயன் உரை (Custom Text for Options E & F)</span>
+                      </span>
+                      <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                        ⚡ Gemini Engine Directive
+                      </span>
+                    </div>
+
+                    {/* Option E custom input */}
+                    <div className="p-2.5 rounded-xl bg-white border border-amber-200 shadow-2xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded bg-purple-700 text-white font-black text-[10px] flex items-center justify-center">E</span>
+                          <span>Option E (5வது தெரிவுக்கான உரை):</span>
+                        </label>
+                        {customOptionE && (
+                          <button
+                            type="button"
+                            onClick={() => setCustomOptionE('')}
+                            className="text-[10px] text-slate-400 hover:text-red-600 font-semibold cursor-pointer"
+                          >
+                            மீட்டமை (Clear)
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={customOptionE}
+                        onChange={(e) => setCustomOptionE(e.target.value)}
+                        placeholder="e.g. மேற்கூறிய அனைத்தும் / All of the above / கூற்றுக்கள் 1, 2 சரியானவை"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 text-xs text-slate-800 bg-amber-50/20 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                      <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                        <span className="text-[10px] text-slate-500 font-medium">பரிந்துரைகள் (Presets):</span>
+                        {[
+                          selectedMedium === 'Tamil' ? 'மேற்கூறிய அனைத்தும்' : selectedMedium === 'Sinhala' ? 'ඉහත සියල්ල' : 'All of the above',
+                          selectedMedium === 'Tamil' ? 'மேற்கூறிய எதுவுமில்லை' : selectedMedium === 'Sinhala' ? 'ඉහත කිසිවක් නොවේ' : 'None of the above',
+                          selectedMedium === 'Tamil' ? 'கூற்றுக்கள் A மற்றும் B இரண்டும் சரி' : 'Both A and B are correct',
+                          selectedMedium === 'Tamil' ? 'விடை தீர்மானிக்க தகவல் போதாது' : 'Insufficient data to determine',
+                        ].map((txt, pIdx) => (
+                          <button
+                            key={pIdx}
+                            type="button"
+                            onClick={() => setCustomOptionE(txt)}
+                            className="text-[10px] px-2 py-0.5 rounded-md bg-amber-100/90 hover:bg-amber-200 text-amber-950 border border-amber-300 transition cursor-pointer font-semibold shadow-2xs"
+                          >
+                            + {txt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Option F custom input (for 6 options) */}
+                    {optionsCount >= 6 && (
+                      <div className="p-2.5 rounded-xl bg-white border border-indigo-200 shadow-2xs space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                            <span className="w-4 h-4 rounded bg-indigo-700 text-white font-black text-[10px] flex items-center justify-center">F</span>
+                            <span>Option F (6வது தெரிவுக்கான உரை):</span>
+                          </label>
+                          {customOptionF && (
+                            <button
+                              type="button"
+                              onClick={() => setCustomOptionF('')}
+                              className="text-[10px] text-slate-400 hover:text-red-600 font-semibold cursor-pointer"
+                            >
+                              மீட்டமை (Clear)
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          value={customOptionF}
+                          onChange={(e) => setCustomOptionF(e.target.value)}
+                          placeholder="e.g. A மற்றும் C ஆகிய இரண்டும் சரியானவை / Both A and C are correct"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 text-xs text-slate-800 bg-indigo-50/20 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                          <span className="text-[10px] text-slate-500 font-medium">பரிந்துரைகள் (Presets):</span>
+                          {[
+                            selectedMedium === 'Tamil' ? 'A மற்றும் C ஆகிய இரண்டும் சரியானவை' : 'Both A and C are correct',
+                            selectedMedium === 'Tamil' ? 'விடை தீர்மானிக்க போதிய தகவல் இல்லை' : 'Insufficient data to determine',
+                            selectedMedium === 'Tamil' ? 'மேற்கூறிய எதுவுமில்லை' : selectedMedium === 'Sinhala' ? 'ඉහත කිසිවක් නොවේ' : 'None of the above',
+                          ].map((txt, pIdx) => (
+                            <button
+                              key={pIdx}
+                              type="button"
+                              onClick={() => setCustomOptionF(txt)}
+                              className="text-[10px] px-2 py-0.5 rounded-md bg-indigo-100/90 hover:bg-indigo-200 text-indigo-950 border border-indigo-300 transition cursor-pointer font-semibold shadow-2xs"
+                            >
+                              + {txt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Questions Count (Higher Numbers 50, 75, 100 + Direct Type-In) */}
@@ -1022,7 +1194,7 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
                     placeholder="e.g. 50"
                   />
                   <span className="text-[10px] text-slate-500 font-medium">
-                    1 முதல் 100+ வரை எவ்வளவு வினாக்களையும் தட்டச்சு செய்யலாம்
+                    1 முதல் 100 வினாக்கள் வரை நேரடியாக தட்டச்சு செய்யலாம் (Term Exam: Up to 100 Questions)
                   </span>
                 </div>
               </div>
@@ -1251,56 +1423,169 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
 
               <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
                 {(generatedData.questions || []).map((q: any, idx: number) => {
+                  const isEditing = editingQuestionIdx === idx;
+                  const curOptions = Array.isArray(q.options) ? q.options : [];
+
                   return (
                     <div
                       key={q.id || idx}
-                      className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2.5"
+                      className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2.5 transition-all"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-800 font-black text-xs inline-flex items-center justify-center shrink-0">
+                        <div className="flex items-start gap-2 flex-1">
+                          <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-800 font-black text-xs inline-flex items-center justify-center shrink-0 mt-0.5">
                             {idx + 1}
                           </span>
-                          <span className="text-xs font-bold text-slate-900">
-                            {q.questionText}
-                          </span>
+                          {isEditing ? (
+                            <div className="flex-1 space-y-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">Question Text / வினா வாசகம்:</label>
+                              <textarea
+                                rows={2}
+                                value={q.questionText}
+                                onChange={(e) => handleUpdateGeneratedQuestion(idx, { questionText: e.target.value })}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-blue-300 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-xs font-bold text-slate-900 leading-snug">
+                              {q.questionText}
+                            </span>
+                          )}
                         </div>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 shrink-0">
-                          {q.marks || 2} Marks
-                        </span>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                            {q.marks || 2} Marks
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingQuestionIdx(isEditing ? null : idx)}
+                            className={`px-2 py-0.5 rounded text-[11px] font-bold border transition cursor-pointer flex items-center gap-1 ${
+                              isEditing
+                                ? 'bg-blue-600 text-white border-blue-700 shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                            }`}
+                            title="Edit question and custom options"
+                          >
+                            <Sliders className="w-3 h-3" />
+                            <span>{isEditing ? 'முடிந்தது (Done)' : 'தெரிவுகளை மாற்று (Edit)'}</span>
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Options */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-8">
-                        {(q.options || []).map((opt: string, optIdx: number) => {
-                          const isCorrect = opt.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase();
-                          const optLabel = ['A', 'B', 'C', 'D', 'E', 'F'][optIdx] || String.fromCharCode(65 + optIdx);
-                          return (
-                            <div
-                              key={optIdx}
-                              className={`p-2 rounded-lg text-xs font-medium border flex items-center justify-between ${
-                                isCorrect
-                                  ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 font-bold'
-                                  : 'bg-slate-50 border-slate-200 text-slate-700'
-                              }`}
-                            >
-                              <span className="flex items-center gap-1.5">
-                                <span className={`w-4 h-4 rounded text-[10px] font-bold inline-flex items-center justify-center ${
-                                  isCorrect ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
-                                }`}>
-                                  {optLabel}
+                      {/* Options (View Mode or Edit Mode) */}
+                      {isEditing ? (
+                        <div className="space-y-2 pl-8 pt-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-slate-700">
+                              விடை தெரிவுகள் (Type custom text for options A–F, click radio for correct):
+                            </span>
+                            {curOptions.length < 6 && (
+                              <button
+                                type="button"
+                                onClick={() => handleAddOptionToGeneratedQuestion(idx)}
+                                className="text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 flex items-center gap-1 cursor-pointer"
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>+ Add Option ({String.fromCharCode(65 + curOptions.length)})</span>
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {curOptions.map((opt: string, optIdx: number) => {
+                              const isCorrect = opt.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase();
+                              const optLabel = ['A', 'B', 'C', 'D', 'E', 'F'][optIdx] || String.fromCharCode(65 + optIdx);
+                              return (
+                                <div
+                                  key={optIdx}
+                                  className={`p-2 rounded-lg text-xs font-medium border flex items-center gap-2 ${
+                                    isCorrect
+                                      ? 'bg-emerald-50 border-emerald-400 text-emerald-950 font-bold ring-1 ring-emerald-300'
+                                      : 'bg-white border-slate-300 text-slate-800'
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name={`generated-correct-${idx}`}
+                                    checked={isCorrect}
+                                    onChange={() => handleUpdateGeneratedQuestion(idx, { correctAnswer: opt })}
+                                    className="text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
+                                    title="Mark as correct answer"
+                                  />
+                                  <span className={`w-4 h-4 rounded text-[10px] font-black inline-flex items-center justify-center shrink-0 ${
+                                    optLabel === 'E'
+                                      ? 'bg-purple-600 text-white'
+                                      : optLabel === 'F'
+                                      ? 'bg-indigo-600 text-white'
+                                      : isCorrect
+                                      ? 'bg-emerald-600 text-white'
+                                      : 'bg-slate-200 text-slate-700'
+                                  }`}>
+                                    {optLabel}
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={opt}
+                                    onChange={(e) => handleUpdateGeneratedQuestionOption(idx, optIdx, e.target.value)}
+                                    placeholder={`Option ${optLabel} text...`}
+                                    className="flex-1 bg-transparent border-0 focus:outline-none text-xs font-semibold px-1"
+                                  />
+                                  {curOptions.length > 2 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveOptionFromGeneratedQuestion(idx, optIdx)}
+                                      className="text-slate-400 hover:text-red-600 p-0.5 cursor-pointer"
+                                      title="Remove option"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-8">
+                          {curOptions.map((opt: string, optIdx: number) => {
+                            const isCorrect = opt.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase();
+                            const optLabel = ['A', 'B', 'C', 'D', 'E', 'F'][optIdx] || String.fromCharCode(65 + optIdx);
+                            return (
+                              <div
+                                key={optIdx}
+                                onClick={() => handleUpdateGeneratedQuestion(idx, { correctAnswer: opt })}
+                                className={`p-2 rounded-lg text-xs font-medium border flex items-center justify-between cursor-pointer transition ${
+                                  isCorrect
+                                    ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 font-bold shadow-2xs'
+                                    : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700'
+                                }`}
+                                title="Click to mark as correct answer"
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span className={`w-4 h-4 rounded text-[10px] font-bold inline-flex items-center justify-center ${
+                                    optLabel === 'E'
+                                      ? 'bg-purple-600 text-white'
+                                      : optLabel === 'F'
+                                      ? 'bg-indigo-600 text-white'
+                                      : isCorrect
+                                      ? 'bg-emerald-600 text-white'
+                                      : 'bg-slate-200 text-slate-700'
+                                  }`}>
+                                    {optLabel}
+                                  </span>
+                                  <span>{opt}</span>
                                 </span>
-                                <span>{opt}</span>
-                              </span>
-                              {isCorrect && (
-                                <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-200 px-1.5 py-0.5 rounded">
-                                  Correct
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                                {isCorrect && (
+                                  <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-200 px-1.5 py-0.5 rounded">
+                                    Correct
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
 
                       {/* Explanation & Learning Outcome */}
                       {(q.explanation || q.learningOutcome) && (
