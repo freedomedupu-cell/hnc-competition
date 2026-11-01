@@ -41,6 +41,8 @@ export interface DbUser {
   curriculumPathId?: 'primary_early' | 'primary_late' | 'junior' | 'senior' | 'advanced' | 'career_competitive';
   curriculumPathTitle?: string;
   enrolledSubjects?: string[];
+  whatsappOptIn?: boolean;
+  whatsappFrequency?: 'instant' | 'daily_summary' | 'weekly_digest';
 }
 
 export interface DbStudent {
@@ -67,6 +69,8 @@ export interface DbStudent {
   redeemedPerks?: string[];
   lastSpinDate?: string;
   enrolledSubjects?: string[];
+  whatsappOptIn?: boolean;
+  whatsappFrequency?: 'instant' | 'daily_summary' | 'weekly_digest';
 }
 
 export interface DbAdmin {
@@ -387,6 +391,8 @@ export interface StudentUser extends BaseUser {
   curriculumPathId?: 'primary_early' | 'primary_late' | 'junior' | 'senior' | 'advanced' | 'career_competitive';
   curriculumPathTitle?: string;
   enrolledSubjects?: string[];
+  whatsappOptIn?: boolean;
+  whatsappFrequency?: 'instant' | 'daily_summary' | 'weekly_digest';
 }
 
 export interface ReferralPerk {
@@ -589,6 +595,19 @@ export interface PlatformSettings {
   maxUploadSizeMb: number;
   paymentSettings?: PaymentGatewayConfig;
   membershipSettings?: MembershipSettings;
+  enableDailySpinWheel?: boolean; // Super Admin On/Off control for Daily Spin & Win wheel
+  enableSubjectAlerts?: boolean; // Super Admin On/Off control for Subject Publication Alerts Banner
+  enableDeadlineAlerts?: boolean; // Super Admin On/Off control for Student Deadlines & Push Alerts Banner
+  enableStudyGamesCard?: boolean; // Super Admin On/Off control for Daily Study Games & Focus Lounge
+  enableAiTimetableCard?: boolean; // Super Admin On/Off control for Gemini AI Study Timetable widget
+  enableSmartDailyTips?: boolean; // Super Admin On/Off control for Smart Daily Tips & Exam Tricks card
+  enableOfflineMaterialsCard?: boolean; // Super Admin On/Off control for Offline Study Materials & Downloads
+  enableReferralCard?: boolean; // Super Admin On/Off control for Referral & Share Points card
+  enableEduArenaCard?: boolean; // Super Admin On/Off control for HNC Edu-Arena Island Quest hero card
+  enableLeaderboardsCard?: boolean; // Super Admin On/Off control for All Leaderboards Hub promo card
+  enableAchievementsCard?: boolean; // Super Admin On/Off control for Student Achievements & Badges
+  enableNextCompetitionCountdown?: boolean; // Super Admin On/Off control for Next Enrolled Competition Countdown
+  enableToastPreviewDeck?: boolean; // Super Admin On/Off control for Live Toast notification status deck
 }
 
 export type MembershipStatus = 'inactive' | 'pending' | 'active' | 'expiring_soon' | 'expired';
@@ -722,5 +741,37 @@ export interface PushNotificationPreferenceSettings {
   permission: NotificationPermission | 'unsupported';
   enrolledSubjectsOnly: boolean;
   lastNotifiedCompIds: string[];
+}
+
+export type StudentToastType = 'competition' | 'result' | 'info';
+
+export interface StudentToastNotification {
+  id: string;
+  type: StudentToastType;
+  title: string;
+  titleTa?: string;
+  titleSi?: string;
+  message: string;
+  messageTa?: string;
+  messageSi?: string;
+  timestamp: number;
+  durationMs?: number;
+  meta?: {
+    competitionId?: string;
+    competitionTitle?: string;
+    grade?: string;
+    subject?: string;
+    entryType?: 'Free' | 'Paid' | string;
+    entryFee?: number;
+    score?: number;
+    totalMarks?: number;
+    percentage?: number;
+    rank?: number;
+    award?: string;
+    linkTab?: string;
+  };
+  actionLabel?: string;
+  actionLabelTa?: string;
+  actionLabelSi?: string;
 }
 

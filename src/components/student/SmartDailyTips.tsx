@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI } from '@google/genai';
 import { useApp } from '../../context/AppContext';
 import {
   Sparkles,
@@ -178,115 +177,55 @@ export const SmartDailyTips: React.FC = () => {
     };
   };
 
-  // Generate Smart Tips with Gemini AI
+  // Generate Smart Tips with Gemini AI via Server Endpoint
   const generateAiSmartTips = async () => {
     setLoading(true);
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      // Instant intelligent heuristic generator (zero delay, zero lag)
-      setTipsData(getCuratedSmartTips());
-      setLoading(false);
-      return;
-    }
 
     try {
-      const ai = new GoogleGenAI({ apiKey });
-
-      const promptContext = `
-You are an expert academic coach and exam strategist for Sri Lankan school students competing in national Olympiads, Quizzes, and exams (Grades 1 to 13, O/L, A/L).
-Analyze this student's recent academic profile and generate personalized 'Smart Daily Tips' including a 3-step actionable study plan for today, an exam preparation trick/technique, and diagnostic insight.
-
-Student Profile:
-- Name: ${studentName}
-- Grade Level: ${studentGrade}
-- District / School: ${currentStudent?.district || 'Sri Lanka'} / ${currentStudent?.institution || 'School'}
-- Exams Completed: ${completedCount}
-- Overall Average Score: ${avgPercentage}%
-- Recent Competition Results: ${JSON.stringify(recentExamsList)}
-- Preferred Language: ${language === 'ta' ? 'Tamil' : language === 'si' ? 'Sinhala' : 'English'}
-
-Instructions:
-1. Provide a concise, highly practical, grade-appropriate 3-step study plan for today with realistic durations (15-30 mins).
-2. Provide 1 high-impact exam trick/hack (e.g. elimination method, active recall, diagram mnemonics, time allocation).
-3. Provide a brief 1-sentence diagnostic focus insight based on whether they need to push from credit to distinction (85%+ Gold Medal).
-4. Provide a motivating 1-sentence quote.
-5. Respond strictly in valid JSON format matching this schema:
-{
-  "summary": "Short 1-2 sentence overview in ${language === 'ta' ? 'Tamil' : language === 'si' ? 'Sinhala' : 'English'}",
-  "focusSubject": "Specific skill/topic to sharpen",
-  "studyPlan": [
-    {
-      "id": "p1",
-      "title": "Action title",
-      "duration": "20 mins",
-      "description": "Clear specific action to do",
-      "category": "Math/Science/English/Review"
-    },
-    {
-      "id": "p2",
-      "title": "Action title",
-      "duration": "25 mins",
-      "description": "Clear specific action to do",
-      "category": "Topic"
-    },
-    {
-      "id": "p3",
-      "title": "Action title",
-      "duration": "15 mins",
-      "description": "Clear specific action to do",
-      "category": "Topic"
-    }
-  ],
-  "examTrick": {
-    "title": "Technique name",
-    "technique": "Why it works",
-    "actionableStep": "Exact way to apply it during exam or study",
-    "tag": "Time Hack / Memory Technique / Trap Avoidance"
-  },
-  "motivationalQuote": "Inspiring closing line"
-}
-`;
-
-      if (!apiKey || apiKey.trim().length < 5) {
-        setTipsData(getCuratedSmartTips());
-        setLoading(false);
-        return;
-      }
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: promptContext,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.6,
+      const res = await fetch('/api/generate-smart-tips', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          studentName,
+          studentGrade,
+          district: currentStudent?.district || 'Sri Lanka',
+          institution: currentStudent?.institution || 'School',
+          completedCount,
+          avgPercentage,
+          recentExamsList,
+          language,
+        }),
       });
 
-      const responseText = response.text || '';
-      const parsed = JSON.parse(responseText);
-
-      if (parsed && parsed.studyPlan && parsed.examTrick) {
-        setTipsData({
-          summary: parsed.summary || getCuratedSmartTips().summary,
-          focusSubject: parsed.focusSubject || 'Olympiad Readiness',
-          studyPlan: parsed.studyPlan.map((p: any, idx: number) => ({
-            id: p.id || `p${idx + 1}`,
-            title: p.title,
-            duration: p.duration || '20 mins',
-            description: p.description,
-            category: p.category || 'Study',
-            completed: false,
-          })),
-          examTrick: parsed.examTrick,
-          motivationalQuote: parsed.motivationalQuote || 'Keep growing every single day!',
-          isAiGenerated: true,
-        });
-      } else {
-        setTipsData(getCuratedSmartTips());
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.success && data?.tips?.studyPlan && data?.tips?.examTrick) {
+          const parsed = data.tips;
+          setTipsData({
+            summary: parsed.summary || getCuratedSmartTips().summary,
+            focusSubject: parsed.focusSubject || 'Olympiad Readiness',
+            studyPlan: parsed.studyPlan.map((p: any, idx: number) => ({
+              id: p.id || `p${idx + 1}`,
+              title: p.title,
+              duration: p.duration || '20 mins',
+              description: p.description,
+              category: p.category || 'Study',
+              completed: false,
+            })),
+            examTrick: parsed.examTrick,
+            motivationalQuote: parsed.motivationalQuote || 'Keep growing every single day!',
+            isAiGenerated: true,
+          });
+          setLoading(false);
+          return;
+        }
       }
+
+      setTipsData(getCuratedSmartTips());
     } catch (err) {
-      console.warn('Gemini Smart Tips note:', err);
+      console.warn('Server Gemini Smart Tips note:', err);
       setTipsData(getCuratedSmartTips());
     } finally {
       setLoading(false);

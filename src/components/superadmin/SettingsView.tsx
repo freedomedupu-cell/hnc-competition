@@ -23,10 +23,17 @@ import {
   XCircle,
   FileText,
   AlertTriangle,
+  MessageSquare,
+  Gamepad2,
+  Layout,
+  Award,
+  Gift,
+  Sparkles,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { BankAccountDetails, PaymentGatewayConfig, MembershipSettings } from '../../types';
 import { simulateSessionTimeoutWarning } from '../../lib/sessionUtils';
+import { NotificationsConfigPanel } from '../common/NotificationsConfigPanel';
 
 export const SettingsView: React.FC = () => {
   const {
@@ -40,13 +47,17 @@ export const SettingsView: React.FC = () => {
     refreshMembershipData,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'general' | 'payments' | 'membership' | 'security'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'payments' | 'membership' | 'notifications' | 'security'>('general');
   const [formData, setFormData] = useState({ ...settings });
   const [memConfig, setMemConfig] = useState<MembershipSettings>({ ...membershipSettings });
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [memSaveSuccess, setMemSaveSuccess] = useState(false);
   const [reviewLoading, setReviewLoading] = useState<string | null>(null);
   const [viewingSlipUrl, setViewingSlipUrl] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setFormData({ ...settings });
+  }, [settings]);
 
   // New bank modal/inline state
   const [showAddBank, setShowAddBank] = useState(false);
@@ -213,6 +224,19 @@ export const SettingsView: React.FC = () => {
           </button>
           <button
             type="button"
+            id="tab-settings-notifications"
+            onClick={() => setActiveTab('notifications')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1.5 ${
+              activeTab === 'notifications'
+                ? 'bg-white text-blue-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Notifications & WhatsApp</span>
+          </button>
+          <button
+            type="button"
             id="tab-settings-security"
             onClick={() => setActiveTab('security')}
             className={`px-3 py-1.5 rounded-lg font-semibold transition ${
@@ -342,6 +366,519 @@ export const SettingsView: React.FC = () => {
                     className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                   />
                 </label>
+
+                {/* SUPER ADMIN SPINNING OPTIONS CONTROL (அதிர்ஷ்ட சுழல் சக்கரம் கட்டுப்பாடு) */}
+                <div className="p-4 rounded-xl border border-amber-300 bg-gradient-to-br from-amber-50/80 via-orange-50/40 to-yellow-50/60 shadow-2xs space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center text-xl shrink-0 shadow-xs border border-amber-500/30">
+                        🎡
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-slate-900">
+                            அதிர்ஷ்ட சுழல் சக்கரம் (Daily Lucky Spin Wheel)
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              formData.enableDailySpinWheel !== false
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-slate-200 text-slate-700 border border-slate-300'
+                            }`}
+                          >
+                            {formData.enableDailySpinWheel !== false
+                              ? 'இயங்குகிறது (Active)'
+                              : 'முடக்கப்பட்டுள்ளது (Disabled)'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-relaxed">
+                          மாணவர்கள் Study Games Hub மற்றும் முகப்புப் பக்கத்தில் தினமும் ஒருமுறை சுழற்றி போனஸ் புள்ளிகளைப் பெறும் Lucky Spin சக்கரத்தின் Super Admin கட்டுப்பாடு.
+                          <br />
+                          <span className="text-[10px] text-slate-500">
+                            (Super Admin Master On/Off switch for the student Spin & Win feature across the platform.)
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Master On/Off Switch */}
+                    <button
+                      type="button"
+                      id="toggle-daily-spin-wheel"
+                      onClick={() => {
+                        const nextState = formData.enableDailySpinWheel === false ? true : false;
+                        setFormData({
+                          ...formData,
+                          enableDailySpinWheel: nextState,
+                        });
+                        updateSettings({ enableDailySpinWheel: nextState });
+                        setSavedSuccess(true);
+                        setTimeout(() => setSavedSuccess(false), 2500);
+                      }}
+                      className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 mt-1 ${
+                        formData.enableDailySpinWheel !== false ? 'bg-amber-500' : 'bg-slate-300'
+                      }`}
+                      aria-label="Toggle Daily Spin Wheel"
+                    >
+                      <span
+                        className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                          formData.enableDailySpinWheel !== false ? 'translate-x-6' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="pt-2 border-t border-amber-200/60 flex items-center justify-between text-[11px]">
+                    <span className="text-amber-900 font-medium">
+                      {formData.enableDailySpinWheel !== false
+                        ? '✓ மாணவர்கள் தினமும் 1 முறை இலவசமாக சுழற்றி புள்ளிகள் பெறலாம்.'
+                        : '⚠️ சுழல் சக்கரம் மாணவர்களுக்கு தற்காலிகமாக மறைக்கப்பட்டு இடைநிறுத்தப்பட்டுள்ளது.'}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-amber-800 bg-white/70 px-2 py-0.5 rounded border border-amber-200">
+                      Super Admin Override
+                    </span>
+                  </div>
+                </div>
+
+                {/* Super Admin Control: Student Subject Publication Alerts Banner */}
+                <div className="p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200/90 rounded-xl space-y-3 shadow-2xs">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 border border-blue-300 flex items-center justify-center text-sm shrink-0 font-bold">
+                        🌐
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-slate-900">
+                            மாணவர் பாட அறிவிப்புகள் (Student Subject Alerts Banner)
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              formData.enableSubjectAlerts !== false
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-slate-200 text-slate-700 border border-slate-300'
+                            }`}
+                          >
+                            {formData.enableSubjectAlerts !== false
+                              ? 'இயங்குகிறது (Active - ON)'
+                              : 'முடக்கப்பட்டுள்ளது (Disabled - OFF)'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-relaxed">
+                          மாணவர் முகப்பில் தோன்றும் "Subject Alerts: English, Enable Push, 🔔 Test, Manage Subjects" பேனர்.
+                          <br />
+                          <span className="text-[10px] text-slate-500">
+                            (Super Admin Master On/Off switch for student enrolled subject publication alerts and push prompts.)
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Master On/Off Switch */}
+                    <button
+                      type="button"
+                      id="toggle-subject-alerts"
+                      onClick={() => {
+                        const nextState = formData.enableSubjectAlerts === false ? true : false;
+                        setFormData({
+                          ...formData,
+                          enableSubjectAlerts: nextState,
+                        });
+                        updateSettings({ enableSubjectAlerts: nextState });
+                        setSavedSuccess(true);
+                        setTimeout(() => setSavedSuccess(false), 2500);
+                      }}
+                      className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 mt-1 ${
+                        formData.enableSubjectAlerts !== false ? 'bg-blue-600' : 'bg-slate-300'
+                      }`}
+                      aria-label="Toggle Subject Alerts Banner"
+                    >
+                      <span
+                        className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                          formData.enableSubjectAlerts !== false ? 'translate-x-6' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between text-[11px]">
+                    <span className="text-blue-900 font-medium">
+                      {formData.enableSubjectAlerts !== false
+                        ? '✓ மாணவர்களுக்கு பாட அறிவிப்புகள் மற்றும் புஷ் வசதி இயக்கத்தில் உள்ளது.'
+                        : '⚠️ பாட அறிவிப்புகள் பேனர் மாணவர் திரையிலிருந்து மறைக்கப்பட்டுள்ளது.'}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-blue-800 bg-white/70 px-2 py-0.5 rounded border border-blue-200">
+                      Super Admin Override
+                    </span>
+                  </div>
+                </div>
+
+                {/* Super Admin Control: Student Deadlines Status & Push Banner */}
+                <div className="p-3 sm:p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200/90 rounded-xl space-y-3 shadow-2xs">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center text-sm shrink-0 font-bold">
+                        ⏰
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-slate-900">
+                            கெடுநிலை & புஷ் அறிவிப்புகள் (Deadlines Status & Push Alerts)
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              formData.enableDeadlineAlerts !== false
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-slate-200 text-slate-700 border border-slate-300'
+                            }`}
+                          >
+                            {formData.enableDeadlineAlerts !== false
+                              ? 'இயங்குகிறது (Active - ON)'
+                              : 'முடக்கப்பட்டுள்ளது (Disabled - OFF)'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-relaxed">
+                          மாணவர் முகப்பில் தோன்றும் "Deadlines Status: No Critical Deadlines Pending... Enable Push Alerts" பேனர்.
+                          <br />
+                          <span className="text-[10px] text-slate-500">
+                            (Super Admin Master On/Off switch for student deadline alert warnings and local push notifications.)
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Master On/Off Switch */}
+                    <button
+                      type="button"
+                      id="toggle-deadline-alerts"
+                      onClick={() => {
+                        const nextState = formData.enableDeadlineAlerts === false ? true : false;
+                        setFormData({
+                          ...formData,
+                          enableDeadlineAlerts: nextState,
+                        });
+                        updateSettings({ enableDeadlineAlerts: nextState });
+                        setSavedSuccess(true);
+                        setTimeout(() => setSavedSuccess(false), 2500);
+                      }}
+                      className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 mt-1 ${
+                        formData.enableDeadlineAlerts !== false ? 'bg-amber-500' : 'bg-slate-300'
+                      }`}
+                      aria-label="Toggle Deadline Alerts Banner"
+                    >
+                      <span
+                        className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                          formData.enableDeadlineAlerts !== false ? 'translate-x-6' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="pt-2 border-t border-amber-200/60 flex items-center justify-between text-[11px]">
+                    <span className="text-amber-900 font-medium">
+                      {formData.enableDeadlineAlerts !== false
+                        ? '✓ மாணவர்களுக்கு காலக்கெடு எச்சரிக்கை மற்றும் புஷ் பொத்தான் இயக்கத்தில் உள்ளது.'
+                        : '⚠️ கெடுநிலை பேனர் மாணவர் திரையிலிருந்து மறைக்கப்பட்டுள்ளது.'}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-amber-800 bg-white/70 px-2 py-0.5 rounded border border-amber-200">
+                      Super Admin Override
+                    </span>
+                  </div>
+                </div>
+
+                {/* Student Dashboard Layout & Interactive Games Master Section */}
+                <div className="p-4 rounded-xl border-2 border-indigo-200 bg-gradient-to-r from-indigo-50/60 to-purple-50/60 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-200/60 pb-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <Gamepad2 className="w-5 h-5 text-indigo-700" />
+                        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          மாணவர் முகப்புப் பலகை & கல்வி விளையாட்டுகள் கட்டுப்பாடு (Dashboard Layout & Games Deck)
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-slate-600">
+                        மாணவர் முகப்பில் பல அட்டைகள் தோன்றுவதை சீரமைக்க (Declutter) குறைந்தபட்ச முகப்பு அல்லது முழு முகப்பைத் தேர்வு செய்யவும்.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const minimalUpdates = {
+                            enableStudyGamesCard: false,
+                            enableDailySpinWheel: false,
+                            enableAiTimetableCard: false,
+                            enableSmartDailyTips: false,
+                            enableOfflineMaterialsCard: false,
+                            enableReferralCard: false,
+                            enableEduArenaCard: false,
+                            enableLeaderboardsCard: false,
+                            enableAchievementsCard: false,
+                            enableToastPreviewDeck: false,
+                            enableSubjectAlerts: false,
+                            enableDeadlineAlerts: true,
+                            enableNextCompetitionCountdown: true,
+                          };
+                          setFormData({ ...formData, ...minimalUpdates });
+                          await updateSettings(minimalUpdates);
+                          setSavedSuccess(true);
+                          setTimeout(() => setSavedSuccess(false), 2500);
+                        }}
+                        className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-slate-900 text-amber-300 hover:bg-slate-800 cursor-pointer shadow-xs flex items-center gap-1"
+                      >
+                        <span>🎯</span>
+                        <span>சுத்த முகப்பு (Clean Mode)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const fullUpdates = {
+                            enableStudyGamesCard: true,
+                            enableDailySpinWheel: true,
+                            enableAiTimetableCard: true,
+                            enableSmartDailyTips: true,
+                            enableOfflineMaterialsCard: true,
+                            enableReferralCard: true,
+                            enableEduArenaCard: true,
+                            enableLeaderboardsCard: true,
+                            enableAchievementsCard: true,
+                            enableToastPreviewDeck: true,
+                            enableSubjectAlerts: true,
+                            enableDeadlineAlerts: true,
+                            enableNextCompetitionCountdown: true,
+                          };
+                          setFormData({ ...formData, ...fullUpdates });
+                          await updateSettings(fullUpdates);
+                          setSavedSuccess(true);
+                          setTimeout(() => setSavedSuccess(false), 2500);
+                        }}
+                        className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer shadow-xs flex items-center gap-1"
+                      >
+                        <span>🌟</span>
+                        <span>முழு முகப்பு (Full Mode)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* 1. Daily Study Games & Focus Lounge */}
+                    <div className="p-3 bg-white rounded-lg border border-purple-200 flex items-center justify-between">
+                      <div className="space-y-0.5 pr-2">
+                        <span className="text-xs font-bold text-slate-900 block">
+                          🎮 Daily Study Games & Focus Lounge (4-in-1)
+                        </span>
+                        <span className="text-[10px] text-slate-500 block">
+                          Lucky spin, 60s brain challenge, speed math rush & Lo-Fi Pomodoro study cam
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const next = formData.enableStudyGamesCard === false;
+                          setFormData({ ...formData, enableStudyGamesCard: next });
+                          await updateSettings({ enableStudyGamesCard: next });
+                        }}
+                        className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                          formData.enableStudyGamesCard !== false ? 'bg-purple-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                          formData.enableStudyGamesCard !== false ? 'translate-x-5' : 'translate-x-0'
+                        }`} />
+                      </button>
+                    </div>
+
+                    {/* 2. Lucky Spin Wheel */}
+                    <div className="p-3 bg-white rounded-lg border border-amber-200 flex items-center justify-between">
+                      <div className="space-y-0.5 pr-2">
+                        <span className="text-xs font-bold text-slate-900 block">
+                          🎡 Daily Lucky Spin Wheel
+                        </span>
+                        <span className="text-[10px] text-slate-500 block">
+                          24h Spin limit with 5-50 point sectors
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const next = formData.enableDailySpinWheel === false;
+                          setFormData({ ...formData, enableDailySpinWheel: next });
+                          await updateSettings({ enableDailySpinWheel: next });
+                        }}
+                        className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                          formData.enableDailySpinWheel !== false ? 'bg-amber-500' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                          formData.enableDailySpinWheel !== false ? 'translate-x-5' : 'translate-x-0'
+                        }`} />
+                      </button>
+                    </div>
+
+                    {/* 3. Edu-Arena Island Quest */}
+                    <div className="p-3 bg-white rounded-lg border border-emerald-200 flex items-center justify-between">
+                      <div className="space-y-0.5 pr-2">
+                        <span className="text-xs font-bold text-slate-900 block">
+                          🎯 HNC Edu-Arena: Island Quest
+                        </span>
+                        <span className="text-[10px] text-slate-500 block">
+                          25 Districts gamified quiz map banner
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const next = formData.enableEduArenaCard === false;
+                          setFormData({ ...formData, enableEduArenaCard: next });
+                          await updateSettings({ enableEduArenaCard: next });
+                        }}
+                        className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                          formData.enableEduArenaCard !== false ? 'bg-emerald-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                          formData.enableEduArenaCard !== false ? 'translate-x-5' : 'translate-x-0'
+                        }`} />
+                      </button>
+                    </div>
+
+                    {/* 4. Gemini AI Timetable */}
+                    <div className="p-3 bg-white rounded-lg border border-indigo-200 flex items-center justify-between">
+                      <div className="space-y-0.5 pr-2">
+                        <span className="text-xs font-bold text-slate-900 block">
+                          📅 Gemini AI Study Timetable
+                        </span>
+                        <span className="text-[10px] text-slate-500 block">
+                          Personalized revision timetable banner
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const next = formData.enableAiTimetableCard === false;
+                          setFormData({ ...formData, enableAiTimetableCard: next });
+                          await updateSettings({ enableAiTimetableCard: next });
+                        }}
+                        className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                          formData.enableAiTimetableCard !== false ? 'bg-indigo-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                          formData.enableAiTimetableCard !== false ? 'translate-x-5' : 'translate-x-0'
+                        }`} />
+                      </button>
+                    </div>
+
+                    {/* 5. Smart Daily Tips */}
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 flex items-center justify-between">
+                      <div className="space-y-0.5 pr-2">
+                        <span className="text-xs font-bold text-slate-900 block">
+                          💡 Smart Daily Tips & Exam Tricks
+                        </span>
+                        <span className="text-[10px] text-slate-500 block">
+                          Daily motivation & exam tricks card
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const next = formData.enableSmartDailyTips === false;
+                          setFormData({ ...formData, enableSmartDailyTips: next });
+                          await updateSettings({ enableSmartDailyTips: next });
+                        }}
+                        className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                          formData.enableSmartDailyTips !== false ? 'bg-amber-500' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                          formData.enableSmartDailyTips !== false ? 'translate-x-5' : 'translate-x-0'
+                        }`} />
+                      </button>
+                    </div>
+
+                    {/* 6. Offline Study Materials */}
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 flex items-center justify-between">
+                      <div className="space-y-0.5 pr-2">
+                        <span className="text-xs font-bold text-slate-900 block">
+                          📦 Offline Study Materials Hub
+                        </span>
+                        <span className="text-[10px] text-slate-500 block">
+                          Service Worker Cache download deck
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const next = formData.enableOfflineMaterialsCard === false;
+                          setFormData({ ...formData, enableOfflineMaterialsCard: next });
+                          await updateSettings({ enableOfflineMaterialsCard: next });
+                        }}
+                        className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                          formData.enableOfflineMaterialsCard !== false ? 'bg-blue-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                          formData.enableOfflineMaterialsCard !== false ? 'translate-x-5' : 'translate-x-0'
+                        }`} />
+                      </button>
+                    </div>
+
+                    {/* 7. Referral & Share Points */}
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 flex items-center justify-between">
+                      <div className="space-y-0.5 pr-2">
+                        <span className="text-xs font-bold text-slate-900 block">
+                          🎁 Referral & Share Points Card
+                        </span>
+                        <span className="text-[10px] text-slate-500 block">
+                          Invitation links and bonus points banner
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const next = formData.enableReferralCard === false;
+                          setFormData({ ...formData, enableReferralCard: next });
+                          await updateSettings({ enableReferralCard: next });
+                        }}
+                        className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                          formData.enableReferralCard !== false ? 'bg-pink-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                          formData.enableReferralCard !== false ? 'translate-x-5' : 'translate-x-0'
+                        }`} />
+                      </button>
+                    </div>
+
+                    {/* 8. Student Achievements Deck */}
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 flex items-center justify-between">
+                      <div className="space-y-0.5 pr-2">
+                        <span className="text-xs font-bold text-slate-900 block">
+                          🎖️ Student Achievements & Medals
+                        </span>
+                        <span className="text-[10px] text-slate-500 block">
+                          Unlocked and locked milestone badges
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const next = formData.enableAchievementsCard === false;
+                          setFormData({ ...formData, enableAchievementsCard: next });
+                          await updateSettings({ enableAchievementsCard: next });
+                        }}
+                        className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                          formData.enableAchievementsCard !== false ? 'bg-indigo-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                          formData.enableAchievementsCard !== false ? 'translate-x-5' : 'translate-x-0'
+                        }`} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex justify-end">
@@ -1128,6 +1665,9 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* TAB 5: NOTIFICATIONS & WHATSAPP GATEWAY */}
+      {activeTab === 'notifications' && <NotificationsConfigPanel />}
 
       {/* Slip Preview Modal */}
       {viewingSlipUrl && (

@@ -10,24 +10,30 @@ import { Sidebar } from './components/common/Sidebar';
 import { AuthView } from './components/auth/AuthView';
 import { APP_LOGO } from './assets/logo';
 
-// Direct imports for ALL platform views (zero dynamic import delay, zero chunk failures)
-import { SuperAdminDashboard } from './components/superadmin/SuperAdminDashboard';
-import { AdminDashboardView } from './components/admin/AdminDashboardView';
+// Direct imports for critical entry views (instant first paint for login and student dashboard)
 import { StudentDashboardView } from './components/student/StudentDashboardView';
 
+// SuperAdmin Views
+import { SuperAdminDashboard } from './components/superadmin/SuperAdminDashboard';
 import { AdminManagement } from './components/superadmin/AdminManagement';
 import { StudentManagement } from './components/superadmin/StudentManagement';
 import { CompetitionManagement } from './components/superadmin/CompetitionManagement';
 import { ResultsManagement } from './components/superadmin/ResultsManagement';
 import { SettingsView } from './components/superadmin/SettingsView';
+import { PlatformMasterControlsView } from './components/superadmin/PlatformMasterControlsView';
 
+// Admin Views
+import { AdminDashboardView } from './components/admin/AdminDashboardView';
 import { AdminCompetitionsView } from './components/admin/AdminCompetitionsView';
 import { StudentInfoView } from './components/admin/StudentInfoView';
 import { AdminResultsView } from './components/admin/AdminResultsView';
 import { AdminProfileView } from './components/admin/AdminProfileView';
 import { LiveProctorView } from './components/admin/LiveProctorView';
 import { SubjectAdminPortal } from './components/admin/SubjectAdminPortal';
+import { SponsorsAndAdsView } from './components/admin/SponsorsAndAdsView';
+import { AdminFeedbackView } from './components/admin/AdminFeedbackView';
 
+// Student Views
 import { StudentCompetitionsView } from './components/student/StudentCompetitionsView';
 import { StudentResultsView } from './components/student/StudentResultsView';
 import { StudentProfileView } from './components/student/StudentProfileView';
@@ -37,15 +43,25 @@ import { StudentAnnouncementsView } from './components/student/StudentAnnounceme
 import { GameQuest } from './components/student/GameQuest';
 import { StudyGamesHub } from './components/student/StudyGamesHub';
 import { StudentFeedbackView } from './components/student/StudentFeedbackView';
-import { LeaderboardsHubView } from './components/leaderboard/LeaderboardsHubView';
 import { StudentTimetableView } from './components/student/StudentTimetableView';
 
+// Leaderboard & Common Views
+import { LeaderboardsHubView } from './components/leaderboard/LeaderboardsHubView';
 import { AnnouncementsManagementView } from './components/common/AnnouncementsManagementView';
-import { SponsorsAndAdsView } from './components/admin/SponsorsAndAdsView';
-import { AdminFeedbackView } from './components/admin/AdminFeedbackView';
+import { NotificationsConfigPanel } from './components/common/NotificationsConfigPanel';
+
+const ViewLoadingFallback: React.FC = () => (
+  <div className="w-full min-h-[300px] flex flex-col items-center justify-center p-8 text-center animate-pulse">
+    <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 mb-3 shadow-xs">
+      <div className="w-5 h-5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+    </div>
+    <span className="text-xs font-semibold text-slate-500">ஏற்றப்படுகிறது... (Loading view...)</span>
+  </div>
+);
 
 // Session Security & Inactivity Timeout Warning
 import { SessionTimeoutWarning } from './components/common/SessionTimeoutWarning';
+import { StudentGlobalToastContainer } from './components/common/StudentGlobalToastContainer';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -116,6 +132,53 @@ export class PortalErrorBoundary extends React.Component<ErrorBoundaryProps, Err
   }
 }
 
+/**
+ * AuthHydrationGate: Ensures user session state is fully hydrated before attempting to render
+ * any protected dashboard route, eliminating race conditions and preventing manual page refreshes.
+ */
+const AuthHydrationGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { currentAuthUser, isAuthHydrated, language } = useApp();
+  const [hydrationTimeoutExpired, setHydrationTimeoutExpired] = useState(false);
+
+  // 1000ms safety circuit breaker so the page is never stuck in a loading state
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setHydrationTimeoutExpired(true);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 1. Session is actively hydrating from Firebase / Local Storage
+  if (!isAuthHydrated && !currentAuthUser && !hydrationTimeoutExpired) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white select-none">
+        <div className="relative flex items-center justify-center mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center shadow-lg">
+            <span className="text-3xl animate-bounce">🏆</span>
+          </div>
+          <div className="absolute inset-0 rounded-2xl border-2 border-blue-400 border-t-transparent animate-spin" />
+        </div>
+        <h2 className="text-base font-bold text-slate-100 tracking-tight">HNC Competition Platform</h2>
+        <p className="text-xs text-slate-400 mt-1 font-medium animate-pulse">
+          {language === 'ta'
+            ? 'பயனர் அமர்வை சரிபார்க்கிறது...'
+            : language === 'si'
+            ? 'පරිශීලක සැසිය පූරණය වෙමින් පවතී...'
+            : 'Hydrating user session...'}
+        </p>
+      </div>
+    );
+  }
+
+  // 2. Hydration complete: If unauthenticated, render AuthView
+  if (!currentAuthUser) {
+    return <AuthView />;
+  }
+
+  // 3. User session state is fully hydrated -> Render protected dashboard route
+  return <>{children}</>;
+};
+
 const MainPortalArea: React.FC = () => {
   const {
     currentAuthUser,
@@ -146,30 +209,35 @@ const MainPortalArea: React.FC = () => {
     } catch {}
   }, [currentAuthUser?.uid]);
 
-  // 1. Unauthenticated State -> Immediately show Auth / Login View without any blocking delay
+  // Unauthenticated fallback safeguard
   if (!currentAuthUser) {
     return <AuthView />;
   }
 
-  // Strict role enforcement: If authenticated as student, NEVER show admin or super admin
+  // Strict role enforcement: If authenticated as student, NEVER show admin or super admin.
+  // When Super Admin or Admin logs in, ensure their authorized portal is active without requiring refresh.
   const effectivePortal =
     currentAuthUser.role === 'student'
       ? 'student'
       : currentAuthUser.role === 'admin'
       ? currentPortal === 'student' ? 'student' : 'admin'
-      : currentPortal;
+      : currentPortal === 'student' || currentPortal === 'admin'
+      ? currentPortal
+      : 'super_admin';
 
   // 2. Distraction-Free Student Exam Engine (Direct render, zero delay)
   if (effectivePortal === 'student' && activeExamComp && examSessionStage === 'taking') {
     return (
-      <StudentExamInterface
-        competition={activeExamComp}
-        onExit={exitActiveExam}
-        onViewResults={() => {
-          exitActiveExam();
-          setStudentNav('My Results');
-        }}
-      />
+      <React.Suspense fallback={<ViewLoadingFallback />}>
+        <StudentExamInterface
+          competition={activeExamComp}
+          onExit={exitActiveExam}
+          onViewResults={() => {
+            exitActiveExam();
+            setStudentNav('My Results');
+          }}
+        />
+      </React.Suspense>
     );
   }
 
@@ -198,8 +266,12 @@ const MainPortalArea: React.FC = () => {
             return <AdminFeedbackView />;
           case 'Leaderboards':
             return <LeaderboardsHubView />;
+          case 'Notifications':
+            return <NotificationsConfigPanel />;
           case 'Settings':
             return <SettingsView />;
+          case 'Platform Master Controls':
+            return <PlatformMasterControlsView onNavigate={setSuperAdminNav} />;
           default:
             return <SuperAdminDashboard onNavigate={setSuperAdminNav} />;
         }
@@ -238,6 +310,8 @@ const MainPortalArea: React.FC = () => {
             return <AdminFeedbackView />;
           case 'Leaderboards':
             return <LeaderboardsHubView />;
+          case 'Notifications':
+            return <NotificationsConfigPanel />;
           case 'Profile':
             return <AdminProfileView />;
           default:
@@ -280,6 +354,9 @@ const MainPortalArea: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-blue-100 selection:text-blue-900 w-full overflow-x-hidden">
+      {/* Global Student Instant Toast Notification System */}
+      <StudentGlobalToastContainer />
+
       {/* Automatic Inactivity Session Timeout Warning Modal */}
       <SessionTimeoutWarning />
 
@@ -293,7 +370,9 @@ const MainPortalArea: React.FC = () => {
 
         <main id="portal-main-content" className="flex-1 p-3 sm:p-6 lg:p-8 min-w-0 w-full overflow-x-hidden">
           <PortalErrorBoundary>
-            {renderActiveView()}
+            <React.Suspense fallback={<ViewLoadingFallback />}>
+              {renderActiveView()}
+            </React.Suspense>
           </PortalErrorBoundary>
         </main>
       </div>
@@ -306,7 +385,9 @@ export default function App() {
     <PortalErrorBoundary>
       <AppProvider>
         <PortalErrorBoundary>
-          <MainPortalArea />
+          <AuthHydrationGate>
+            <MainPortalArea />
+          </AuthHydrationGate>
         </PortalErrorBoundary>
       </AppProvider>
     </PortalErrorBoundary>

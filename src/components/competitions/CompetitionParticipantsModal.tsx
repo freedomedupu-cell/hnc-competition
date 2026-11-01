@@ -17,7 +17,13 @@ import {
   FileText,
   ExternalLink,
   ZoomIn,
+  MessageSquare,
 } from 'lucide-react';
+import {
+  formatExam15MinAlertMessage,
+  buildWhatsappChatUrl,
+  logWhatsappSmsDispatch,
+} from '../../utils/whatsappSmsNotificationService';
 
 interface CompetitionParticipantsModalProps {
   isOpen: boolean;
@@ -261,9 +267,36 @@ export const CompetitionParticipantsModal: React.FC<CompetitionParticipantsModal
                           {p.registeredAt ? new Date(p.registeredAt).toLocaleDateString() : 'Active'}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <Badge variant="success" className="text-[10px]">
-                            Enrolled
-                          </Badge>
+                          <div className="flex items-center justify-end gap-2">
+                            <Badge variant="success" className="text-[10px]">
+                              Enrolled
+                            </Badge>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const phone = (p as any).phone || (p as any).whatsappPhone || '0771234567';
+                                const msg = formatExam15MinAlertMessage(competition, p.studentName, 'ta');
+                                logWhatsappSmsDispatch({
+                                  studentId: p.studentId,
+                                  studentName: p.studentName,
+                                  recipientPhone: phone,
+                                  channel: 'whatsapp',
+                                  triggerType: '15_min_before_exam',
+                                  competitionId: competition.id,
+                                  competitionTitle: competition.title,
+                                  messageText: msg,
+                                  status: 'sent',
+                                });
+                                const waUrl = buildWhatsappChatUrl(phone, msg);
+                                window.open(waUrl, '_blank');
+                              }}
+                              className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors shadow-2xs"
+                              title="Send WhatsApp Exam Reminder Alert"
+                            >
+                              <MessageSquare className="w-3 h-3 text-emerald-600" />
+                              <span>📲 Alert</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))

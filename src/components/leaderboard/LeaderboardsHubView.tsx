@@ -965,121 +965,76 @@ export const LeaderboardsHubView: React.FC<LeaderboardsHubViewProps> = ({
               </button>
             )}
           </div>
-
-          {/* Grade Level Filter */}
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <select
-              id="filter-grade-select"
-              value={selectedGradeFilter}
-              onChange={(e) => setSelectedGradeFilter(e.target.value)}
-              className="w-full md:w-auto px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            >
-              <option value="all">{language === 'ta' ? 'அனைத்து தரங்கள் (All Grades)' : 'All Grade Categories'}</option>
-              <option value="primary">{language === 'ta' ? 'Grade 1-5 (Primary / புலமைப்பரிசில்)' : 'Grade 1-5 Primary'}</option>
-              <option value="junior">{language === 'ta' ? 'Grade 6-9 (Junior Secondary)' : 'Grade 6-9 Junior'}</option>
-              <option value="senior">{language === 'ta' ? 'Grade 10-11 (O/L Senior)' : 'Grade 10-11 O/L'}</option>
-              <option value="advanced">{language === 'ta' ? 'Grade 12-13 (A/L Advanced)' : 'Grade 12-13 A/L'}</option>
-              <option value="after_school">{language === 'ta' ? 'போட்டிப் பரீட்சைகள் (Competitive Exams)' : 'After School & Competitive'}</option>
-            </select>
-
-            {/* 25 Districts Filter */}
-            <select
-              id="filter-district-select"
-              value={selectedDistrictFilter}
-              onChange={(e) => setSelectedDistrictFilter(e.target.value)}
-              className="w-full md:w-auto px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            >
-              <option value="all">{language === 'ta' ? 'அனைத்து 25 மாவட்டங்கள்' : 'All 25 Districts'}</option>
-              {SRI_LANKA_25_DISTRICTS.map((dist) => (
-                <option key={dist.id} value={dist.id}>
-                  {language === 'ta' ? dist.nameTa : dist.nameEn} ({dist.nameEn})
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
 
         {/* Tab Specific Sub-Filters */}
-        <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-slate-100 text-xs">
-          {activeTab === 'exams_quizzes' && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[11px] font-bold text-slate-400 mr-1">
-                {language === 'ta' ? 'போட்டி வகை:' : 'Type:'}
-              </span>
-              {[
-                { id: 'all', label: language === 'ta' ? 'அனைத்தும்' : 'All Contests' },
-                { id: 'Exam', label: language === 'ta' ? 'பரீட்சைகள் (Exams)' : 'Exams' },
-                { id: 'Quiz', label: language === 'ta' ? 'வினாடி வினாக்கள் (Quizzes)' : 'Quizzes' },
-                { id: 'Competition', label: language === 'ta' ? 'ஒலிம்பியாட்கள் (Competitions)' : 'Competitions' },
-              ].map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => setExamTypeFilter(opt.id as any)}
-                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
-                    examTypeFilter === opt.id
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
+        {(activeTab === 'exams_quizzes' || activeTab === 'edu_arena_studio' || activeTab === 'island_quest') && (
+          <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-slate-100 text-xs">
+            {activeTab === 'exams_quizzes' && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-bold text-slate-400 mr-1">
+                  {language === 'ta' ? 'போட்டி வகை:' : 'Type:'}
+                </span>
+                {[
+                  { id: 'all', label: language === 'ta' ? 'அனைத்தும்' : 'All Contests' },
+                  { id: 'Exam', label: language === 'ta' ? 'பரீட்சைகள் (Exams)' : 'Exams' },
+                  { id: 'Quiz', label: language === 'ta' ? 'வினாடி வினாக்கள் (Quizzes)' : 'Quizzes' },
+                  { id: 'Competition', label: language === 'ta' ? 'ஒலிம்பியாட்கள் (Competitions)' : 'Competitions' },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setExamTypeFilter(opt.id as any)}
+                    className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
+                      examTypeFilter === opt.id
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
-          {activeTab === 'edu_arena_studio' && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[11px] font-bold text-slate-400 mr-1">
-                {language === 'ta' ? 'கேமிங் வடிவம்:' : 'Gaming Mode:'}
-              </span>
-              {[
-                { id: 'all', label: language === 'ta' ? 'அனைத்து வடிவங்கள்' : 'All Modes' },
-                { id: 'kahoot', label: '▲ Speed Rush (Kahoot)' },
-                { id: 'quizizz', label: '⚡ Power Battle (Quizizz)' },
-                { id: 'trivia_crack', label: '🎡 Wheel Duel (Trivia)' },
-                { id: 'brain_out', label: '🧠 Brain Logic (IQ)' },
-              ].map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => setArenaModeFilter(m.id as any)}
-                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
-                    arenaModeFilter === m.id
-                      ? 'bg-purple-600 text-white shadow-xs'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-          )}
+            {activeTab === 'edu_arena_studio' && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-bold text-slate-400 mr-1">
+                  {language === 'ta' ? 'கேமிங் வடிவம்:' : 'Gaming Mode:'}
+                </span>
+                {[
+                  { id: 'all', label: language === 'ta' ? 'அனைத்து வடிவங்கள்' : 'All Modes' },
+                  { id: 'kahoot', label: '▲ Speed Rush (Kahoot)' },
+                  { id: 'quizizz', label: '⚡ Power Battle (Quizizz)' },
+                  { id: 'trivia_crack', label: '🎡 Wheel Duel (Trivia)' },
+                  { id: 'brain_out', label: '🧠 Brain Logic (IQ)' },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setArenaModeFilter(m.id as any)}
+                    className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
+                      arenaModeFilter === m.id
+                        ? 'bg-purple-600 text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
-          {activeTab === 'referrals' && (
-            <div className="flex items-center gap-2 text-slate-500 text-[11px]">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>
-                {language === 'ta'
-                  ? 'ஒவ்வொரு வெற்றிகரமான பதிவிற்கும் +50 புள்ளிகள் மற்றும் சிறப்பு சான்றிதழ்!'
-                  : 'Earn +50 Points for every friend who joins & attempts an academic challenge!'}
-              </span>
-            </div>
-          )}
-
-          {activeTab === 'island_quest' && (
-            <div className="flex items-center gap-2 text-slate-500 text-[11px]">
-              <Compass className="w-3.5 h-3.5 text-emerald-500" />
-              <span>
-                {language === 'ta'
-                  ? '25 மாவட்டங்களையும் வென்று இலங்கை தேசிய மகுடத்தைச் சூடுங்கள்!'
-                  : 'Conquer all 25 districts to claim the Golden Ceylon Academic Sovereign Crown!'}
-              </span>
-            </div>
-          )}
-
-          <div className="text-[11px] text-slate-400 font-medium ml-auto">
-            {processedLeaderboard.length} {language === 'ta' ? 'மாணவர்கள் பட்டியலில்' : 'Participants Ranked'}
+            {activeTab === 'island_quest' && (
+              <div className="flex items-center gap-2 text-slate-500 text-[11px]">
+                <Compass className="w-3.5 h-3.5 text-emerald-500" />
+                <span>
+                  {language === 'ta'
+                    ? '25 மாவட்டங்களையும் வென்று இலங்கை தேசிய மகுடத்தைச் சூடுங்கள்!'
+                    : 'Conquer all 25 districts to claim the Golden Ceylon Academic Sovereign Crown!'}
+                </span>
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
 
       {/* 6. COMPLETE RANKINGS TABLE */}

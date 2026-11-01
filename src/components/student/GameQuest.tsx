@@ -442,7 +442,7 @@ export const GameQuest: React.FC = () => {
     unlockedNext: boolean;
   } | null>(null);
 
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Save student progress to localStorage
   useEffect(() => {

@@ -11,7 +11,12 @@ import {
   Award,
   Edit3,
   Save,
+  MessageSquare,
 } from 'lucide-react';
+import {
+  formatResultsPublishedMessage,
+  dispatchWhatsappBusinessGateway,
+} from '../../utils/whatsappSmsNotificationService';
 
 export const AdminResultsView: React.FC = () => {
   const { results, competitions, updateResultEvaluation } = useApp();
@@ -51,6 +56,25 @@ export const AdminResultsView: React.FC = () => {
           award: evalForm.award,
           percentage,
           publishStatus: 'published',
+        });
+
+        // Hook into WhatsApp Notification Service to dispatch result notification
+        const waMsg = formatResultsPublishedMessage(
+          selectedResult.competitionTitle,
+          selectedResult.studentName,
+          updatedScore,
+          totalMarks,
+          selectedResult.rank || 1,
+          evalForm.award,
+          'ta'
+        );
+
+        await dispatchWhatsappBusinessGateway('0771234567', waMsg, {
+          studentId: selectedResult.studentId,
+          studentName: selectedResult.studentName,
+          triggerType: 'results_published',
+          competitionId: selectedResult.competitionId,
+          competitionTitle: selectedResult.competitionTitle,
         });
       } catch (err) {
         console.warn('Evaluation update note:', err);

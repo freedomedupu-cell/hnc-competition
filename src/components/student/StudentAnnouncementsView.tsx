@@ -45,12 +45,21 @@ export const StudentAnnouncementsView: React.FC = () => {
   );
 
   const handleActionClick = (actionUrl?: string) => {
-    if (actionUrl === 'referral') {
+    if (!actionUrl) return;
+    const trimmed = actionUrl.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('www.')) {
+      const targetUrl = trimmed.startsWith('www.') ? `https://${trimmed}` : trimmed;
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (trimmed === 'referral') {
       setStudentNav('Referral & Points');
-    } else if (actionUrl === 'competitions') {
+    } else if (trimmed === 'competitions') {
       setStudentNav('Competitions');
-    } else if (actionUrl === 'results') {
+    } else if (trimmed === 'results') {
       setStudentNav('My Results');
+    } else if (trimmed === 'profile') {
+      setStudentNav('My Profile');
     } else {
       setStudentNav('Referral & Points');
     }
@@ -318,19 +327,45 @@ export const StudentAnnouncementsView: React.FC = () => {
                     </span>
 
                     {ann.actionLabel && (
-                      <button
-                        onClick={() => handleActionClick(ann.actionUrl)}
-                        className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-2xs self-start sm:self-auto ${
+                      (() => {
+                        const trimmed = (ann.actionUrl || '').trim();
+                        const isExternal = trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('www.');
+                        const externalUrl = trimmed.startsWith('www.') ? `https://${trimmed}` : trimmed;
+                        const btnClass = `px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-2xs self-start sm:self-auto cursor-pointer ${
                           isPoints
                             ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white'
                             : 'bg-blue-700 hover:bg-blue-800 text-white'
-                        }`}
-                      >
-                        <span>
-                          {language === 'ta' && ann.actionLabelTa ? ann.actionLabelTa : ann.actionLabel}
-                        </span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                        }`;
+
+                        if (isExternal) {
+                          return (
+                            <a
+                              href={externalUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={btnClass}
+                            >
+                              <span>
+                                {language === 'ta' && ann.actionLabelTa ? ann.actionLabelTa : ann.actionLabel}
+                              </span>
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          );
+                        }
+
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => handleActionClick(ann.actionUrl)}
+                            className={btnClass}
+                          >
+                            <span>
+                              {language === 'ta' && ann.actionLabelTa ? ann.actionLabelTa : ann.actionLabel}
+                            </span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        );
+                      })()
                     )}
                   </div>
                 </div>

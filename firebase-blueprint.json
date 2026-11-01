@@ -225,6 +225,17 @@
         "createdAt": { "type": "string", "description": "ISO timestamp of submission" },
         "repliedAt": { "type": "string", "description": "ISO timestamp of administrative response" }
       }
+    },
+    "settings": {
+      "title": "Platform Settings",
+      "description": "Institutional platform configuration, payment gateways, and feature toggles",
+      "fields": {
+        "platformName": { "type": "string", "description": "Platform display name" },
+        "academicYear": { "type": "string", "description": "Academic term" },
+        "enableDailySpinWheel": { "type": "boolean", "description": "Super Admin master switch for student lucky spin wheel" },
+        "enableSubjectAlerts": { "type": "boolean", "description": "Super Admin master switch for student subject publication alerts banner" },
+        "enableDeadlineAlerts": { "type": "boolean", "description": "Super Admin master switch for student deadlines status and push alerts banner" }
+      }
     }
   }
 }

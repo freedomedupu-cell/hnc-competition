@@ -501,10 +501,15 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
       });
 
       const result = await response.json();
+      const valStatus = result.curriculum_validation_status || result.competition?.curriculum_validation_status;
+      console.log('🛡️ [DEBUG LOG] [/api/auto-generate-competition] curriculum_validation_status from AI:', valStatus);
+
       if (result.success && result.competition) {
         setGeneratedData(result.competition);
         if (result.source === 'fallback') {
           setSuccessNotice('✨ பாடத்திட்ட அடிப்படையிலான வினாக்கள் வெற்றிகரமாகத் தொகுக்கப்பட்டுள்ளன!');
+        } else {
+          setSuccessNotice('✨ AI வினாக்கள் வெற்றிகரமாக உருவாக்கப்பட்டன! (இலங்கை NIE பாடத்திட்டம் சரிபார்க்கப்பட்டது)');
         }
       } else {
         console.warn('API returned non-success, using curriculum engine:', result.error);

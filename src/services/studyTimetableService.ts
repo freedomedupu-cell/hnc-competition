@@ -175,7 +175,7 @@ export function identifyWeakSubjectsFromResults(
 export async function generateStudyTimetable(input: StudyTimetableInput): Promise<StudyTimetable> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1500);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     const res = await fetch('/api/generate-study-timetable', {
       method: 'POST',

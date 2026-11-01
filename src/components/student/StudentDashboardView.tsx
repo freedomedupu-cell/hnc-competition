@@ -33,6 +33,9 @@ import {
   Zap,
   Headphones,
   Coffee,
+  Globe,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import {
   Math3DIcon,
@@ -56,6 +59,7 @@ import { SmartDailyTips } from './SmartDailyTips';
 import { StudentDeadlineAlertsBanner } from './StudentDeadlineAlertsBanner';
 import { SubjectPublicationAlertBanner } from './SubjectPublicationAlertBanner';
 import { PreExam15MinAlertBanner } from './PreExam15MinAlertBanner';
+import { StudentUpcomingCompetitionAlertBanner } from './StudentUpcomingCompetitionAlertBanner';
 import { WhatsappSmsAlertModal } from './WhatsappSmsAlertModal';
 import { EnrolledSubjectsModal } from './EnrolledSubjectsModal';
 import { identifyWeakSubjectsFromResults } from '../../services/studyTimetableService';
@@ -84,10 +88,15 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
     awardSharePoints,
     isMembershipActiveForStudent,
     membershipSettings,
-    studentCurriculumPath,
+    settings,
     language,
     t,
+    triggerTestToast,
+    toastSoundEnabled,
+    setToastSoundEnabled,
   } = useApp();
+
+  const isSpinWheelEnabled = settings.enableDailySpinWheel !== false;
 
   // Active question-format filter from the 4 colorful top cards
   const [selectedFormat, setSelectedFormat] = useState<
@@ -414,68 +423,107 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
       {/* TOP BAR கீழ், WELCOME CARD மேலேயும்: ANIMATED NATIONAL LEADERBOARD */}
       <AnimatedHeroLeaderboard onNavigate={onNavigate} />
 
+      {/* 0.2 UPCOMING COMPETITIONS NOTIFICATION SYSTEM (CONFIGURED VIA NOTIFICATIONS PANEL) */}
+      <StudentUpcomingCompetitionAlertBanner
+        onViewCompetition={(comp) => setDetailsComp(comp)}
+        onOpenWhatsappSettings={() => setShowWhatsappModal(true)}
+      />
+
       {/* 0.3 AUTOMATED WHATSAPP & SMS 15-MIN PRE-EXAM ALERT BANNER */}
       <PreExam15MinAlertBanner
         onJoinCompetition={handleJoinCompetition}
         onOpenWhatsappSettings={() => setShowWhatsappModal(true)}
       />
 
-      {/* 0.4 ENROLLED SUBJECTS REAL-TIME PUBLICATION NOTIFICATIONS */}
-      <SubjectPublicationAlertBanner
-        onViewDetails={(comp) => setDetailsComp(comp)}
-        onJoinCompetition={handleJoinCompetition}
-        onOpenSubjectsModal={() => setShowSubjectsModal(true)}
-      />
+      {/* 0.4 ENROLLED SUBJECTS REAL-TIME PUBLICATION NOTIFICATIONS (Super Admin Controlled On/Off) */}
+      {settings.enableSubjectAlerts !== false && (
+        <SubjectPublicationAlertBanner
+          onViewDetails={(comp) => setDetailsComp(comp)}
+          onJoinCompetition={handleJoinCompetition}
+          onOpenSubjectsModal={() => setShowSubjectsModal(true)}
+        />
+      )}
 
-      {/* 0.5 URGENT COMPETITION DEADLINES & LOCAL PUSH NOTIFICATION SYSTEM */}
-      <StudentDeadlineAlertsBanner
-        onJoinCompetition={handleJoinCompetition}
-        onViewDetails={(comp) => setDetailsComp(comp)}
-      />
+      {/* 0.5 URGENT COMPETITION DEADLINES & LOCAL PUSH NOTIFICATION SYSTEM (Super Admin Controlled On/Off) */}
+      {settings.enableDeadlineAlerts !== false && (
+        <StudentDeadlineAlertsBanner
+          onJoinCompetition={handleJoinCompetition}
+          onViewDetails={(comp) => setDetailsComp(comp)}
+        />
+      )}
 
-      {/* SRI LANKAN SINGLE CURRICULUM PATH SPECIFICATION BANNER */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 p-4 sm:p-5 text-white border border-indigo-700/60 shadow-md">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
-          <div className="flex items-start sm:items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center text-xl shadow-md shrink-0 border border-indigo-300/30">
-              {studentCurriculumPath.icon}
+      {/* 0.8 LIVE COUNTDOWN TIMER UNTIL NEXT ENROLLED COMPETITION (Super Admin Controlled On/Off) */}
+      {settings.enableNextCompetitionCountdown !== false && (
+        <NextEnrolledCompetitionCountdown
+          onJoinCompetition={handleJoinCompetition}
+          onViewDetails={(comp) => setDetailsComp(comp)}
+        />
+      )}
+
+      {/* 0.9 LIVE INSTANT TOAST NOTIFICATION STATUS & PREVIEW DECK (Super Admin Controlled On/Off) */}
+      {settings.enableToastPreviewDeck !== false && (
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-3.5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-200 flex items-center justify-center text-sm shrink-0 font-bold">
+              🔔
             </div>
-            <div className="space-y-0.5 min-w-0">
+            <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow-xs">
-                  {language === 'ta' ? 'ஒற்றைப் பாடத்திட்டப் பாதை' : language === 'si' ? 'තනි විෂය නිර්දේශ මාවත' : 'Single Curriculum Path Active'}
+                <span className="text-xs font-black text-slate-900 tracking-tight">
+                  {language === 'ta'
+                    ? 'நேரலை டோஸ்ட் அறிவிப்புகள் (Instant Toast Alerts Active)'
+                    : language === 'si'
+                    ? 'ක්ෂණික ටෝස්ට් දැනුම්දීම් සක්‍රීයයි'
+                    : 'Instant Toast Notifications Active'}
                 </span>
-                <span className="text-[11px] font-bold text-blue-200">
-                  {studentCurriculumPath.stageBadgeTa}
-                </span>
-                <span className="text-[10px] font-mono font-bold bg-white/10 px-2 py-0.5 rounded border border-white/15 text-emerald-300">
-                  {studentCurriculumPath.mcqOptionCount} Options Strict
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Sync
                 </span>
               </div>
-              <h2 className="text-sm sm:text-base font-extrabold text-white tracking-tight truncate">
-                {studentCurriculumPath.titleTa}
-              </h2>
-              <p className="text-[11px] text-slate-300 leading-tight">
+              <p className="text-[11px] text-slate-500 truncate">
                 {language === 'ta'
-                  ? `பதிவு செய்யப்பட்ட வகுப்பு: ${studentGrade}. உங்கள் கல்வி நிலைக்குரிய வினாக்கள் மற்றும் போட்டிகள் மட்டுமே இங்கு காட்டப்படும்; பிற வகுப்புகள் தானாக மறைக்கப்பட்டுள்ளன.`
-                  : `Enrolled Grade: ${studentGrade}. Only content aligned with your single curriculum path is displayed; irrelevant tiers are hidden.`}
+                  ? 'புதிய போட்டிகள் வெளியாகும்போதும், தேர்வு முடிவுகள் மதிப்பிடப்படும்போதும் உடனடி டோஸ்ட் அறிவிப்புகள் தோன்றும்.'
+                  : 'Real-time toast notifications pop up instantly when new competitions are published or when your results are graded.'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start md:self-auto shrink-0 flex-wrap">
-            <span className="text-[10px] font-semibold text-slate-300 bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-xl flex items-center gap-1.5">
-              <span>🏛️ {studentCurriculumPath.curriculumStandard.split('(')[0].trim()}</span>
-            </span>
+          <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-auto flex-wrap">
+            {/* Quick interactive test buttons */}
+            <button
+              onClick={() => triggerTestToast('competition')}
+              className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95"
+              title="Test New Competition Toast"
+            >
+              <span>🏆</span>
+              <span>{language === 'ta' ? 'போட்டி சோதனை' : 'Test Comp Alert'}</span>
+            </button>
+
+            <button
+              onClick={() => triggerTestToast('result')}
+              className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95"
+              title="Test Graded Result Toast"
+            >
+              <span>🎉</span>
+              <span>{language === 'ta' ? 'முடிவு சோதனை' : 'Test Result Alert'}</span>
+            </button>
+
+            {/* Sound Toggle */}
+            <button
+              onClick={() => setToastSoundEnabled(!toastSoundEnabled)}
+              className={`p-1.5 rounded-lg border transition cursor-pointer active:scale-95 ${
+                toastSoundEnabled
+                  ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                  : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
+              }`}
+              title={toastSoundEnabled ? 'Chime sound is ON' : 'Chime sound is MUTED'}
+            >
+              {toastSoundEnabled ? <Volume2 className="w-3.5 h-3.5 text-blue-600" /> : <VolumeX className="w-3.5 h-3.5" />}
+            </button>
           </div>
         </div>
-      </div>
-
-      {/* 0.8 LIVE COUNTDOWN TIMER UNTIL NEXT ENROLLED COMPETITION */}
-      <NextEnrolledCompetitionCountdown
-        onJoinCompetition={handleJoinCompetition}
-        onViewDetails={(comp) => setDetailsComp(comp)}
-      />
+      )}
 
       {/* 1. HERO BANNER: "Challenge Yourself and Win!" (COMPACT) */}
       <div
@@ -585,22 +633,29 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
         </div>
 
         <div className="flex items-center gap-2.5 w-full md:w-auto justify-end flex-wrap sm:flex-nowrap">
-          <button
-            type="button"
-            onClick={() => setStudentNav('Study Games Hub')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-xs cursor-pointer ${
-              isSpinClaimedToday
-                ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                : 'bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 hover:brightness-105 active:scale-95 shadow-amber-400/20 animate-pulse'
-            }`}
-          >
-            <span className="text-sm">🎡</span>
-            <span>
-              {isSpinClaimedToday
-                ? (language === 'ta' ? 'இன்றைய ஸ்பின் முடிந்தது ✓' : 'Today’s Spin Claimed ✓')
-                : (language === 'ta' ? 'அதிர்ஷ்ட ஸ்பின் சுழற்றுக! 🎡' : 'Spin Lucky Wheel Now! 🎡')}
-            </span>
-          </button>
+          {isSpinWheelEnabled ? (
+            <button
+              type="button"
+              onClick={() => setStudentNav('Study Games Hub')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-xs cursor-pointer ${
+                isSpinClaimedToday
+                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                  : 'bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 hover:brightness-105 active:scale-95 shadow-amber-400/20 animate-pulse'
+              }`}
+            >
+              <span className="text-sm">🎡</span>
+              <span>
+                {isSpinClaimedToday
+                  ? (language === 'ta' ? 'இன்றைய ஸ்பின் முடிந்தது ✓' : 'Today’s Spin Claimed ✓')
+                  : (language === 'ta' ? 'அதிர்ஷ்ட ஸ்பின் சுழற்றுக! 🎡' : 'Spin Lucky Wheel Now! 🎡')}
+              </span>
+            </button>
+          ) : (
+            <div className="px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 text-xs font-semibold flex items-center gap-1.5">
+              <span>🎡</span>
+              <span>{language === 'ta' ? 'ஸ்பின் முடக்கப்பட்டுள்ளது' : 'Spin Paused'}</span>
+            </div>
+          )}
 
           <button
             type="button"
@@ -613,8 +668,9 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
         </div>
       </div>
 
-      {/* 4-IN-1 STUDY GAMES, DAILY STREAK & FOCUS CAM QUICK DECK */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-800 space-y-3">
+      {/* 4-IN-1 STUDY GAMES, DAILY STREAK & FOCUS CAM QUICK DECK (Super Admin Controlled On/Off) */}
+      {settings.enableStudyGamesCard !== false && (
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-800 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 flex items-center justify-center font-black shadow-md shrink-0">
@@ -660,11 +716,15 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
             <div className="flex items-center justify-between">
               <span className="text-xl">🎡</span>
               <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                isSpinClaimedToday
+                !isSpinWheelEnabled
+                  ? 'bg-slate-700/80 text-slate-300'
+                  : isSpinClaimedToday
                   ? 'bg-slate-700/80 text-emerald-300 border border-emerald-500/30'
                   : 'bg-amber-400/95 text-slate-950 animate-pulse'
               }`}>
-                {isSpinClaimedToday ? 'Done ✓' : 'Free Spin'}
+                {!isSpinWheelEnabled
+                  ? (language === 'ta' ? 'முடக்கப்பட்டது' : 'Paused')
+                  : isSpinClaimedToday ? 'Done ✓' : 'Free Spin'}
               </span>
             </div>
             <div className="mt-2">
@@ -672,7 +732,9 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
                 Lucky Spin Wheel
               </div>
               <div className="text-[10px] text-slate-300">
-                {isSpinClaimedToday
+                {!isSpinWheelEnabled
+                  ? (language === 'ta' ? 'நிர்வாகியால் இடைநிறுத்தப்பட்டது' : 'Paused by Super Admin')
+                  : isSpinClaimedToday
                   ? (language === 'ta' ? 'இன்றைய ஸ்பின் முடிந்தது ✓' : 'Claimed for Today ✓')
                   : (language === 'ta' ? 'இன்றைய இலவச சுழல் தயார்!' : 'Daily Free Spin Ready!')}
               </div>
@@ -743,62 +805,67 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
           </div>
         </div>
       </div>
+    )}
 
-      {/* 2. SMART DAILY TIPS & EXAM TRICKS (AI-POWERED) */}
-      <SmartDailyTips />
+      {/* 2. SMART DAILY TIPS & EXAM TRICKS (Super Admin Controlled On/Off) */}
+      {settings.enableSmartDailyTips !== false && <SmartDailyTips />}
 
-      {/* 2.5 GEMINI AI PERSONALIZED STUDY TIMETABLE BANNER / WIDGET */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white rounded-3xl p-5 sm:p-6 shadow-md border border-indigo-700/60 relative overflow-hidden">
-        <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
+      {/* 2.5 GEMINI AI PERSONALIZED STUDY TIMETABLE BANNER / WIDGET (Super Admin Controlled On/Off) */}
+      {settings.enableAiTimetableCard !== false && (
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white rounded-3xl p-5 sm:p-6 shadow-md border border-indigo-700/60 relative overflow-hidden">
+          <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 flex items-center gap-1 shadow-xs">
-                <Sparkles className="w-3 h-3 text-slate-950" />
-                <span>Gemini 3.8 Flash AI Coach</span>
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-blue-200 border border-white/15">
-                {language === 'ta' ? 'தனிப்பயனாக்கப்பட்ட படிப்பு அட்டவணை' : 'Personalized AI Timetable'}
-              </span>
-              {weakSubjects.length > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/30 text-rose-300 border border-rose-400/30">
-                  {weakSubjects.length} {language === 'ta' ? 'பலவீனமான பாடங்கள் இலக்கு' : 'Weak Subjects Targeted'}
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 flex items-center gap-1 shadow-xs">
+                  <Sparkles className="w-3 h-3 text-slate-950" />
+                  <span>Gemini 3.8 Flash AI Coach</span>
                 </span>
-              )}
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-blue-200 border border-white/15">
+                  {language === 'ta' ? 'தனிப்பயனாக்கப்பட்ட படிப்பு அட்டவணை' : 'Personalized AI Timetable'}
+                </span>
+                {weakSubjects.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/30 text-rose-300 border border-rose-400/30">
+                    {weakSubjects.length} {language === 'ta' ? 'பலவீனமான பாடங்கள் இலக்கு' : 'Weak Subjects Targeted'}
+                  </span>
+                )}
+              </div>
+
+              <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
+                {language === 'ta'
+                  ? 'உங்கள் பலவீனமான பாடங்கள் & போட்டித் தேதிகளுக்கான AI படிப்பு அட்டவணை'
+                  : 'AI Study Timetable: Targeted for Weak Subjects & Upcoming Contests'}
+              </h3>
+
+              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                {language === 'ta'
+                  ? `கடந்த பரீட்சைகளின் அடிப்படையில் கண்டறியப்பட்ட ${weakSubjects.slice(0, 2).join(', ')} போன்ற பலவீனமான பாடங்களை பலப்படுத்தவும், ${visibleCompetitions.length} எதிர்வரும் போட்டிகளில் அதிக புள்ளிகளை பெறவும் 7-நாள் தனிப்பயனாக்கப்பட்ட அட்டவணை.`
+                  : `Targeted revision for weak areas (${weakSubjects.slice(0, 2).join(', ')}) combined with strategic prep for your ${visibleCompetitions.length} eligible upcoming contests.`}
+              </p>
             </div>
 
-            <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
-              {language === 'ta'
-                ? 'உங்கள் பலவீனமான பாடங்கள் & போட்டித் தேதிகளுக்கான AI படிப்பு அட்டவணை'
-                : 'AI Study Timetable: Targeted for Weak Subjects & Upcoming Contests'}
-            </h3>
-
-            <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-              {language === 'ta'
-                ? `கடந்த பரீட்சைகளின் அடிப்படையில் கண்டறியப்பட்ட ${weakSubjects.slice(0, 2).join(', ')} போன்ற பலவீனமான பாடங்களை பலப்படுத்தவும், ${visibleCompetitions.length} எதிர்வரும் போட்டிகளில் அதிக புள்ளிகளை பெறவும் 7-நாள் தனிப்பயனாக்கப்பட்ட அட்டவணை.`
-                : `Targeted revision for weak areas (${weakSubjects.slice(0, 2).join(', ')}) combined with strategic prep for your ${visibleCompetitions.length} eligible upcoming contests.`}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2.5 self-start md:self-auto shrink-0 flex-wrap">
-            <button
-              type="button"
-              onClick={() => onNavigate('AI Study Timetable')}
-              className="px-4.5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 hover:brightness-105 active:scale-95 text-slate-950 font-black text-xs transition flex items-center gap-2 shadow-md shadow-amber-400/20 cursor-pointer"
-            >
-              <Calendar className="w-4 h-4 text-slate-950" />
-              <span>{language === 'ta' ? 'படிப்பு அட்டவணையைத் திறக்க →' : 'Open AI Timetable →'}</span>
-            </button>
+            <div className="flex items-center gap-2.5 self-start md:self-auto shrink-0 flex-wrap">
+              <button
+                type="button"
+                onClick={() => onNavigate('AI Study Timetable')}
+                className="px-4.5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 hover:brightness-105 active:scale-95 text-slate-950 font-black text-xs transition flex items-center gap-2 shadow-md shadow-amber-400/20 cursor-pointer"
+              >
+                <Calendar className="w-4 h-4 text-slate-950" />
+                <span>{language === 'ta' ? 'படிப்பு அட்டவணையைத் திறக்க →' : 'Open AI Timetable →'}</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* 2.8 OFFLINE STUDY MATERIALS & DOWNLOADS HUB (SERVICE WORKER CACHED) */}
-      <OfflineStudyMaterialsHub
-        studentGrade={currentAuthUser?.grade || currentStudent?.gradeLevel || 'Grade 10'}
-        onNavigate={onNavigate}
-      />
+      {/* 2.8 OFFLINE STUDY MATERIALS & DOWNLOADS HUB (Super Admin Controlled On/Off) */}
+      {settings.enableOfflineMaterialsCard !== false && (
+        <OfflineStudyMaterialsHub
+          studentGrade={currentAuthUser?.grade || currentStudent?.gradeLevel || 'Grade 10'}
+          onNavigate={onNavigate}
+        />
+      )}
 
       {/* 3. FORMAT / CATEGORY CARDS (4 in a Row) (COMPACT) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
@@ -887,152 +954,160 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
         </div>
       </div>
 
-      {/* 2.5 REFERRAL & SHARE POINTS PROMO BANNER */}
-      {refToast && (
-        <div className="p-3 bg-emerald-600 text-white text-xs font-semibold rounded-xl flex items-center justify-between shadow-md">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>{refToast}</span>
+      {/* 2.5 REFERRAL & SHARE POINTS PROMO BANNER (Super Admin Controlled On/Off) */}
+      {settings.enableReferralCard !== false && (
+        <>
+          {refToast && (
+            <div className="p-3 bg-emerald-600 text-white text-xs font-semibold rounded-xl flex items-center justify-between shadow-md">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>{refToast}</span>
+              </div>
+              <button onClick={() => setRefToast(null)} className="text-white/80 hover:text-white">✕</button>
+            </div>
+          )}
+
+          <div className="bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-blue-500/10 border border-amber-300/60 rounded-3xl p-4 sm:p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/20">
+                <Gift className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-200">
+                    {language === 'ta' ? 'புள்ளிகள் & வெகுமதிகள்' : 'Earn Points'}
+                  </span>
+                  <span className="text-xs font-bold text-slate-800 font-mono">
+                    {livePoints} PTS
+                  </span>
+                </div>
+                <h3 className="text-sm sm:text-base font-extrabold text-slate-900 mt-1">
+                  {language === 'ta'
+                    ? 'நண்பர்களை அழைத்து இலவச தேர்வுகள் & தூதர் விருதுகளை வெல்லுங்கள்! 🎁'
+                    : language === 'si'
+                    ? 'මිතුරන්ට ආරාධනා කර නොමිලේ විභාග සහ තානාපති ත්‍යාග දිනාගන්න! 🎁'
+                    : 'Invite Friends: Unlock Free Exams, Ambassador Cert & Gold Badge! 🎁'}
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  {language === 'ta'
+                    ? 'ஒரு பதிவிற்கு 25 புள்ளிகள்! 200 புள்ளிகளில் இலவச தேர்வு, 500-ல் தூதர் சான்றிதழ், 1000-ல் தங்க பேட்ஜ்!'
+                    : language === 'si'
+                    ? 'සෑම ලියාපදිංචියකටම ලකුණු 25ක්! ලකුණු 200න් නොමිලේ විභාග, 500න් තානාපති සහතිකය, 1000න් රන් තරු ලාංඡනය!'
+                    : 'Earn 25 points per registration! Unlock: 200 pts Free Exam, 500 pts Ambassador Cert, 1,000 pts Gold Star Badge!'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full md:w-auto shrink-0 flex-wrap sm:flex-nowrap justify-end">
+              <button
+                onClick={() => {
+                  const code = currentStudent.referralCode || `HNC-${(currentStudent.studentId || 'STUDENT').toUpperCase().replace(/[^A-Z0-9]/g, '')}`;
+                  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ais-pre-hf3y3oosirb26omqwqx6g7-151010066822.asia-southeast1.run.app';
+                  const text = `🏆 Join me in HNC National Student Competition! Register with my referral code ${code} to get 25 welcome bonus points: ${baseUrl}?ref=${code}`;
+                  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+                  setRefToast(
+                    language === 'ta'
+                      ? '📲 WhatsApp-ல் திறக்கப்பட்டது! உங்கள் நண்பர் பதிவு செய்தவுடன் உங்களுக்கு +25 புள்ளிகள் சேரும்.'
+                      : '📲 Shared to WhatsApp! You will receive +25 points when your friend completes registration.'
+                  );
+                  setTimeout(() => setRefToast(null), 4000);
+                }}
+                className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>{language === 'ta' ? 'WhatsApp-ல் பகிர்க' : 'Share on WhatsApp'}</span>
+              </button>
+
+              <button
+                onClick={() => setStudentNav('Referral & Points')}
+                className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition"
+              >
+                <Coins className="w-4 h-4 text-amber-400" />
+                <span>{language === 'ta' ? 'வெகுமதிகள்' : 'Rewards Hub'}</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
-          <button onClick={() => setRefToast(null)} className="text-white/80 hover:text-white">✕</button>
+        </>
+      )}
+
+      {/* 2.5 HNC EDU-ARENA: ISLAND QUEST HERO PROMO CARD (Super Admin Controlled On/Off) */}
+      {settings.enableEduArenaCard !== false && (
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 via-slate-900 to-blue-900 p-6 sm:p-7 text-white shadow-md border border-indigo-700/50">
+          <div className="absolute -right-8 -top-8 w-48 h-48 rounded-full bg-blue-500/10 blur-2xl pointer-events-none" />
+          <div className="absolute right-1/3 -bottom-8 w-40 h-40 rounded-full bg-amber-500/10 blur-xl pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-2 max-w-xl">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{language === 'ta' ? 'புதிய கேமிஃபிகேஷன் அரங்கம்' : 'Interactive Gamified Quest'}</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
+                <span>🎯 HNC Edu-Arena: தீவுப் பயணம்</span>
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                {language === 'ta'
+                  ? 'இலங்கையின் 25 மாவட்டங்களைக் கடந்து உங்கள் கல்விச் சிகரத்தை அடையுங்கள்! 50-50, நேர முடக்கம் மற்றும் HNC Arena போர்க்களத்தில் பங்கேற்று XP புள்ளிகளை வெல்லுங்கள்!'
+                  : 'Conquer the academic challenges across 25 Sri Lankan districts! Compete in rapid HNC Arena battles with 50-50 power-ups and earn XP!'}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setStudentNav('Edu-Arena Quest')}
+                className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black rounded-2xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 transition active:scale-95 cursor-pointer"
+              >
+                <Gamepad2 className="w-5 h-5 text-slate-950" />
+                <span>{language === 'ta' ? 'விளையாடத் தொடங்கு ⚔️' : 'Play Quest Now ⚔️'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      <div className="bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-blue-500/10 border border-amber-300/60 rounded-3xl p-4 sm:p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/20">
-            <Gift className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-200">
-                {language === 'ta' ? 'புள்ளிகள் & வெகுமதிகள்' : 'Earn Points'}
-              </span>
-              <span className="text-xs font-bold text-slate-800 font-mono">
-                {livePoints} PTS
-              </span>
+      {/* 2.6 ALL LEADERBOARDS HUB PROMO CARD (Super Admin Controlled On/Off) */}
+      {settings.enableLeaderboardsCard !== false && (
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-indigo-500/10 border-2 border-amber-300/80 p-5 sm:p-6 shadow-sm">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 text-slate-950 flex items-center justify-center font-black text-2xl shadow-lg shadow-amber-500/25 shrink-0">
+                🏆
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 bg-amber-200/80 px-2.5 py-0.5 rounded-full border border-amber-300">
+                    {language === 'ta' ? 'அனைத்து தரவரிசைகள்' : 'Official Leaderboards Hub'}
+                  </span>
+                  <span className="text-[11px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                    4 Active Rankings 🇱🇰
+                  </span>
+                </div>
+                <h3 className="text-sm sm:text-base font-black text-slate-900 mt-1">
+                  {language === 'ta'
+                    ? 'தேர்வு, வினாடி-வினா, பரிந்துரை, 25 மாவட்ட தீவுப் பயணம் & Edu-Arena தரவரிசை மையம்'
+                    : 'Exams, Quizzes, Referral Points, Island Quest & Edu-Arena Leaderboards Hub'}
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  {language === 'ta'
+                    ? 'உங்கள் தேசிய நிலை, விருதுகள், மற்றும் சக மாணவர்களின் மதிப்பெண்களை நேரடியாகப் பாருங்கள்.'
+                    : 'Explore real-time All-Island podium rankings, ambassador scores, and district honors.'}
+                </p>
+              </div>
             </div>
-            <h3 className="text-sm sm:text-base font-extrabold text-slate-900 mt-1">
-              {language === 'ta'
-                ? 'நண்பர்களை அழைத்து இலவச தேர்வுகள் & தூதர் விருதுகளை வெல்லுங்கள்! 🎁'
-                : language === 'si'
-                ? 'මිතුරන්ට ආරාධනා කර නොමිලේ විභාග සහ තානාපති ත්‍යාග දිනාගන්න! 🎁'
-                : 'Invite Friends: Unlock Free Exams, Ambassador Cert & Gold Badge! 🎁'}
-            </h3>
-            <p className="text-xs text-slate-600 mt-0.5">
-              {language === 'ta'
-                ? 'ஒரு பதிவிற்கு 25 புள்ளிகள்! 200 புள்ளிகளில் இலவச தேர்வு, 500-ல் தூதர் சான்றிதழ், 1000-ல் தங்க பேட்ஜ்!'
-                : language === 'si'
-                ? 'සෑම ලියාපදිංචියකටම ලකුණු 25ක්! ලකුණු 200න් නොමිලේ විභාග, 500න් තානාපති සහතිකය, 1000න් රන් තරු ලාංඡනය!'
-                : 'Earn 25 points per registration! Unlock: 200 pts Free Exam, 500 pts Ambassador Cert, 1,000 pts Gold Star Badge!'}
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto shrink-0 flex-wrap sm:flex-nowrap justify-end">
-          <button
-            onClick={() => {
-              const code = currentStudent.referralCode || `HNC-${(currentStudent.studentId || 'STUDENT').toUpperCase().replace(/[^A-Z0-9]/g, '')}`;
-              const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ais-pre-hf3y3oosirb26omqwqx6g7-151010066822.asia-southeast1.run.app';
-              const text = `🏆 Join me in HNC National Student Competition! Register with my referral code ${code} to get 25 welcome bonus points: ${baseUrl}?ref=${code}`;
-              window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
-              setRefToast(
-                language === 'ta'
-                  ? '📲 WhatsApp-ல் திறக்கப்பட்டது! உங்கள் நண்பர் பதிவு செய்தவுடன் உங்களுக்கு +25 புள்ளிகள் சேரும்.'
-                  : '📲 Shared to WhatsApp! You will receive +25 points when your friend completes registration.'
-              );
-              setTimeout(() => setRefToast(null), 4000);
-            }}
-            className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95"
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span>{language === 'ta' ? 'WhatsApp-ல் பகிர்க' : 'Share on WhatsApp'}</span>
-          </button>
-
-          <button
-            onClick={() => setStudentNav('Referral & Points')}
-            className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition"
-          >
-            <Coins className="w-4 h-4 text-amber-400" />
-            <span>{language === 'ta' ? 'வெகுமதிகள்' : 'Rewards Hub'}</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* 2.5 HNC EDU-ARENA: ISLAND QUEST HERO PROMO CARD */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 via-slate-900 to-blue-900 p-6 sm:p-7 text-white shadow-md border border-indigo-700/50">
-        <div className="absolute -right-8 -top-8 w-48 h-48 rounded-full bg-blue-500/10 blur-2xl pointer-events-none" />
-        <div className="absolute right-1/3 -bottom-8 w-40 h-40 rounded-full bg-amber-500/10 blur-xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{language === 'ta' ? 'புதிய கேமிஃபிகேஷன் அரங்கம்' : 'Interactive Gamified Quest'}</span>
-            </div>
-            <h3 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
-              <span>🎯 HNC Edu-Arena: தீவுப் பயணம்</span>
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              {language === 'ta'
-                ? 'இலங்கையின் 25 மாவட்டங்களைக் கடந்து உங்கள் கல்விச் சிகரத்தை அடையுங்கள்! 50-50, நேர முடக்கம் மற்றும் HNC Arena போர்க்களத்தில் பங்கேற்று XP புள்ளிகளை வெல்லுங்கள்!'
-                : 'Conquer the academic challenges across 25 Sri Lankan districts! Compete in rapid HNC Arena battles with 50-50 power-ups and earn XP!'}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
             <button
-              onClick={() => setStudentNav('Edu-Arena Quest')}
-              className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black rounded-2xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 transition active:scale-95 cursor-pointer"
+              onClick={() => setStudentNav('Leaderboards')}
+              className="w-full md:w-auto px-5 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 transition active:scale-95 shrink-0"
             >
-              <Gamepad2 className="w-5 h-5 text-slate-950" />
-              <span>{language === 'ta' ? 'விளையாடத் தொடங்கு ⚔️' : 'Play Quest Now ⚔️'}</span>
-              <ArrowRight className="w-4 h-4" />
+              <Trophy className="w-4 h-4 text-slate-950" />
+              <span>{language === 'ta' ? 'தரவரிசையைப் பார்க்க 🏆' : 'View Leaderboards 🏆'}</span>
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
-      </div>
-
-      {/* 2.6 ALL LEADERBOARDS HUB PROMO CARD */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-indigo-500/10 border-2 border-amber-300/80 p-5 sm:p-6 shadow-sm">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 text-slate-950 flex items-center justify-center font-black text-2xl shadow-lg shadow-amber-500/25 shrink-0">
-              🏆
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 bg-amber-200/80 px-2.5 py-0.5 rounded-full border border-amber-300">
-                  {language === 'ta' ? 'அனைத்து தரவரிசைகள்' : 'Official Leaderboards Hub'}
-                </span>
-                <span className="text-[11px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                  4 Active Rankings 🇱🇰
-                </span>
-              </div>
-              <h3 className="text-sm sm:text-base font-black text-slate-900 mt-1">
-                {language === 'ta'
-                  ? 'தேர்வு, வினாடி-வினா, பரிந்துரை, 25 மாவட்ட தீவுப் பயணம் & Edu-Arena தரவரிசை மையம்'
-                  : 'Exams, Quizzes, Referral Points, Island Quest & Edu-Arena Leaderboards Hub'}
-              </h3>
-              <p className="text-xs text-slate-600 mt-0.5">
-                {language === 'ta'
-                  ? 'உங்கள் தேசிய நிலை, விருதுகள், மற்றும் சக மாணவர்களின் மதிப்பெண்களை நேரடியாகப் பாருங்கள்.'
-                  : 'Explore real-time All-Island podium rankings, ambassador scores, and district honors.'}
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setStudentNav('Leaderboards')}
-            className="w-full md:w-auto px-5 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 transition active:scale-95 shrink-0"
-          >
-            <Trophy className="w-4 h-4 text-slate-950" />
-            <span>{language === 'ta' ? 'தரவரிசையைப் பார்க்க 🏆' : 'View Leaderboards 🏆'}</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* 3. UPCOMING COMPETITIONS CARD CONTAINER */}
       <div
@@ -1287,8 +1362,8 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
         <CelebratingStudentGraphic className="relative w-12 sm:w-14 h-7 sm:h-8 shrink-0 flex items-center justify-center select-none" />
       </div>
 
-      {/* 4.4 STUDENT ACHIEVEMENTS & MILESTONES */}
-      <StudentAchievements compact={true} />
+      {/* 4.4 STUDENT ACHIEVEMENTS & MILESTONES (Super Admin Controlled On/Off) */}
+      {settings.enableAchievementsCard !== false && <StudentAchievements compact={true} />}
 
       {/* 4.45 STUDENT FEEDBACK & QUERY CALLOUT */}
       <div className="bg-gradient-to-r from-rose-50 via-pink-50 to-amber-50 rounded-3xl p-5 sm:p-6 border border-rose-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1348,7 +1423,26 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+          <a
+            href="https://hnc-edu.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-600/30 to-indigo-600/20 hover:bg-blue-600/40 border border-blue-400/30 backdrop-blur-sm transition-all flex items-center justify-between group cursor-pointer shadow-sm"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-blue-500/30 text-blue-300 flex items-center justify-center shrink-0">
+                <Globe className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <span className="font-bold text-white text-xs block group-hover:text-amber-300 transition-colors">
+                  {language === 'ta' ? 'இணையதளம் (Website)' : language === 'si' ? 'වෙබ් අඩවිය' : 'Official Website'}
+                </span>
+                <span className="text-[10px] text-blue-200/70">hnc-edu.app</span>
+              </div>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-blue-300 group-hover:text-white" />
+          </a>
           <a
             href="https://whatsapp.com/channel/0029VaEAS90Gk1FwJW7arA23"
             target="_blank"

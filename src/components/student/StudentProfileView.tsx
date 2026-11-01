@@ -38,12 +38,22 @@ import {
   VolumeX,
   BookOpen,
   Settings,
+  Globe,
 } from 'lucide-react';
 import { StudentMembershipModal } from './StudentMembershipModal';
 import { StudentAchievements } from './StudentAchievements';
 import { EnrolledSubjectsModal } from './EnrolledSubjectsModal';
 import { WhatsappSmsAlertModal } from './WhatsappSmsAlertModal';
-import { getStoredWhatsappSmsSettings, formatDisplayPhoneNumber } from '../../utils/whatsappSmsNotificationService';
+import {
+  getStoredWhatsappSmsSettings,
+  saveWhatsappSmsSettings,
+  formatDisplayPhoneNumber,
+  dispatchWhatsappBusinessGateway,
+  formatResultsPublishedMessage,
+  NotificationFrequency,
+  NOTIFICATION_FREQUENCY_OPTIONS,
+  WhatsappSmsSettings,
+} from '../../utils/whatsappSmsNotificationService';
 import { SavePulseIndicator, SaveStatus } from '../common/SavePulseIndicator';
 import { SRI_LANKA_25_DISTRICTS } from '../../data/sriLankaDistricts';
 import { detectStudentCurriculumPath, AVAILABLE_GRADES } from '../../lib/gradeUtils';
@@ -72,6 +82,158 @@ export const StudentProfileView: React.FC = () => {
   const [showSubjectsModal, setShowSubjectsModal] = useState(false);
   const [showWhatsappModal, setShowWhatsappModal] = useState(false);
   const [whatsappSettings, setWhatsappSettings] = useState(getStoredWhatsappSmsSettings);
+  const [waToast, setWaToast] = useState<string | null>(null);
+  const [testWhatsappUrl, setTestWhatsappUrl] = useState<string | null>(null);
+  const [isSendingWaTest, setIsSendingWaTest] = useState(false);
+
+  // Sync whatsappSettings with student's whatsappOptIn & frequency if present in profile
+  React.useEffect(() => {
+    let needsUpdate = false;
+    const partial: Partial<WhatsappSmsSettings> = {};
+    if (
+      currentStudent.whatsappOptIn !== undefined &&
+      currentStudent.whatsappOptIn !== whatsappSettings.enableWhatsappAlerts
+    ) {
+      partial.enableWhatsappAlerts = currentStudent.whatsappOptIn;
+      needsUpdate = true;
+    }
+    if (
+      currentStudent.whatsappFrequency &&
+      currentStudent.whatsappFrequency !== whatsappSettings.notificationFrequency
+    ) {
+      partial.notificationFrequency = currentStudent.whatsappFrequency;
+      needsUpdate = true;
+    }
+    if (needsUpdate) {
+      const updated = saveWhatsappSmsSettings(partial);
+      setWhatsappSettings(updated);
+    }
+  }, [currentStudent.whatsappOptIn, currentStudent.whatsappFrequency]);
+
+  const handleUpdateFrequency = async (freq: NotificationFrequency) => {
+    const updated = saveWhatsappSmsSettings({ notificationFrequency: freq });
+    setWhatsappSettings(updated);
+    try {
+      if (updateStudentProfile) {
+        await updateStudentProfile({ whatsappFrequency: freq });
+      }
+    } catch (e) {
+      console.warn('Frequency profile sync note:', e);
+    }
+
+    const matched = NOTIFICATION_FREQUENCY_OPTIONS.find((o) => o.id === freq);
+    const label = matched
+      ? (language === 'ta' ? matched.labelTa : language === 'si' ? matched.labelSi : matched.labelEn)
+      : freq;
+
+    setWaToast(
+      language === 'ta'
+        ? `✅ அறிவிப்பு இடைவெளி மாற்றப்பட்டது: ${label}`
+        : language === 'si'
+        ? `✅ දැනුම්දීම් සංඛ්‍යාතය යාවත්කාලීන විය: ${label}`
+        : `✅ Notification frequency updated to: ${label}`
+    );
+    setTimeout(() => setWaToast(null), 3500);
+  };
+
+  const handleToggleWhatsappOptIn = async (enabled: boolean) => {
+    const updated = saveWhatsappSmsSettings({ enableWhatsappAlerts: enabled });
+    setWhatsappSettings(updated);
+    try {
+      if (updateStudentProfile) {
+        await updateStudentProfile({ whatsappOptIn: enabled });
+      }
+    } catch (e) {
+      console.warn('Opt-in profile sync note:', e);
+    }
+    setWaToast(
+      enabled
+        ? (language === 'ta'
+            ? '✅ WhatsApp அறிவிப்புகளுக்கு அனுமதி வழங்கப்பட்டது (Opted In)'
+            : language === 'si'
+            ? '✅ WhatsApp දැනුම්දීම් සක්‍රීය කරන ලදී (Opted In)'
+            : '✅ Opted-in for WhatsApp automated updates!')
+        : (language === 'ta'
+            ? '⏸️ WhatsApp அறிவிப்புகள் இடைநிறுத்தப்பட்டன (Opted Out)'
+            : language === 'si'
+            ? '⏸️ WhatsApp දැනුම්දීම් අක්‍රීය කරන ලදී (Opted Out)'
+            : '⏸️ Opted-out from WhatsApp updates')
+    );
+    setTimeout(() => setWaToast(null), 3500);
+  };
+
+  const handleToggleWhatsappOption = (
+    key: 'notifyResultsPublished' | 'notifyAnnouncements' | 'notify15MinBeforeExam',
+    value: boolean
+  ) => {
+    const updated = saveWhatsappSmsSettings({ [key]: value });
+    setWhatsappSettings(updated);
+    setWaToast(
+      language === 'ta'
+        ? '✅ விருப்பத்தேர்வு சேமிக்கப்பட்டது'
+        : language === 'si'
+        ? '✅ සැකසුම සුරැකිණි'
+        : '✅ Preference saved successfully'
+    );
+    setTimeout(() => setWaToast(null), 2500);
+  };
+
+  const handleSendTestWhatsappNotification = async () => {
+    const targetPhone = currentStudent.phone || whatsappSettings.whatsappNumber;
+    if (!targetPhone) {
+      setWaToast(
+        language === 'ta'
+          ? '⚠️ முதலில் உங்கள் WhatsApp தொலைபேசி இலக்கத்தை உள்ளிடுக'
+          : language === 'si'
+          ? '⚠️ කරුණාකර පළමුව ඔබගේ WhatsApp අංකය ඇතුළත් කරන්න'
+          : '⚠️ Please register your WhatsApp phone number first'
+      );
+      setTimeout(() => setWaToast(null), 3500);
+      setShowWhatsappModal(true);
+      return;
+    }
+    setIsSendingWaTest(true);
+    try {
+      const msg = formatResultsPublishedMessage(
+        competitions[0]?.title || 'National Science & Mathematics Challenge 2026',
+        currentStudent.name || 'Student Candidate',
+        92,
+        100,
+        1,
+        'Gold Medal of Excellence',
+        language
+      );
+      const res = await dispatchWhatsappBusinessGateway(targetPhone, msg, {
+        studentId: currentStudent.studentId || currentStudent.id,
+        studentName: currentStudent.name || 'Student Candidate',
+        triggerType: 'manual_test',
+        competitionId: competitions[0]?.id || 'comp-test',
+        competitionTitle: competitions[0]?.title || 'National Challenge',
+      });
+      if (res.success && res.whatsappUrl) {
+        setTestWhatsappUrl(res.whatsappUrl);
+        try {
+          window.open(res.whatsappUrl, '_blank', 'noopener,noreferrer');
+        } catch {
+          // Ignore popup blocker exception
+        }
+      }
+      setWaToast(
+        language === 'ta'
+          ? '📲 சோதனை அறிவிப்பு தயார்! கீழே உள்ள பட்டனை கிளிக் செய்து WhatsApp திறக்கலாம்.'
+          : language === 'si'
+          ? '📲 පරීක්ෂණ දැනුම්දීම සූදානම්! WhatsApp විවෘත කිරීමට පහත ක්ලික් කරන්න.'
+          : '📲 Test notification ready! Click the button below to open WhatsApp Web.'
+      );
+    } catch {
+      setWaToast('Failed to dispatch test notification');
+    } finally {
+      setIsSendingWaTest(false);
+      setTimeout(() => {
+        setWaToast(null);
+      }, 12000);
+    }
+  };
   const [copiedCode, setCopiedCode] = useState(false);
   const [avatarToast, setAvatarToast] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -1229,62 +1391,437 @@ export const StudentProfileView: React.FC = () => {
             </div>
           </div>
 
-          {/* WHATSAPP & SMS AUTOMATED 15-MIN PRE-EXAM ALERTS CARD */}
-          <div className="p-4 sm:p-5 rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50/90 via-teal-50/70 to-slate-50 space-y-3.5 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-200/80 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white flex items-center justify-center text-lg shadow-sm shrink-0">
+          {/* WHATSAPP AUTOMATED UPDATES & NOTIFICATION CARD */}
+          <div className="p-4 sm:p-6 rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50/90 via-teal-50/60 to-slate-50 space-y-4 shadow-sm">
+            {/* Top Header with Master Opt-In Toggle */}
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-emerald-200/80 pb-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-700 text-white flex items-center justify-center text-xl shadow-md shrink-0 ring-4 ring-emerald-100">
                   📲
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm font-extrabold text-emerald-950">
+                    <h3 className="text-base font-black text-emerald-950 tracking-tight">
                       {language === 'ta'
-                        ? 'வாட்ஸ்அப் & SMS 15 நிமிட பரீட்சை நினைவூட்டல்'
-                        : 'WhatsApp & SMS 15-Min Pre-Exam Automated Alert'}
+                        ? 'வாட்ஸ்அப் உடனடி அறிவிப்புகள் (WhatsApp Updates)'
+                        : language === 'si'
+                        ? 'WhatsApp ස්වයංක්‍රීය දැනුම්දීම්'
+                        : 'WhatsApp Updates & Notification Service'}
                     </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-200 text-emerald-900 border border-emerald-300">
-                      Live Service Active
-                    </span>
+                    {whatsappSettings.enableWhatsappAlerts ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        {language === 'ta' ? 'அனுமதிக்கப்பட்டது (Active)' : language === 'si' ? 'සක්‍රීයයි' : 'Opted In (Active)'}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-slate-200 text-slate-700 border border-slate-300 shadow-2xs">
+                        <span className="w-2 h-2 rounded-full bg-slate-400" />
+                        {language === 'ta' ? 'முடக்கப்பட்டுள்ளது (Paused)' : language === 'si' ? 'අක්‍රීයයි' : 'Opted Out (Paused)'}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-[11px] text-slate-600 mt-0.5">
+                  <p className="text-xs text-slate-600 mt-1 max-w-xl leading-relaxed">
                     {language === 'ta'
-                      ? 'நீங்கள் பதிவு செய்யும் பரீட்சை தொடங்குவதற்கு 15 நிமிடங்களுக்கு முன் நேரடி வாட்ஸ்அப் செய்தி மற்றும் SMS பெறவும்.'
-                      : 'Receive direct WhatsApp and SMS reminders 15 minutes before your registered exams start.'}
+                      ? 'உங்கள் தொலைபேசி இலக்கத்திற்கு தேர்வு முடிவுகள், தரவரிசைகள் மற்றும் உத்தியோகபூர்வ அறிவிப்புகளை நேரடியாகப் பெறவும்.'
+                      : language === 'si'
+                      ? 'ඔබගේ දුරකථන අංකයට විභාග ප්‍රතිඵල, ශ්‍රේණිගත කිරීම් සහ නිල නිවේදන කෙලින්ම ලබාගන්න.'
+                      : 'Receive automated notifications to your phone for published exam results, Island rankings, and official announcements.'}
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setShowWhatsappModal(true)}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition flex items-center gap-1.5 self-start sm:self-auto shrink-0 cursor-pointer"
-              >
-                <Settings className="w-3.5 h-3.5 text-emerald-200" />
-                <span>{language === 'ta' ? 'வாட்ஸ்அப் இலக்கம் / அமைப்புகள்' : 'Configure WhatsApp & SMS'}</span>
-              </button>
+              {/* Master Opt-in Toggle Switch */}
+              <div className="flex items-center gap-3 bg-white/95 backdrop-blur-xs px-3.5 py-2.5 rounded-xl border border-emerald-200 shadow-xs shrink-0 self-start sm:self-auto">
+                <div className="text-right">
+                  <span className="text-xs font-black text-slate-900 block">
+                    {language === 'ta'
+                      ? 'வாட்ஸ்அப் அனுமதி'
+                      : language === 'si'
+                      ? 'WhatsApp කැමැත්ත'
+                      : 'Opt-in for WhatsApp Updates'}
+                  </span>
+                  <span className={`text-[10px] font-extrabold ${whatsappSettings.enableWhatsappAlerts ? 'text-emerald-700' : 'text-slate-500'}`}>
+                    {whatsappSettings.enableWhatsappAlerts
+                      ? (language === 'ta' ? 'இயக்கத்தில் உள்ளது' : 'Enabled')
+                      : (language === 'ta' ? 'இடைநிறுத்தப்பட்டுள்ளது' : 'Disabled')}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={whatsappSettings.enableWhatsappAlerts}
+                  onClick={() => handleToggleWhatsappOptIn(!whatsappSettings.enableWhatsappAlerts)}
+                  className={`relative inline-flex h-6 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${
+                    whatsappSettings.enableWhatsappAlerts ? 'bg-emerald-600' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      whatsappSettings.enableWhatsappAlerts ? 'translate-x-6' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs bg-white p-3 rounded-xl border border-emerald-200">
-              <div className="flex items-center gap-2">
-                <span className="text-base">🇱🇰</span>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 block uppercase">
-                    {language === 'ta' ? 'பதிவு செய்யப்பட்ட வாட்ஸ்அப் இலக்கம்:' : 'Registered WhatsApp Number:'}
-                  </span>
-                  <span className="font-black text-slate-900">
-                    {formatDisplayPhoneNumber(currentStudent.phone || whatsappSettings.whatsappNumber) || 'Not set yet'}
-                  </span>
+            {/* Notification Toast Feedback */}
+            {waToast && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-base shrink-0">📲</span>
+                  <span className="leading-snug">{waToast}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                  {testWhatsappUrl && (
+                    <a
+                      href={testWhatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs transition-colors cursor-pointer"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{language === 'ta' ? 'WhatsApp திறக்க' : language === 'si' ? 'WhatsApp විවෘත කරන්න' : 'Open WhatsApp'}</span>
+                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWaToast(null);
+                      setTestWhatsappUrl(null);
+                    }}
+                    className="text-emerald-700 hover:text-emerald-950 text-sm font-black px-1.5 py-1 cursor-pointer rounded hover:bg-emerald-100 transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Preferred Notification Frequency Dropdown Panel */}
+            <div
+              className={`p-3.5 sm:p-4 rounded-xl border transition-all ${
+                !whatsappSettings.enableWhatsappAlerts
+                  ? 'bg-slate-100/70 border-slate-200 opacity-60'
+                  : 'bg-white/95 border-emerald-300 shadow-2xs'
+              }`}
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs text-base">
+                    ⏱️
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label htmlFor="whatsapp-frequency-select" className="text-xs font-black text-slate-900 cursor-pointer">
+                        {language === 'ta'
+                          ? 'அறிவிப்பு இடைவெளி (Preferred Notification Frequency)'
+                          : language === 'si'
+                          ? 'දැනුම්දීම් සංඛ්‍යාතය (Preferred Notification Frequency)'
+                          : 'Preferred Notification Frequency'}
+                      </label>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        {whatsappSettings.notificationFrequency === 'daily_summary'
+                          ? (language === 'ta' ? '📅 தினசரி மாலை 6:00' : language === 'si' ? '📅 දිනපතා සවස 6:00' : '📅 Daily at 6:00 PM')
+                          : whatsappSettings.notificationFrequency === 'weekly_digest'
+                          ? (language === 'ta' ? '📰 ஞாயிறு காலை 9:00' : language === 'si' ? '📰 ඉරිදා උදෑසන 9:00' : '📰 Sundays at 9:00 AM')
+                          : (language === 'ta' ? '⚡ உடனடி (Real-Time)' : language === 'si' ? '⚡ ක්ෂණික' : '⚡ Instant (Real-time)')}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                      {language === 'ta'
+                        ? 'அறிவிப்புகள் உடனுக்குடன் வர வேண்டுமா அல்லது தொகுப்பாக வர வேண்டுமா என்பதை தேர்ந்தெடுக்கவும்.'
+                        : language === 'si'
+                        ? 'දැනුම්දීම් ක්ෂණිකවද නැතහොත් සාරාංශයක් ලෙසද ලබාගන්නේද යන්න තෝරන්න.'
+                        : 'Choose how frequently WhatsApp updates are delivered to your mobile phone number.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Frequency Dropdown Select */}
+                <div className="w-full md:w-72 shrink-0">
+                  <div className="relative">
+                    <select
+                      id="whatsapp-frequency-select"
+                      disabled={!whatsappSettings.enableWhatsappAlerts}
+                      value={whatsappSettings.notificationFrequency || 'instant'}
+                      onChange={(e) => handleUpdateFrequency(e.target.value as NotificationFrequency)}
+                      className="w-full appearance-none px-3.5 py-2.5 pr-8 rounded-xl border border-slate-300 bg-white font-extrabold text-slate-900 text-xs shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-100 transition cursor-pointer"
+                    >
+                      <option value="instant">
+                        ⚡ {language === 'ta' ? 'Instant (உடனடி - நிகழ்வுகள் நடக்கும்போதே)' : language === 'si' ? 'Instant (ක්ෂණික - සිදුවීම් වූ වහාම)' : 'Instant (Real-time as events occur)'}
+                      </option>
+                      <option value="daily_summary">
+                        📅 {language === 'ta' ? 'Daily Summary (தினசரி சுருக்கம் - மாலை 6:00)' : language === 'si' ? 'Daily Summary (දෛනික සාරාංශය - සවස 6:00)' : 'Daily Summary (Batched daily at 6:00 PM)'}
+                      </option>
+                      <option value="weekly_digest">
+                        📰 {language === 'ta' ? 'Weekly Digest (வாராந்திர தொகுப்பு - ஞாயிறு காலை)' : language === 'si' ? 'Weekly Digest (සතිපතා සාරාංශය - ඉරිදා උදෑසන)' : 'Weekly Digest (Roundup every Sunday)'}
+                      </option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500 text-xs">
+                      ▼
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setShowWhatsappModal(true)}
-                className="px-3 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-bold text-[11px] transition flex items-center gap-1 self-start sm:self-auto cursor-pointer"
-              >
-                <span>⚡ Test WhatsApp Alert</span>
-              </button>
+              {/* Informative helper note */}
+              <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="text-emerald-600 font-bold">ℹ️</span>
+                  <span>
+                    {whatsappSettings.notificationFrequency === 'daily_summary'
+                      ? (language === 'ta'
+                          ? 'அனைத்து முடிவுகளும் அறிவிப்புகளும் மாலை 6:00 மணிக்கு ஒரே செய்தியாக தொகுத்து அனுப்பப்படும்.'
+                          : 'All announcement circulars and result publications will be bundled into a single evening digest.')
+                      : whatsappSettings.notificationFrequency === 'weekly_digest'
+                      ? (language === 'ta'
+                          ? 'வாராந்திர சுருக்கம் மற்றும் எதிர்வரும் பரீட்சை அட்டவணை ஒவ்வொரு ஞாயிற்றுக்கிழமை காலை 9:00 மணிக்கு அனுப்பப்படும்.'
+                          : 'Weekly digest recaps rankings and upcoming competitions every Sunday at 9:00 AM.')
+                      : (language === 'ta'
+                          ? 'அறிவிப்புகள் மற்றும் தேர்வு முடிவுகள் வெளியான உடனேயே WhatsApp செய்தி அனுப்பப்படும்.'
+                          : 'Notifications are dispatched immediately in real-time as soon as published.')}
+                  </span>
+                </span>
+                <span className="text-[10px] font-semibold text-slate-400 italic">
+                  {language === 'ta' ? '15 நிமிட நேரலை பரீட்சை அலர்ட் எப்போதும் உடனடி' : 'Pre-exam 15m countdowns are always dispatched immediately'}
+                </span>
+              </div>
+            </div>
+
+            {/* Granular Notification Channels (Result alerts & Announcements as requested) */}
+            <div className="space-y-2.5 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-900">
+                  {language === 'ta'
+                    ? 'தானியங்கி அறிவிப்பு விருப்பத்தேர்வுகள் (Notification Preferences)'
+                    : language === 'si'
+                    ? 'ස්වයංක්‍රීය දැනුම්දීම් නාලිකා'
+                    : 'Automated Notification Triggers'}
+                </span>
+                {!whatsappSettings.enableWhatsappAlerts && (
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                    {language === 'ta' ? 'அனைத்தும் இடைநிறுத்தப்பட்டுள்ளன' : 'All channels paused via master switch'}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {/* 1. Exam Results & Score Rankings Toggle */}
+                <div
+                  className={`p-3 rounded-xl border transition-all ${
+                    !whatsappSettings.enableWhatsappAlerts
+                      ? 'bg-slate-100/70 border-slate-200 opacity-60'
+                      : whatsappSettings.notifyResultsPublished
+                      ? 'bg-white border-emerald-300 shadow-2xs'
+                      : 'bg-white/60 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-sm shrink-0 font-bold">
+                        🏆
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900">
+                          {language === 'ta'
+                            ? 'தேர்வு முடிவுகள் & தரவரிசைகள்'
+                            : language === 'si'
+                            ? 'විභාග ප්‍රතිඵල සහ ශ්‍රේණිගත කිරීම්'
+                            : 'Exam Results & Rankings'}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                          {language === 'ta'
+                            ? 'மதிப்பெண்கள், அகில இலங்கை/மாவட்ட தரவரிசை மற்றும் டிஜிட்டல் விருது சான்றிதழ் இணைப்பு.'
+                            : language === 'si'
+                            ? 'ලකුණු, දිවයිනේ ශ්‍රේණිගත කිරීම සහ සහතික පත්‍රය ලබාගන්න.'
+                            : 'Instant score card, Island/District rank, and digital merit award upon publication.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={!whatsappSettings.enableWhatsappAlerts}
+                      onClick={() =>
+                        handleToggleWhatsappOption('notifyResultsPublished', !whatsappSettings.notifyResultsPublished)
+                      }
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:cursor-not-allowed ${
+                        whatsappSettings.enableWhatsappAlerts && whatsappSettings.notifyResultsPublished
+                          ? 'bg-emerald-600'
+                          : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                          whatsappSettings.enableWhatsappAlerts && whatsappSettings.notifyResultsPublished
+                            ? 'translate-x-4'
+                            : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Official Announcements & Contests Toggle */}
+                <div
+                  className={`p-3 rounded-xl border transition-all ${
+                    !whatsappSettings.enableWhatsappAlerts
+                      ? 'bg-slate-100/70 border-slate-200 opacity-60'
+                      : whatsappSettings.notifyAnnouncements
+                      ? 'bg-white border-emerald-300 shadow-2xs'
+                      : 'bg-white/60 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-sm shrink-0 font-bold">
+                        📢
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900">
+                          {language === 'ta'
+                            ? 'உத்தியோகபூர்வ அறிவிப்புகள் & போட்டிகள்'
+                            : language === 'si'
+                            ? 'නිල නිවේදන සහ තරඟ'
+                            : 'Announcements & Contests'}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                          {language === 'ta'
+                            ? 'புதிய கல்விப் போட்டிகள், பாடத்திட்ட வழிகாட்டல்கள் மற்றும் சுற்றறிக்கைகள் பற்றிய தகவல்கள்.'
+                            : language === 'si'
+                            ? 'නව අධ්‍යයන තරඟ සහ විභාග දැනුම්දීම් කෙලින්ම ලබාගන්න.'
+                            : 'New academic competitions, schedule changes, and urgent institutional circulars.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={!whatsappSettings.enableWhatsappAlerts}
+                      onClick={() =>
+                        handleToggleWhatsappOption('notifyAnnouncements', !whatsappSettings.notifyAnnouncements)
+                      }
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:cursor-not-allowed ${
+                        whatsappSettings.enableWhatsappAlerts && whatsappSettings.notifyAnnouncements
+                          ? 'bg-emerald-600'
+                          : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                          whatsappSettings.enableWhatsappAlerts && whatsappSettings.notifyAnnouncements
+                            ? 'translate-x-4'
+                            : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. 15-Minute Pre-Exam Alerts Toggle */}
+                <div
+                  className={`p-3 rounded-xl border transition-all md:col-span-2 ${
+                    !whatsappSettings.enableWhatsappAlerts
+                      ? 'bg-slate-100/70 border-slate-200 opacity-60'
+                      : whatsappSettings.notify15MinBeforeExam
+                      ? 'bg-white border-emerald-300 shadow-2xs'
+                      : 'bg-white/60 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center text-sm shrink-0 font-bold">
+                        ⏰
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900">
+                          {language === 'ta'
+                            ? 'பரீட்சைக்கு 15 நிமிட முன்கூட்டிய நினைவூட்டல்'
+                            : language === 'si'
+                            ? 'විනාඩි 15කට පෙර විභාග මතක්කිරීම්'
+                            : '15-Min Pre-Exam Countdown Reminder'}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                          {language === 'ta'
+                            ? 'நீங்கள் பதிவு செய்யும் பரீட்சை தொடங்குவதற்கு 15 நிமிடங்களுக்கு முன் நேரடி வாட்ஸ்அப் செய்தி மற்றும் 1-Click நுழைவு இணைப்பு.'
+                            : language === 'si'
+                            ? 'ලියාපදිංචි විභාගය ආරම්භ වීමට මිනිත්තු 15කට පෙර සෘජු WhatsApp පණිවිඩයක් ලබාගන්න.'
+                            : 'Direct WhatsApp alert with quick-access exam hall link 15 minutes prior to scheduled start time.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={!whatsappSettings.enableWhatsappAlerts}
+                      onClick={() =>
+                        handleToggleWhatsappOption('notify15MinBeforeExam', !whatsappSettings.notify15MinBeforeExam)
+                      }
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:cursor-not-allowed ${
+                        whatsappSettings.enableWhatsappAlerts && whatsappSettings.notify15MinBeforeExam
+                          ? 'bg-emerald-600'
+                          : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                          whatsappSettings.enableWhatsappAlerts && whatsappSettings.notify15MinBeforeExam
+                            ? 'translate-x-4'
+                            : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Bar: Registered Phone Number & Quick Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-white p-3.5 rounded-xl border border-emerald-200">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">🇱🇰</span>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">
+                    {language === 'ta' ? 'பதிவு செய்யப்பட்ட வாட்ஸ்அப் தொலைபேசி இலக்கம்:' : 'Registered WhatsApp Mobile Number:'}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-black text-slate-900 text-sm">
+                      {formatDisplayPhoneNumber(currentStudent.phone || whatsappSettings.whatsappNumber) || (
+                        <span className="text-amber-600 italic font-medium">
+                          {language === 'ta' ? 'இலக்கம் பதிவு செய்யப்படவில்லை' : 'No phone number registered'}
+                        </span>
+                      )}
+                    </span>
+                    {Boolean(currentStudent.phone || whatsappSettings.whatsappNumber) && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        {whatsappSettings.enableWhatsappAlerts ? 'Active Gateway' : 'Opted Out'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  disabled={isSendingWaTest}
+                  onClick={handleSendTestWhatsappNotification}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <span>⚡</span>
+                  <span>{isSendingWaTest ? 'Sending...' : 'Test WhatsApp Alert'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowWhatsappModal(true)}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5 text-emerald-200" />
+                  <span>{language === 'ta' ? 'அமைப்புகள் / இலக்கம் மாற்றுக' : 'Configure & Audit Logs'}</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1311,6 +1848,34 @@ export const StudentProfileView: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              {/* Official College Portal Website */}
+              <a
+                href="https://hnc-edu.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="col-span-1 sm:col-span-2 p-3.5 rounded-xl bg-gradient-to-r from-blue-50 via-indigo-50/60 to-sky-50 border border-blue-200 hover:border-blue-400 hover:shadow-md transition-all flex items-center justify-between group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                    <Globe className="w-5 h-5" />
+                  </div>
+                  <div className="text-left">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-extrabold text-slate-900 text-xs sm:text-sm block group-hover:text-blue-700">
+                        {language === 'ta' ? 'கல்லூரி அதிகாரப்பூர்வ இணையதளம்' : language === 'si' ? 'විද්‍යාලයේ නිල වෙබ් අඩවිය' : 'Higher Novas College Official Website'}
+                      </span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">
+                        portal
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-blue-700 font-semibold block">https://hnc-edu.app</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors shrink-0">
+                  <span>{language === 'ta' ? 'இணையதளம் திறக்க (Open)' : language === 'si' ? 'වෙබ් අඩවිය විවෘත කරන්න' : 'Open Website'}</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </div>
+              </a>
               <a
                 href="https://whatsapp.com/channel/0029VaEAS90Gk1FwJW7arA23"
                 target="_blank"
@@ -1533,7 +2098,10 @@ export const StudentProfileView: React.FC = () => {
       {/* WhatsApp & SMS Notification Alert Modal */}
       <WhatsappSmsAlertModal
         isOpen={showWhatsappModal}
-        onClose={() => setShowWhatsappModal(false)}
+        onClose={() => {
+          setShowWhatsappModal(false);
+          setWhatsappSettings(getStoredWhatsappSmsSettings());
+        }}
       />
     </div>
   );

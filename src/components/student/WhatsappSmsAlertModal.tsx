@@ -27,6 +27,7 @@ import {
   getStoredWhatsappSmsLogs,
   WhatsappSmsSettings,
   DbWhatsappSmsLog,
+  NotificationFrequency,
 } from '../../utils/whatsappSmsNotificationService';
 import { playSubjectPublicationChime } from '../../utils/subjectNotificationUtils';
 
@@ -64,13 +65,15 @@ export const WhatsappSmsAlertModal: React.FC<WhatsappSmsAlertModalProps> = ({ is
       notify15MinBeforeExam: settings.notify15MinBeforeExam,
       notifyRegistrationConfirm: settings.notifyRegistrationConfirm,
       notifyResultsPublished: settings.notifyResultsPublished,
+      notifyAnnouncements: settings.notifyAnnouncements,
+      notificationFrequency: settings.notificationFrequency || 'instant',
     });
 
     setSettings(updatedSettings);
 
     try {
       if (updateStudentProfile) {
-        await updateStudentProfile({ phone: normPhone });
+        await updateStudentProfile({ phone: normPhone, whatsappFrequency: settings.notificationFrequency || 'instant' });
       }
       showToast(
         language === 'ta'
@@ -336,6 +339,52 @@ export const WhatsappSmsAlertModal: React.FC<WhatsappSmsAlertModalProps> = ({ is
                   className="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
                 />
               </label>
+
+              {/* Preferred Notification Frequency Dropdown */}
+              <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-slate-900 flex items-center gap-1.5 text-xs">
+                    <Clock className="w-3.5 h-3.5 text-teal-600" />
+                    <span>
+                      {language === 'ta'
+                        ? 'அறிவிப்பு இடைவெளி (Delivery Frequency)'
+                        : 'Preferred Notification Frequency'}
+                    </span>
+                  </span>
+                  <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                    {settings.notificationFrequency === 'daily_summary'
+                      ? 'Daily 6 PM'
+                      : settings.notificationFrequency === 'weekly_digest'
+                      ? 'Weekly Sunday'
+                      : 'Instant Real-time'}
+                  </span>
+                </div>
+                <select
+                  value={settings.notificationFrequency || 'instant'}
+                  onChange={(e) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      notificationFrequency: e.target.value as NotificationFrequency,
+                    }))
+                  }
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-extrabold text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                >
+                  <option value="instant">
+                    ⚡ {language === 'ta' ? 'Instant (உடனடி - நிகழ்வுகள் நடக்கும்போதே)' : 'Instant (Real-time as events occur)'}
+                  </option>
+                  <option value="daily_summary">
+                    📅 {language === 'ta' ? 'Daily Summary (தினசரி சுருக்கம் - மாலை 6:00)' : 'Daily Summary (Batched daily at 6:00 PM)'}
+                  </option>
+                  <option value="weekly_digest">
+                    📰 {language === 'ta' ? 'Weekly Digest (வாராந்திர தொகுப்பு - ஞாயிறு காலை)' : 'Weekly Digest (Roundup every Sunday)'}
+                  </option>
+                </select>
+                <p className="text-[10px] text-slate-500">
+                  {language === 'ta'
+                    ? 'முக்கிய 15-நிமிட பரீட்சை எச்சரிக்கைகள் எப்போதும் உடனுக்குடன் அனுப்பப்படும்.'
+                    : '15-min pre-exam countdown alerts are always delivered instantly in real-time.'}
+                </p>
+              </div>
             </div>
 
             {/* Action Buttons: Save & Send Instant Test */}

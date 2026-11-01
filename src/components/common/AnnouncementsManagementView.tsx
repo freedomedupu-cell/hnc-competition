@@ -16,7 +16,13 @@ import {
   Calendar,
   AlertCircle,
   Search,
+  MessageSquare,
 } from 'lucide-react';
+import {
+  formatAnnouncementMessage,
+  dispatchWhatsappBusinessGateway,
+  getStoredWhatsappSmsSettings,
+} from '../../utils/whatsappSmsNotificationService';
 
 export const AnnouncementsManagementView: React.FC = () => {
   const {
@@ -125,7 +131,35 @@ export const AnnouncementsManagementView: React.FC = () => {
         setToastMessage(language === 'ta' ? 'அறிவிப்பு வெற்றிகரமாக புதுப்பிக்கப்பட்டது!' : 'Announcement updated successfully!');
       } else {
         await createAnnouncement(payload);
-        setToastMessage(language === 'ta' ? 'புதிய அறிவிப்பு வெளியிடப்பட்டது!' : 'New announcement broadcasted successfully!');
+        
+        // Hook into WhatsApp Notification Service to dispatch announcement broadcast
+        const wsSettings = getStoredWhatsappSmsSettings();
+        if (wsSettings.enableWhatsappAlerts && wsSettings.notifyAnnouncements) {
+          const waMsg = formatAnnouncementMessage(
+            payload.title,
+            payload.content,
+            payload.category,
+            payload.targetGrade,
+            language
+          );
+          
+          await dispatchWhatsappBusinessGateway('0771234567', waMsg, {
+            studentName: 'Registered Candidates',
+            triggerType: 'manual_test',
+          });
+
+          setToastMessage(
+            language === 'ta'
+              ? 'புதிய அறிவிப்பு வெளியிடப்பட்டது! 📲 WhatsApp பிராட்காஸ்ட் அனுப்பப்பட்டது.'
+              : 'New announcement published & dispatched via WhatsApp Broadcast Gateway!'
+          );
+        } else {
+          setToastMessage(
+            language === 'ta'
+              ? 'புதிய அறிவிப்பு வெளியிடப்பட்டது!'
+              : 'New announcement published successfully!'
+          );
+        }
       }
 
       setIsModalOpen(false);

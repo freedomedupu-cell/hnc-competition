@@ -14,6 +14,7 @@ import {
   Sparkles,
   Shield,
   Layers,
+  Sliders,
   ChevronRight,
   X,
   Home,
@@ -34,6 +35,7 @@ import {
   HelpCircle,
   FileText,
   BookOpen,
+  Globe,
 } from 'lucide-react';
 import { SuperAdminNav, AdminNav, StudentNav } from '../../context/AppContext';
 import { isGradeEligible } from '../../lib/gradeUtils';
@@ -172,6 +174,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
       badge: '🔥 Live',
     },
     {
+      id: 'Platform Master Controls',
+      label:
+        language === 'ta'
+          ? 'தள முதன்மைக் கட்டுப்பாடுகள்'
+          : language === 'si'
+          ? 'වේදිකා ප්‍රධාන පාලන'
+          : 'Platform Master Controls',
+      icon: <Sliders className="w-4 h-4 text-indigo-400" />,
+      badge: 'Master',
+    },
+    {
       id: 'Settings',
       label: t('navSettings'),
       icon: <Settings className="w-4 h-4" />,
@@ -261,6 +274,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
           : 'Student Feedback',
       icon: <MessageCircle className="w-4 h-4 text-pink-500" />,
       badge: feedbacks.filter((f) => f.status === 'pending').length || undefined,
+    },
+    {
+      id: 'Notifications',
+      label:
+        language === 'ta'
+          ? 'அறிவிப்புகள் & WhatsApp'
+          : language === 'si'
+          ? 'දැනුම්දීම් සහ WhatsApp'
+          : 'Notifications & WhatsApp',
+      icon: <MessageSquare className="w-4 h-4 text-emerald-600" />,
     },
     {
       id: 'Profile',
@@ -735,7 +758,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           </div>
 
-          <div className="grid grid-cols-2 gap-1.5 pt-1">
+          <a
+            href="https://hnc-edu.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-1.5 rounded-lg bg-blue-950/70 hover:bg-blue-900/90 border border-blue-700/50 text-[10px] font-bold text-blue-200 transition group cursor-pointer"
+            title="Open Higher Novas College Website"
+          >
+            <div className="flex items-center gap-1.5 truncate">
+              <Globe className="w-3.5 h-3.5 text-blue-400 shrink-0 group-hover:scale-110 transition-transform" />
+              <span className="truncate">{language === 'ta' ? 'இணையதளம் (Website)' : language === 'si' ? 'වෙබ් අඩවිය' : 'Official Website'}</span>
+            </div>
+            <ExternalLink className="w-3 h-3 text-blue-400 shrink-0 group-hover:text-white" />
+          </a>
+
+          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
             <a
               href="https://whatsapp.com/channel/0029VaEAS90Gk1FwJW7arA23"
               target="_blank"

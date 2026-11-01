@@ -510,8 +510,14 @@ export const DAILY_QUESTIONS_BY_TIER: Record<
 };
 
 export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin', onNavigate }) => {
-  const { currentStudent, currentAuthUser, adjustStudentPoints, language } = useApp();
-  const [activeTab, setActiveTab] = useState<StudyGameTab>(initialTab);
+  const { currentStudent, currentAuthUser, adjustStudentPoints, settings, language } = useApp();
+  const isSpinWheelEnabled = settings.enableDailySpinWheel !== false;
+  const [activeTab, setActiveTab] = useState<StudyGameTab>(() => {
+    if (initialTab === 'spin' && settings.enableDailySpinWheel === false) {
+      return 'streak';
+    }
+    return initialTab;
+  });
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   const studentUid = currentAuthUser?.uid || currentStudent?.id || 'guest';
@@ -1258,7 +1264,11 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
         >
           <div className="flex items-center justify-between">
             <span className="text-2xl">🎡</span>
-            {!hasSpunToday ? (
+            {!isSpinWheelEnabled ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
+                {language === 'ta' ? 'முடக்கப்பட்டுள்ளது' : 'Paused'}
+              </span>
+            ) : !hasSpunToday ? (
               <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 animate-pulse">
                 Ready!
               </span>
@@ -1344,7 +1354,41 @@ export const StudyGamesHub: React.FC<StudyGamesHubProps> = ({ initialTab = 'spin
       {/* ------------------------------------------------------------------- */}
       {/* TAB 1: LUCKY SPIN WHEEL                                             */}
       {/* ------------------------------------------------------------------- */}
-      {activeTab === 'spin' && (
+      {activeTab === 'spin' && !isSpinWheelEnabled ? (
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-12 text-center shadow-sm max-w-xl mx-auto my-6 space-y-4">
+          <div className="w-16 h-16 rounded-3xl bg-amber-100 border border-amber-300 text-amber-800 flex items-center justify-center text-3xl mx-auto shadow-sm">
+            🎡
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-lg font-bold text-slate-900">
+              {language === 'ta'
+                ? 'அதிர்ஷ்ட சுழல் சக்கரம் தற்காலிகமாக முடக்கப்பட்டுள்ளது'
+                : 'Lucky Spin Wheel is Currently Paused'}
+            </h3>
+            <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
+              {language === 'ta'
+                ? 'கல்லூரி Super Admin அமைப்புகளின்படி தினசரி சுழல் சக்கரம் தற்காலிகமாக இடைநிறுத்தப்பட்டுள்ளது. வேகக் கணிதம் அல்லது பிற விளையாட்டுகளில் பங்கேற்று புள்ளிகளை வெல்லுங்கள்!'
+                : 'The Lucky Spin Wheel has been temporarily paused by the Super Admin in platform settings. You can continue earning points through Speed Math Rush & Streak Quests!'}
+            </p>
+          </div>
+          <div className="pt-2 flex flex-wrap justify-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setActiveTab('math')}
+              className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs"
+            >
+              {language === 'ta' ? 'வேகக் கணிதத்தில் விளையாடு' : 'Play Speed Math Rush'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('streak')}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition cursor-pointer"
+            >
+              {language === 'ta' ? 'தினசரி தொடர் பயிற்சி' : 'Streak Workout'}
+            </button>
+          </div>
+        </div>
+      ) : activeTab === 'spin' && (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
             {/* Visual SVG Wheel */}

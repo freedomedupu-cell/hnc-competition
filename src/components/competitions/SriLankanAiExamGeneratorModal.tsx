@@ -190,6 +190,8 @@ export const SriLankanAiExamGeneratorModal: React.FC<SriLankanAiExamGeneratorMod
         defaultMarks,
       });
 
+      console.log('🛡️ [DEBUG LOG] [SriLankanAiExamGeneratorModal] curriculum_validation_status from AI:', result.curriculum_validation_status);
+
       setGenerationResult(result);
       setDraftQuestions(result.questions);
     } catch (err: any) {

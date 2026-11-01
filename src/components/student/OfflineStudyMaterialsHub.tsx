@@ -168,7 +168,7 @@ export const OfflineStudyMaterialsHub: React.FC<OfflineStudyMaterialsHubProps> =
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+    <div id="offline-study-materials-hub" className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden scroll-mt-20">
       {/* Top Banner Header */}
       <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">

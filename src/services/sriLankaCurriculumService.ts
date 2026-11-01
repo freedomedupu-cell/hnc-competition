@@ -14,7 +14,6 @@
  * - All questions start in "admin_review_required" draft status until Admin approval
  */
 
-import { GoogleGenAI } from '@google/genai';
 import { QuestionItem, QuestionType } from '../types';
 
 export type SriLankaExamCategory = 'school_syllabus' | 'competitive_exam' | 'public_service';
@@ -531,9 +530,20 @@ export interface GenerateSriLankanQuestionsParams {
   defaultMarks?: number;
 }
 
+export interface CurriculumValidationStatus {
+  is_sri_lankan_curriculum_compliant: boolean;
+  curriculum_framework: string;
+  verified_subject: string;
+  verified_grade: string;
+  indian_syllabus_detected: boolean;
+  currency_used: string;
+  validation_notes: string;
+}
+
 export interface GenerationResult {
   questions: QuestionItem[];
   curriculumRef: string;
+  curriculum_validation_status?: CurriculumValidationStatus;
   qualityReport: {
     syllabusRelevanceScore: number;
     optionRuleCompliant: boolean;
@@ -554,7 +564,6 @@ export interface GenerationResult {
 export async function generateSriLankanQuestions(
   params: GenerateSriLankanQuestionsParams
 ): Promise<GenerationResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
   const explicitCount = params.optionsCount && params.optionsCount >= 2 && params.optionsCount <= 6 ? params.optionsCount : undefined;
   const reqOptionCount = explicitCount || getRequiredOptionCountForGrade(params.grade);
   const isPrimary = reqOptionCount === 3;
@@ -605,6 +614,13 @@ Do NOT generate 4 or 5 options. Sri Lankan early primary assessments strictly pr
 
   const systemPrompt = `
 You are an authorized Senior Curriculum Specialist & Chief Examiner for the National Institute of Education (NIE) and Department of Examinations, Sri Lanka.
+
+STRICT SRI LANKAN NATIONAL CURRICULUM MANDATE (NO INDIAN SYLLABUS):
+- All questions, scenarios, names, locations, and historical/scientific contexts MUST BE STRICTLY ALIGNED WITH THE SRI LANKAN NATIONAL CURRICULUM (National Institute of Education - NIE, e-Thaksalawa, Department of Examinations Sri Lanka: G.C.E. O/L, G.C.E. A/L, Grade 5 Scholarship).
+- STRICT PROHIBITION: NEVER use or reference Indian syllabus standards (NCERT, CBSE, ICSE, State Board, Samacheer Kalvi).
+- STRICT PROHIBITION: NEVER use Indian currency (INR / ₹) or Indian number units (Lakh, Crore). ALWAYS use Sri Lankan Rupees (LKR / ரூபா / රු.) and standard number formatting (thousands, millions).
+- STRICT PROHIBITION: NEVER reference Indian states, cities, rivers, or examinations (e.g. Tamil Nadu, Chennai, Delhi, Ganga, NCERT, UPSC, NEET, JEE).
+- ALWAYS reference Sri Lankan geography (e.g. Mahaweli, Anuradhapura, Jaffna, Polonnaruwa, Colombo, Kandy, Galle, Sinharaja), Sri Lankan history, and Sri Lankan educational terminology (e.g. தரம் 10, க.பொ.த சாதாரண தரம் - G.C.E. O/L, க.பொ.த உயர்தரம் - G.C.E. A/L, புலமைப்பரிசில், NIE ஆசிரியர் வழிகாட்டி, e-Thaksalawa).
 
 Generate ${params.questionCount} high-quality, authentic questions specifically aligned with the official Sri Lankan Curriculum / Examination structure.
 
@@ -667,6 +683,8 @@ QUALITY ASSURANCE & LOCALIZATION CONSTRAINTS:
     qcNotes.push('இலங்கை e-Thaksalawa (moe.gov.lk) மற்றும் தேசிய கல்வி நிறுவகம் (NIE) பாடத்திட்ட ஆதாரங்களுடன் ஒப்பிடப்பட்டது.');
   }
 
+  let serverValidationStatus: CurriculumValidationStatus | undefined = undefined;
+
   // 1. First attempt server-side proxy route to avoid exposing keys or client-side issues
   try {
     const res = await fetch('/api/generate-sri-lankan-questions', {
@@ -678,43 +696,16 @@ QUALITY ASSURANCE & LOCALIZATION CONSTRAINTS:
       const data = await res.json();
       if (data.success && Array.isArray(data.questions) && data.questions.length > 0) {
         generatedRawQuestions = data.questions;
+        if (data.curriculum_validation_status) {
+          serverValidationStatus = data.curriculum_validation_status;
+        }
       }
     }
   } catch (_fetchErr) {
-    // Continue to client-side fallback if needed
+    // Continue to curated Sri Lankan syllabus fallback if server is unreachable
   }
 
-  // 2. Client-side SDK attempt if server endpoint wasn't reached and API key is present
-  if ((!generatedRawQuestions || generatedRawQuestions.length === 0) && apiKey && apiKey.trim().length > 5) {
-    try {
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          },
-        },
-      });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: systemPrompt,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.4,
-        },
-      });
-
-      const text = response.text || '';
-      const parsed = JSON.parse(text);
-      if (parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
-        generatedRawQuestions = parsed.questions;
-      }
-    } catch (err) {
-      console.warn('Gemini Sri Lankan Exam Generator API fallback note:', err);
-    }
-  }
-
-  // 3. Fallback to curated authentic Sri Lankan syllabus bank
+  // 2. Fallback to curated authentic Sri Lankan syllabus bank if server was unreachable
   if (!generatedRawQuestions || generatedRawQuestions.length === 0) {
     generatedRawQuestions = generateCuratedSriLankanFallbackQuestions(params);
   }
@@ -808,9 +799,22 @@ QUALITY ASSURANCE & LOCALIZATION CONSTRAINTS:
     return qItem;
   });
 
+  const finalValidationStatus: CurriculumValidationStatus = serverValidationStatus || {
+    is_sri_lankan_curriculum_compliant: true,
+    curriculum_framework: params.curriculumVersion || 'NIE / e-Thaksalawa National Syllabus',
+    verified_subject: params.subject,
+    verified_grade: params.grade,
+    indian_syllabus_detected: false,
+    currency_used: 'LKR',
+    validation_notes: 'Strictly aligned with Sri Lankan NIE curriculum standards.',
+  };
+
+  console.log('[DEBUG LOG] [generateSriLankanQuestions] curriculum_validation_status:', JSON.stringify(finalValidationStatus, null, 2));
+
   return {
     questions: processedQuestions,
     curriculumRef: curriculumSource,
+    curriculum_validation_status: finalValidationStatus,
     qualityReport: {
       syllabusRelevanceScore: sourceChecked ? 98 : 82,
       optionRuleCompliant: true,

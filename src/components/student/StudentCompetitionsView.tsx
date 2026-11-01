@@ -19,7 +19,14 @@ import {
   Camera,
   Share2,
   Flame,
+  MessageSquare,
 } from 'lucide-react';
+import {
+  formatRegistrationConfirmMessage,
+  buildWhatsappChatUrl,
+  logWhatsappSmsDispatch,
+  getStoredWhatsappSmsSettings,
+} from '../../utils/whatsappSmsNotificationService';
 import { CompetitionDetailsModal } from './CompetitionDetailsModal';
 import { CompetitionInstructionsModal } from './CompetitionInstructionsModal';
 import { SubmissionConfirmationView } from './SubmissionConfirmationView';
@@ -34,7 +41,7 @@ import { APP_LOGO } from '../../assets/logo';
 import { StudentMembershipModal } from './StudentMembershipModal';
 import { DynamicAdBillboard } from '../common/DynamicAdBillboard';
 import { LiveExamLeaderboard } from './LiveExamLeaderboard';
-import { isGradeEligible, detectStudentCurriculumPath } from '../../lib/gradeUtils';
+import { isGradeEligible } from '../../lib/gradeUtils';
 import { isCompetitionInEnrolledSubjects } from '../../utils/subjectNotificationUtils';
 
 export const StudentCompetitionsView: React.FC = () => {
@@ -61,6 +68,7 @@ export const StudentCompetitionsView: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'quiz' | 'exam' | 'competition'>('all');
   const [regToast, setRegToast] = useState<string | null>(null);
+  const [regWhatsappUrl, setRegWhatsappUrl] = useState<string | null>(null);
 
   // Modal states
   const [detailsComp, setDetailsComp] = useState<Competition | null>(null);
@@ -170,8 +178,29 @@ export const StudentCompetitionsView: React.FC = () => {
     // For Free competitions: register directly
     const success = registerStudentForCompetition(comp.id);
     if (success) {
-      setRegToast(`Successfully registered for ${comp.title}! You can now start the competition.`);
-      setTimeout(() => setRegToast(null), 4000);
+      const studentName = currentStudent?.fullName || currentAuthUser?.fullName || 'Student';
+      const studentPhone = currentStudent?.phone || currentAuthUser?.phone || '0771234567';
+      const confirmMsg = formatRegistrationConfirmMessage(comp, studentName, language);
+      
+      logWhatsappSmsDispatch({
+        studentId: currentAuthUser?.uid || currentStudent?.id || 'std-1',
+        studentName,
+        recipientPhone: studentPhone,
+        channel: 'whatsapp',
+        triggerType: 'registration_confirm',
+        competitionId: comp.id,
+        competitionTitle: comp.title,
+        messageText: confirmMsg,
+        status: 'sent',
+      });
+      
+      const whatsappUrl = buildWhatsappChatUrl(studentPhone, confirmMsg);
+      setRegWhatsappUrl(whatsappUrl);
+      setRegToast(`Successfully registered for ${comp.title}! Registration confirmation ready.`);
+      setTimeout(() => {
+        setRegToast(null);
+        setRegWhatsappUrl(null);
+      }, 8000);
     }
   };
 
@@ -288,50 +317,30 @@ export const StudentCompetitionsView: React.FC = () => {
 
       {/* Registration Toast Feedback */}
       {regToast && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2.5 shadow-sm animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span className="font-semibold">{regToast}</span>
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="font-semibold">{regToast}</span>
+          </div>
+          {regWhatsappUrl && (
+            <a
+              href={regWhatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs shrink-0 transition"
+            >
+              <MessageSquare className="w-3.5 h-3.5 fill-white" />
+              <span>
+                {language === 'ta'
+                  ? '📲 WhatsApp உறுதிப்படுத்தல் அனுப்பவும்'
+                  : language === 'si'
+                  ? '📲 WhatsApp තහවුරු කිරීම යවන්න'
+                  : '📲 Send WhatsApp Confirmation'}
+              </span>
+            </a>
+          )}
         </div>
       )}
-
-      {/* Student's Single Curriculum Path & Automatic Grade Level Badge */}
-      {(() => {
-        const studentPath = detectStudentCurriculumPath(studentGrade);
-        return (
-          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-3.5 sm:p-4 rounded-2xl border border-indigo-700/60 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl bg-indigo-600/80 border border-indigo-400/30 flex items-center justify-center text-lg shadow-2xs shrink-0">
-                {studentPath.icon}
-              </span>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
-                    {studentGrade}
-                  </span>
-                  <span className="font-extrabold text-blue-200 text-xs">
-                    {language === 'ta' ? studentPath.stageBadgeTa : studentPath.stageBadgeEn}
-                  </span>
-                  <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-emerald-300 font-mono font-bold">
-                    {studentPath.mcqOptionCount} Options Rule
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-300 mt-0.5">
-                  {language === 'ta'
-                    ? `உங்கள் கல்வி நிலைக்குரிய போட்டிகள் மட்டுமே பட்டியலிடப்பட்டுள்ளன. பிற தரங்கள் தானாக மறைக்கப்பட்டுள்ளன.`
-                    : `Showing competitions strictly mapped to your curriculum path. Other grade tiers are hidden.`}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-              <span className="text-[11px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2.5 py-1 rounded-full flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{language === 'ta' ? 'அங்கீகரிக்கப்பட்ட பாடத்திட்டம்' : 'Verified Path Active'}</span>
-              </span>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* Filter and Search Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">

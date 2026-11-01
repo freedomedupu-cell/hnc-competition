@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   PortalRole,
   AdminUser,
@@ -28,6 +28,7 @@ import {
   DbStudentFeedback,
   FeedbackCategory,
   SubjectNotificationAlert,
+  StudentToastNotification,
 } from '../types';
 import {
   getDefaultSubjectsForGrade,
@@ -37,6 +38,16 @@ import {
   markCompetitionAsNotified,
   playSubjectPublicationChime,
 } from '../utils/subjectNotificationUtils';
+import {
+  playCompetitionPublishedChime,
+  playResultGradedChime,
+  isToastSoundEnabled,
+  setToastSoundEnabled as setToastSoundEnabledUtil,
+} from '../utils/toastSoundUtils';
+import {
+  formatResultsPublishedMessage,
+  dispatchWhatsappBusinessGateway,
+} from '../utils/whatsappSmsNotificationService';
 import {
   initialSuperAdmin,
   initialAdmins,
@@ -135,6 +146,8 @@ export type SuperAdminNav =
   | 'Feedback'
   | 'Leaderboards'
   | 'Audit Trail'
+  | 'Notifications'
+  | 'Platform Master Controls'
   | 'Settings';
 
 export type AdminNav = 
@@ -151,6 +164,7 @@ export type AdminNav =
   | 'Feedback'
   | 'Leaderboards'
   | 'Audit Trail'
+  | 'Notifications'
   | 'Profile';
 
 export type StudentNav = 
@@ -166,7 +180,14 @@ export type StudentNav =
   | 'Announcements'
   | 'Feedback';
 
+export type AppTheme = 'light' | 'dark';
+
 interface AppContextType {
+  // Theme Management
+  theme: AppTheme;
+  setTheme: (theme: AppTheme) => void;
+  toggleTheme: () => void;
+
   // Localization
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -176,6 +197,7 @@ interface AppContextType {
   currentAuthUser: DbUser | null;
   setCurrentAuthUser: (user: DbUser | null) => void;
   authLoading: boolean;
+  isAuthHydrated: boolean;
   logout: () => Promise<void>;
 
   // Current active portal (strictly enforced by Firestore role)
@@ -387,6 +409,15 @@ interface AppContextType {
   deleteFeedback: (feedbackId: string) => Promise<void>;
   isFeedbackModalOpen: boolean;
   setIsFeedbackModalOpen: (open: boolean) => void;
+
+  // Student Instant Toast Notification System
+  studentToasts: StudentToastNotification[];
+  addStudentToast: (toast: Omit<StudentToastNotification, 'id' | 'timestamp'>) => void;
+  dismissStudentToast: (toastId: string) => void;
+  clearAllStudentToasts: () => void;
+  toastSoundEnabled: boolean;
+  setToastSoundEnabled: (enabled: boolean) => void;
+  triggerTestToast: (type: 'competition' | 'result') => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -409,10 +440,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('hnc_preferred_lang', lang);
     }
   };
+
+  // Theme state: 'light' (Academic Light) or 'dark' (High-Contrast Dark Mode)
+  const [theme, setThemeState] = useState<AppTheme>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('hnc_theme_mode');
+      if (saved === 'dark' || saved === 'light') return saved;
+    }
+    return 'light';
+  });
+
+  const setTheme = useCallback((newTheme: AppTheme) => {
+    setThemeState(newTheme);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hnc_theme_mode', newTheme);
+    }
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hnc_theme_mode', next);
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, [theme]);
   
   // Real Firebase Auth user & loading status
   const [currentAuthUser, setCurrentAuthUserState] = useState<DbUser | null>(() => getSavedActiveUser());
   const [authLoading, setAuthLoading] = useState<boolean>(false);
+  const [isAuthHydrated, setIsAuthHydrated] = useState<boolean>(() => {
+    const saved = getSavedActiveUser();
+    return Boolean(saved && saved.uid && saved.role && saved.status !== 'inactive');
+  });
 
   // Portal role (strictly synchronized with currentAuthUser.role, default 'student' for safety)
   const [currentPortal, setInternalPortal] = useState<PortalRole>(() => getSavedActiveUser()?.role || 'student');
@@ -422,11 +493,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [adminNav, setAdminNav] = useState<AdminNav>('Dashboard');
   const [studentNav, setStudentNav] = useState<StudentNav>('Dashboard');
 
-  // Synchronized setter for authenticated user that immediately updates the active portal
+  // Last authenticated user ID ref to detect immediate login/logout transitions
+  const lastAuthUidRef = useRef<string | null>(getSavedActiveUser()?.uid || null);
+
+  // Synchronized setter for authenticated user that immediately updates active portal & storage
   const setCurrentAuthUser = useCallback(
     (userOrUpdater: DbUser | null | ((prev: DbUser | null) => DbUser | null)) => {
-      setCurrentAuthUserState((prev) => {
-        const nextUser = typeof userOrUpdater === 'function' ? userOrUpdater(prev) : userOrUpdater;
+      setIsAuthHydrated(true);
+      setAuthLoading(false);
+
+      if (typeof userOrUpdater === 'function') {
+        setCurrentAuthUserState((prev) => {
+          const nextUser = userOrUpdater(prev);
+          if (nextUser) {
+            saveActiveUser(nextUser);
+            setInternalPortal(nextUser.role);
+          } else {
+            logoutUserSession();
+            setInternalPortal('student');
+          }
+          return nextUser;
+        });
+      } else {
+        const nextUser = userOrUpdater;
         if (nextUser) {
           saveActiveUser(nextUser);
           setInternalPortal(nextUser.role);
@@ -442,23 +531,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           logoutUserSession();
           setInternalPortal('student');
         }
-        return nextUser;
-      });
+        setCurrentAuthUserState(nextUser);
+      }
     },
     []
   );
 
-  // Automatically enforce portal to match authenticated user role whenever auth changes
+  // Automatically enforce portal to match authenticated user role whenever login or auth changes
   useEffect(() => {
-    if (currentAuthUser?.role) {
-      if (currentAuthUser.role === 'student' && currentPortal !== 'student') {
-        setInternalPortal('student');
-        setStudentNav('Dashboard');
-      } else if (currentAuthUser.role === 'admin' && currentPortal !== 'admin' && currentPortal !== 'student') {
-        setInternalPortal('admin');
-        const isSubj = currentAuthUser.adminType === 'subject_admin' || Boolean(currentAuthUser.assignedSubject);
-        setAdminNav(isSubj ? 'Quiz' : 'Dashboard');
+    if (currentAuthUser?.uid) {
+      const isNewLogin = currentAuthUser.uid !== lastAuthUidRef.current;
+      lastAuthUidRef.current = currentAuthUser.uid;
+
+      if (isNewLogin) {
+        // Immediate switch to the logged-in user's authorized portal on new login
+        setInternalPortal(currentAuthUser.role);
+        if (currentAuthUser.role === 'student') {
+          setStudentNav('Dashboard');
+        } else if (currentAuthUser.role === 'admin') {
+          const isSubj = currentAuthUser.adminType === 'subject_admin' || Boolean(currentAuthUser.assignedSubject);
+          setAdminNav(isSubj ? 'Quiz' : 'Dashboard');
+        } else if (currentAuthUser.role === 'super_admin') {
+          setSuperAdminNav('Dashboard');
+        }
+      } else {
+        // Enforce role boundaries for student (students can never view admin/superadmin)
+        if (currentAuthUser.role === 'student' && currentPortal !== 'student') {
+          setInternalPortal('student');
+          setStudentNav('Dashboard');
+        }
       }
+    } else {
+      lastAuthUidRef.current = null;
     }
   }, [currentAuthUser?.uid, currentAuthUser?.role, currentPortal]);
 
@@ -473,7 +577,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [results, setResults] = useState<CompetitionResult[]>(initialResults);
   const [announcements, setAnnouncements] = useState<DbAnnouncement[]>([]);
   const [auditLogs, setAuditLogs] = useState<SystemAuditLog[]>(initialAuditLogs);
-  const [settings, setSettings] = useState<PlatformSettings>(initialSettings);
+  const [settings, setSettings] = useState<PlatformSettings>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('hnc_platform_settings_v2');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return { ...initialSettings, ...parsed };
+        }
+      } catch {}
+    }
+    return initialSettings;
+  });
 
   const [studentRegistrations, setStudentRegistrations] = useState<string[]>([]);
 
@@ -521,6 +636,91 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [subjectPublicationAlerts, setSubjectPublicationAlerts] = useState<SubjectNotificationAlert[]>([]);
 
+  // Student Instant Toast Notification System State
+  const [studentToasts, setStudentToasts] = useState<StudentToastNotification[]>([]);
+  const [toastSoundEnabled, setToastSoundEnabledState] = useState<boolean>(isToastSoundEnabled);
+
+  const setToastSoundEnabled = (enabled: boolean) => {
+    setToastSoundEnabledState(enabled);
+    setToastSoundEnabledUtil(enabled);
+  };
+
+  const addStudentToast = useCallback(
+    (toastData: Omit<StudentToastNotification, 'id' | 'timestamp'>) => {
+      const newToast: StudentToastNotification = {
+        ...toastData,
+        id: `toast-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        timestamp: Date.now(),
+      };
+      setStudentToasts((prev) => [newToast, ...prev.slice(0, 5)]);
+    },
+    []
+  );
+
+  const dismissStudentToast = useCallback((id: string) => {
+    setStudentToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const clearAllStudentToasts = useCallback(() => {
+    setStudentToasts([]);
+  }, []);
+
+  // Track known competition IDs and known results per student to detect new events in real time
+  const initialKnownCompsRef = useRef<Set<string> | null>(null);
+  const initialKnownResultsRef = useRef<Map<string, { status: string; score: number }> | null>(null);
+
+  const triggerTestToast = useCallback(
+    (type: 'competition' | 'result') => {
+      if (type === 'competition') {
+        addStudentToast({
+          type: 'competition',
+          title: '🏆 New Competition Published!',
+          titleTa: '🏆 புதிய போட்டி வெளியாகியுள்ளது!',
+          titleSi: '🏆 නව තරඟාවලියක් ප්‍රකාශයට පත් කර ඇත!',
+          message: 'National Mathematics Olympiad 2026 • Grade 6-11 • Free Entry • Medals & Certificates',
+          messageTa: 'தேசிய கணித ஒலிம்பியாட் 2026 • தரம் 6-11 • இலவச அனுமதி • பதக்கங்கள் & சான்றிதழ்கள்',
+          messageSi: 'ජාතික ගණිත ඔලිම්පියාඩ් 2026 • 6-11 ශ්‍රේණි • නොමිලේ • පදක්කම් සහ සහතිකපත්',
+          durationMs: 8500,
+          meta: {
+            competitionTitle: 'National Mathematics Olympiad 2026',
+            grade: 'Grade 6-11',
+            entryType: 'Free',
+            linkTab: 'Competitions',
+          },
+          actionLabel: 'View & Register →',
+          actionLabelTa: 'பார் / பதிவு செய் →',
+          actionLabelSi: 'බලන්න සහ ලියාපදිංචි වන්න →',
+        });
+        playCompetitionPublishedChime();
+      } else {
+        addStudentToast({
+          type: 'result',
+          title: '🎉 Results Graded & Published!',
+          titleTa: '🎉 தேர்வு முடிவுகள் வெளியிடப்பட்டுள்ளன!',
+          titleSi: '🎉 ප්‍රතිඵල ශ්‍රේණිගත කර ප්‍රකාශයට පත් කර ඇත!',
+          message: 'Science Talent Challenge 2026: Score 92/100 (92%) • Rank #1 Island-Wide • Gold Medal Winner',
+          messageTa: 'விஞ்ஞானத் திறன் போட்டி 2026: பெற்ற மதிப்பெண் 92/100 (92%) • அகில இலங்கை தரம் #1 • தங்கப் பதக்கம் வென்றுள்ளார்',
+          messageSi: 'විද්‍යා කුසලතා තරඟය 2026: ලකුණු 92/100 (92%) • දිවයිනේ ස්ථානය #1 • රන් පදක්කම් ලාභී',
+          durationMs: 9500,
+          meta: {
+            competitionTitle: 'Science Talent Challenge 2026',
+            score: 92,
+            totalMarks: 100,
+            percentage: 92,
+            rank: 1,
+            award: 'Gold Medal',
+            linkTab: 'My Results',
+          },
+          actionLabel: 'View Results & Certificate →',
+          actionLabelTa: 'மதிப்பெண் அறிக்கை பார் →',
+          actionLabelSi: 'ප්‍රතිඵල වාර්තාව බලන්න →',
+        });
+        playResultGradedChime();
+      }
+    },
+    [addStudentToast]
+  );
+
   // Districts Quest & Study Gaming Studio State
   const [isDistrictsStudioOpen, setIsDistrictsStudioOpen] = useState<boolean>(false);
   const [districtsStudioInitialAction, setDistrictsStudioInitialAction] = useState<'list' | 'create'>('list');
@@ -563,17 +763,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Listen to Firebase Auth state on mount
   useEffect(() => {
-    // Run database hygiene once in background without blocking initial auth / UI render
-    if (typeof window !== 'undefined' && !localStorage.getItem('hnc_seed_initialized_v2')) {
-      seedInitialDataIfEmpty().then(() => {
-        localStorage.setItem('hnc_seed_initialized_v2', 'true');
-      }).catch(() => {});
+    // Run database hygiene in background AFTER UI is completely mounted and visible
+    let seedTimer: any = null;
+    if (typeof window !== 'undefined' && !localStorage.getItem('hnc_seed_initialized_v4')) {
+      seedTimer = setTimeout(() => {
+        seedInitialDataIfEmpty().then(() => {
+          localStorage.setItem('hnc_seed_initialized_v4', 'true');
+        }).catch(() => {});
+      }, 6000);
     }
 
-    // Immediately release loading screen if not already
-    setAuthLoading(false);
+    // Hydration timeout safeguard (ensures the dashboard is never blocked)
+    const hydrationTimer = setTimeout(() => {
+      setIsAuthHydrated(true);
+      setAuthLoading(false);
+    }, 1000);
 
     const handleForceReady = () => {
+      setIsAuthHydrated(true);
       setAuthLoading(false);
     };
     if (typeof window !== 'undefined') {
@@ -581,12 +788,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
-      setAuthLoading(false);
       try {
         const saved = getSavedActiveUser();
 
-        // If a valid saved user exists, immediately end loading and present the portal UI
+        // If a valid saved user exists, immediately hydrate and present the portal UI
         if (saved && saved.role && saved.status !== 'inactive') {
+          setIsAuthHydrated(true);
           setAuthLoading(false);
         }
 
@@ -599,7 +806,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             (saved.uid === fbUser.uid ||
               (fbUser.email &&
                 (saved.email?.toLowerCase() === fbUser.email.toLowerCase() ||
-                  saved.authEmail?.toLowerCase() === fbUser.email.toLowerCase())))
+                  saved.authEmail?.toLowerCase() === fbUser.email.toLowerCase() ||
+                  (saved.username && fbUser.email.toLowerCase().startsWith(saved.username.toLowerCase() + '@')) ||
+                  (fbUser.email.toLowerCase() === 'freedomedupu@gmail.com' && saved.role === 'super_admin'))))
           ) {
             resolvedUser = saved;
           }
@@ -777,11 +986,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setCurrentAuthUserState((prev) => (prev && prev.status !== 'inactive' ? prev : null));
         }
       } finally {
+        setIsAuthHydrated(true);
         setAuthLoading(false);
       }
     });
 
     return () => {
+      if (seedTimer) clearTimeout(seedTimer);
+      clearTimeout(hydrationTimer);
       if (typeof window !== 'undefined') {
         window.removeEventListener('hnc_force_ready', handleForceReady);
       }
@@ -907,6 +1119,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               ? studentEnrolledSubjectsState
               : getDefaultSubjectsForGrade(studentGrade));
 
+        // 1. Instant Toast Notification for Newly Published Competitions
+        const seenStorageKey = `hnc_toast_seen_comps_${currentAuthUser.uid}`;
+        let storedSeenIds: string[] = [];
+        try {
+          storedSeenIds = JSON.parse(localStorage.getItem(seenStorageKey) || '[]');
+        } catch {}
+        const seenIdSet = new Set(storedSeenIds);
+
+        if (initialKnownCompsRef.current === null) {
+          // First snapshot on load: seed existing competitions
+          initialKnownCompsRef.current = new Set(mapped.map((c) => c.id));
+          const mergedSeen = Array.from(new Set([...storedSeenIds, ...mapped.map((c) => c.id)]));
+          try {
+            localStorage.setItem(seenStorageKey, JSON.stringify(mergedSeen));
+          } catch {}
+        } else {
+          // Subsequent snapshots: identify new or newly published competitions
+          mapped.forEach((c) => {
+            const s = (c.status || '').toLowerCase();
+            const isPending =
+              c.approvalStatus === 'pending_approval' ||
+              (c.status as string) === 'Pending Approval' ||
+              c.approvalStatus === 'rejected';
+            const isLive = !isPending && (s.includes('publish') || s.includes('open') || s.includes('ongoing'));
+
+            if (isLive && !initialKnownCompsRef.current?.has(c.id) && !seenIdSet.has(c.id)) {
+              if (isGradeEligible(c.grade, studentGrade)) {
+                initialKnownCompsRef.current?.add(c.id);
+                seenIdSet.add(c.id);
+                try {
+                  localStorage.setItem(seenStorageKey, JSON.stringify(Array.from(seenIdSet)));
+                } catch {}
+
+                addStudentToast({
+                  type: 'competition',
+                  title: '🏆 New Competition Published!',
+                  titleTa: '🏆 புதிய போட்டி வெளியாகியுள்ளது!',
+                  titleSi: '🏆 නව තරඟාවලියක් ප්‍රකාශයට පත් කර ඇත!',
+                  message: `${c.title} • ${c.grade || 'All Grades'} • ${c.entryType === 'Free' ? 'Free Entry' : `Rs. ${c.entryFee}`}`,
+                  messageTa: `${c.title} • ${c.grade || 'அனைத்து தரங்கள்'} • ${c.entryType === 'Free' ? 'இலவச அனுமதி' : `கட்டணம்: ரூ. ${c.entryFee}`}`,
+                  messageSi: `${c.title} • ${c.grade || 'සියලු ශ්‍රේණි'} • ${c.entryType === 'Free' ? 'නොමිලේ' : `ගාස්තුව: රු. ${c.entryFee}`}`,
+                  durationMs: 8500,
+                  meta: {
+                    competitionId: c.id,
+                    competitionTitle: c.title,
+                    grade: c.grade,
+                    subject: c.category,
+                    entryType: c.entryType,
+                    entryFee: c.entryFee,
+                    linkTab: 'Competitions',
+                  },
+                  actionLabel: 'View & Register →',
+                  actionLabelTa: 'பார் / பதிவு செய் →',
+                  actionLabelSi: 'බලන්න සහ ලියාපදිංචි වන්න →',
+                });
+                playCompetitionPublishedChime();
+              }
+            }
+          });
+        }
+
         const newAlerts: SubjectNotificationAlert[] = [];
 
         mapped.forEach((c) => {
@@ -915,7 +1188,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const isLive = !isPending && (s.includes('publish') || s.includes('open') || s.includes('ongoing'));
           if (isLive) {
             // STRICT GRADE FILTER:
-            // "குறிப்பிட்ட மாணவருடைய தரங்களுக்கு மட்டுமே அவரவர் டாஸ் போர்டுல மற்றும் நோட்டிபிகேஷன்ல பரீட்சைகள் டிஸ்ப்ளே ஆக வேண்டும் ஓபன் அண்ட் கொடுத்தா மட்டும் தான் எல்லா மாணவர்களும் டிஸ்ப்ளே ஆகணும்"
             if (!isGradeEligible(c.grade, studentGrade)) {
               return;
             }
@@ -978,6 +1250,70 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           publishedAt: r.submittedAt,
         }));
         setResults(mapped);
+
+        // Instant Toast Notification for Newly Graded / Published Results
+        if (currentAuthUser && (currentAuthUser.role === 'student' || currentPortal === 'student')) {
+          const resultsStorageKey = `hnc_toast_seen_results_${currentAuthUser.uid}`;
+          let storedSeenResultIds: string[] = [];
+          try {
+            storedSeenResultIds = JSON.parse(localStorage.getItem(resultsStorageKey) || '[]');
+          } catch {}
+          const seenResultIdSet = new Set(storedSeenResultIds);
+
+          if (initialKnownResultsRef.current === null) {
+            // First snapshot on load: seed existing results
+            const initMap = new Map<string, { status: string; score: number }>();
+            mapped.forEach((r) => initMap.set(r.id, { status: r.publishStatus, score: r.score }));
+            initialKnownResultsRef.current = initMap;
+            const updatedSeenResults = Array.from(new Set([...storedSeenResultIds, ...mapped.map((r) => r.id)]));
+            try {
+              localStorage.setItem(resultsStorageKey, JSON.stringify(updatedSeenResults));
+            } catch {}
+          } else {
+            // Check for freshly published or newly graded results
+            mapped.forEach((r) => {
+              const prev = initialKnownResultsRef.current?.get(r.id);
+              const isNewlyAdded = !prev && !seenResultIdSet.has(r.id);
+              const isNewlyPublished = prev && prev.status !== 'published' && r.publishStatus === 'published';
+              const isNewlyGraded = prev && prev.score === 0 && r.score > 0 && r.publishStatus === 'published';
+
+              if (r.publishStatus === 'published' && (isNewlyAdded || isNewlyPublished || isNewlyGraded)) {
+                initialKnownResultsRef.current?.set(r.id, { status: r.publishStatus, score: r.score });
+                seenResultIdSet.add(r.id);
+                try {
+                  localStorage.setItem(resultsStorageKey, JSON.stringify(Array.from(seenResultIdSet)));
+                } catch {}
+
+                const pct = r.percentile || Math.round(((r.score || 0) / (r.maxScore || 100)) * 100);
+
+                addStudentToast({
+                  type: 'result',
+                  title: '🎉 Results Graded & Published!',
+                  titleTa: '🎉 தேர்வு முடிவுகள் வெளியிடப்பட்டுள்ளன!',
+                  titleSi: '🎉 ප්‍රතිඵල ශ්‍රේණිගත කර ප්‍රකාශයට පත් කර ඇත!',
+                  message: `${r.competitionTitle}: Score ${r.score}/${r.maxScore} (${pct}%) • Rank #${r.rank} • ${r.award}`,
+                  messageTa: `${r.competitionTitle}: பெற்ற மதிப்பெண் ${r.score}/${r.maxScore} (${pct}%) • தரம் #${r.rank} • ${r.award}`,
+                  messageSi: `${r.competitionTitle}: ලකුණු ${r.score}/${r.maxScore} (${pct}%) • ස්ථානය #${r.rank} • ${r.award}`,
+                  durationMs: 9500,
+                  meta: {
+                    competitionId: r.competitionId,
+                    competitionTitle: r.competitionTitle,
+                    score: r.score,
+                    totalMarks: r.maxScore,
+                    percentage: pct,
+                    rank: r.rank,
+                    award: r.award,
+                    linkTab: 'My Results',
+                  },
+                  actionLabel: 'View Results & Certificate →',
+                  actionLabelTa: 'மதிப்பெண் அறிக்கை பார் →',
+                  actionLabelSi: 'ප්‍රතිඵල වාර්තාව බලන්න →',
+                });
+                playResultGradedChime();
+              }
+            });
+          }
+        }
       }
     );
 
@@ -1170,6 +1506,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
+    // 12. Real-time platform settings subscription (including Super Admin spin wheel toggle)
+    let unsubSettings: (() => void) | undefined;
+    try {
+      unsubSettings = onSnapshot(doc(db, 'settings', 'platform'), (snap) => {
+        if (snap.exists()) {
+          const remoteSettings = snap.data() as Partial<PlatformSettings>;
+          setSettings((prev) => {
+            const merged = { ...prev, ...remoteSettings };
+            try {
+              localStorage.setItem('hnc_platform_settings_v2', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
+        }
+      });
+    } catch (err) {
+      console.warn('Real-time settings listener notice:', err);
+    }
+
     return () => {
       unsubComp();
       unsubResults();
@@ -1183,6 +1538,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (unsubProctor) unsubProctor();
       unsubAds();
       if (unsubFeedbacks) unsubFeedbacks();
+      if (unsubSettings) unsubSettings();
     };
   }, [currentAuthUser?.uid, currentAuthUser?.role]);
 
@@ -1313,6 +1669,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           })()
         : undefined) ||
       studentCurriculumPath.coreSubjectsEn,
+    whatsappOptIn: currentAuthUser?.whatsappOptIn ?? true,
+    whatsappFrequency: currentAuthUser?.whatsappFrequency || 'instant',
   }), [
     currentAuthUser?.uid,
     currentAuthUser?.avatarUrl,
@@ -1336,6 +1694,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     currentAuthUser?.redeemedPerks,
     currentAuthUser?.lastSpinDate,
     currentAuthUser?.enrolledSubjects,
+    currentAuthUser?.whatsappOptIn,
+    currentAuthUser?.whatsappFrequency,
     studentRegistrations.length,
     results,
     studentCurriculumPath.coreSubjectsEn,
@@ -1916,6 +2276,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       await toggleResultPublishInFirestore(resultId, target.publishStatus);
+
+      if (nextStatus === 'published') {
+        const waMsg = formatResultsPublishedMessage(
+          target.competitionTitle,
+          target.studentName,
+          target.score,
+          target.maxScore || target.totalMarks || 100,
+          target.rank || 1,
+          target.award,
+          'ta'
+        );
+        dispatchWhatsappBusinessGateway('0771234567', waMsg, {
+          studentId: target.studentId,
+          studentName: target.studentName,
+          triggerType: 'results_published',
+          competitionId: target.competitionId,
+          competitionTitle: target.competitionTitle,
+        }).catch((e) => console.warn('WhatsApp dispatch note:', e));
+      }
     } catch (err) {
       console.warn('Result publish toggle sync notice:', err);
     }
@@ -1961,8 +2340,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateSettings = (newSettings: Partial<PlatformSettings>) => {
-    setSettings((prev) => ({ ...prev, ...newSettings }));
+  const updateSettings = async (newSettings: Partial<PlatformSettings>) => {
+    setSettings((prev) => {
+      const merged = { ...prev, ...newSettings };
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('hnc_platform_settings_v2', JSON.stringify(merged));
+        } catch {}
+      }
+      return merged;
+    });
+
+    try {
+      await setDoc(doc(db, 'settings', 'platform'), newSettings, { merge: true });
+    } catch (err) {
+      console.warn('Firestore settings update note:', err);
+    }
   };
 
   const updateStudentProfile = async (profile: Partial<StudentUser>) => {
@@ -1980,6 +2373,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           address: profile.address !== undefined ? profile.address : currentAuthUser.address,
           dateOfBirth: profile.dateOfBirth !== undefined ? profile.dateOfBirth : currentAuthUser.dateOfBirth,
           avatarUrl: newAvatar,
+          whatsappOptIn: profile.whatsappOptIn !== undefined ? profile.whatsappOptIn : currentAuthUser.whatsappOptIn,
+          whatsappFrequency: profile.whatsappFrequency !== undefined ? profile.whatsappFrequency : (currentAuthUser.whatsappFrequency || 'instant'),
         }
       : {
           uid: targetUid,
@@ -1990,6 +2385,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           avatarUrl: newAvatar,
           studentId: currentStudent.studentId,
           createdAt: new Date().toISOString(),
+          whatsappOptIn: profile.whatsappOptIn !== undefined ? profile.whatsappOptIn : true,
+          whatsappFrequency: profile.whatsappFrequency || 'instant',
         };
 
     // Immediate reactive local state updates
@@ -1998,7 +2395,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Update students list state
     setStudents((prev) =>
-      prev.map((s) => (s.id === targetUid || s.studentId === currentStudent.studentId ? { ...s, avatarUrl: newAvatar } : s))
+      prev.map((s) => (s.id === targetUid || s.studentId === currentStudent.studentId ? { ...s, avatarUrl: newAvatar, whatsappOptIn: updated.whatsappOptIn, whatsappFrequency: updated.whatsappFrequency } : s))
     );
 
     // Resilient Firestore persistence
@@ -2013,6 +2410,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (profile.dateOfBirth !== undefined) firestorePayload.dateOfBirth = profile.dateOfBirth;
       if (profile.bio !== undefined) firestorePayload.bio = profile.bio;
       if (profile.enrolledSubjects !== undefined) firestorePayload.enrolledSubjects = profile.enrolledSubjects;
+      if (profile.whatsappOptIn !== undefined) firestorePayload.whatsappOptIn = profile.whatsappOptIn;
+      if (profile.whatsappFrequency !== undefined) firestorePayload.whatsappFrequency = profile.whatsappFrequency;
 
       try {
         await setDoc(doc(db, 'users', targetUid), firestorePayload, { merge: true });
@@ -3126,6 +3525,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentAuthUser,
         setCurrentAuthUser,
         authLoading,
+        isAuthHydrated,
         logout,
         currentPortal,
         setCurrentPortal,
@@ -3234,6 +3634,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteFeedback,
         isFeedbackModalOpen,
         setIsFeedbackModalOpen,
+        studentToasts,
+        addStudentToast,
+        dismissStudentToast,
+        clearAllStudentToasts,
+        toastSoundEnabled,
+        setToastSoundEnabled,
+        triggerTestToast,
+        theme,
+        setTheme,
+        toggleTheme,
         purgeDemoCompetitions: async () => {
           return await purgeAllDemoCompetitions();
         },

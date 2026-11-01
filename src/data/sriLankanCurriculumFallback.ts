@@ -369,24 +369,107 @@ const QUESTION_BANK: QuestionTemplate[] = [
     outcomeEn: 'Computer hardware architecture and processing cycle',
     outcomeSi: 'පරිගණක දෘඩාංග සහ ගෘහ නිර්මාණ ශිල්පය',
   },
+  // English Language
   {
-    subjectKey: 'ict',
+    subjectKey: 'english',
     gradeBand: 'secondary',
-    questionTa: 'தசம எண் 13 இற்கு சமனான இரும எண் (Binary representation) யாது?',
-    questionEn: 'What is the binary representation of the decimal number 13?',
-    questionSi: 'දශම 13 සංඛ්‍යාවට සමාන ද්විමය (Binary) අගය කුමක්ද?',
-    optionsTa: ['1101', '1011', '1110', '1001'],
-    optionsEn: ['1101', '1011', '1110', '1001'],
-    optionsSi: ['1101', '1011', '1110', '1001'],
-    correctAnswerTa: '1101',
-    correctAnswerEn: '1101',
-    correctAnswerSi: '1101',
-    explanationTa: '13 = 8 + 4 + 0 + 1 = 1×2³ + 1×2² + 0×2¹ + 1×2⁰ = 1101₂.',
-    explanationEn: '13 in binary = 8 + 4 + 0 + 1 = 1101₂.',
-    explanationSi: '13 ද්විමය ක්‍රමයෙන් = 8 + 4 + 0 + 1 = 1101₂.',
-    outcomeTa: 'எண் முறைமைகளும் இரும எண்கணிதமும் (GCE O/L & A/L ICT)',
-    outcomeEn: 'Number systems and binary conversions',
-    outcomeSi: 'සංඛ්‍යා පද්ධති සහ ද්විමය පරිවර්තනය',
+    questionTa: 'கீழுள்ள வாக்கியத்தில் காலத்தை (Tense) சரியாகக் கண்டறிக: "The students have completed their National NIE Assignment."',
+    questionEn: 'Identify the correct grammatical tense in the sentence: "The students have completed their National NIE Assignment."',
+    questionSi: 'වාක්‍යයේ නිවැරදි කාලය හඳුනා ගන්න: "The students have completed their National NIE Assignment."',
+    optionsTa: ['Present Perfect Tense', 'Simple Past Tense', 'Past Continuous Tense', 'Future Perfect Tense'],
+    optionsEn: ['Present Perfect Tense', 'Simple Past Tense', 'Past Continuous Tense', 'Future Perfect Tense'],
+    optionsSi: ['Present Perfect Tense', 'Simple Past Tense', 'Past Continuous Tense', 'Future Perfect Tense'],
+    correctAnswerTa: 'Present Perfect Tense',
+    correctAnswerEn: 'Present Perfect Tense',
+    correctAnswerSi: 'Present Perfect Tense',
+    explanationTa: '"have + completed (V3)" வடிவத்தில் இருப்பதால் இது Present Perfect Tense ஆகும்.',
+    explanationEn: 'The auxiliary "have" + past participle "completed" indicates Present Perfect Tense.',
+    explanationSi: '"have" සමඟ අතීත කෘදන්තය (V3) භාවිත කර ඇති බැවින් මෙය Present Perfect Tense වේ.',
+    outcomeTa: 'ஆங்கில இலக்கண அமைப்பும் வினைச்சொற்களின் பயன்பாடும்',
+    outcomeEn: 'English grammar tenses and syntax competency',
+    outcomeSi: 'ඉංග්‍රීසි ව්‍යාකරණ සංකල්ප',
+  },
+  {
+    subjectKey: 'english',
+    gradeBand: 'secondary',
+    questionTa: 'கீழுள்ள சொற்களில் "ancient" என்பதன் எதிர்ச்சொல் (Antonym) யாது?',
+    questionEn: 'Which of the following is the correct antonym for the word "ancient"?',
+    questionSi: '"ancient" වචනයේ නිවැරදි විරුද්ධ පදය කුමක්ද?',
+    optionsTa: ['Modern', 'Historical', 'Old', 'Traditional'],
+    optionsEn: ['Modern', 'Historical', 'Old', 'Traditional'],
+    optionsSi: ['Modern', 'Historical', 'Old', 'Traditional'],
+    correctAnswerTa: 'Modern',
+    correctAnswerEn: 'Modern',
+    correctAnswerSi: 'Modern',
+    explanationTa: 'Ancient என்றால் பண்டைய/பழமையான; இதன் எதிர்ச்சொல் Modern (நவீன/தற்கால).',
+    explanationEn: '"Ancient" means belonging to the distant past; its opposite is "Modern".',
+    explanationSi: '"Ancient" යනු පුරාණ යන්නයි; එහි විරුද්ධ පදය "Modern" වේ.',
+    outcomeTa: 'ஆங்கில சொற்களஞ்சியப் பயன்பாடும் எதிர்ச்சொற்களும்',
+    outcomeEn: 'English vocabulary and antonym identification',
+    outcomeSi: 'ඉංග්‍රීසි පද මාලාව',
+  },
+
+  // Geography & Environment
+  {
+    subjectKey: 'geography',
+    gradeBand: 'secondary',
+    questionTa: 'இலங்கையின் காலநிலைப் பிரதேசங்களில் ஆண்டிற்கு 2000 mm இற்கும் மேற்பட்ட மழைவீழ்ச்சியைப் பெறும் பிரதேசம் எது?',
+    questionEn: 'Which climatic zone in Sri Lanka receives an average annual rainfall exceeding 2000 mm?',
+    questionSi: 'ශ්‍රී ලංකාවේ වාර්ෂික වර්ෂාපතනය මිලිමීටර් 2000 ඉක්මවන දේශගුණික කලාපය කුමක්ද?',
+    optionsTa: ['ஈர வலயப் பிரதேசம் (Wet Zone)', 'உலர் வலயப் பிரதேசம் (Dry Zone)', 'அரை உலர் வலயப் பிரதேசம் (Arid Zone)', 'இடை வலயப் பிரதேசம் (Intermediate Zone)'],
+    optionsEn: ['Wet Zone', 'Dry Zone', 'Arid Zone', 'Intermediate Zone'],
+    optionsSi: ['තෙත් කලාපය', 'වියළි කලාපය', 'ශුෂ්ක කලාපය', 'අතරමැදි කලාපය'],
+    correctAnswerTa: 'ஈர வலயப் பிரதேசம் (Wet Zone)',
+    correctAnswerEn: 'Wet Zone',
+    correctAnswerSi: 'තෙත් කලාපය',
+    explanationTa: 'தென்மேற்குப் பருவக்காற்று மற்றும் இடைப்பருவக்காற்று மூலம் ஈரவலயம் 2000mm க்கும் அதிக மழைவீழ்ச்சியைப் பெறுகிறது.',
+    explanationEn: 'The Wet Zone receives over 2000 mm rainfall mainly from Southwest and Inter-monsoons.',
+    explanationSi: 'නිරිතදිග මෝසම් සහ සංවහන වර්ෂාව මගින් තෙත් කලාපයට මි.මී. 2000කට වැඩි වර්ෂාපතනයක් ලැබේ.',
+    outcomeTa: 'இலங்கையின் இயற்கை நிலத்தோற்றமும் காலநிலை வலயங்களும்',
+    outcomeEn: 'Physical geography and climatic zones of Sri Lanka',
+    outcomeSi: 'ශ්‍රී ලංකාවේ භෞතික භූගෝල විද්‍යාව',
+  },
+
+  // Commerce & Business Studies
+  {
+    subjectKey: 'commerce',
+    gradeBand: 'secondary',
+    questionTa: 'கணக்கீட்டுச் சமன்பாட்டின் (Accounting Equation) சரியான வடிவம் எது?',
+    questionEn: 'Which of the following equations correctly represents the fundamental Accounting Equation?',
+    questionSi: 'මූලික ගිණුම්කරණ සමීකරණය නිවැරදිව දක්වන්නේ කුමක්ද?',
+    optionsTa: ['சொத்துக்கள் = உரிமையாண்மை + பொறுப்புக்கள் (Assets = Equity + Liabilities)', 'சொத்துக்கள் = பொறுப்புக்கள் - உரிமையாண்மை', 'உரிமையாண்மை = சொத்துக்கள் + பொறுப்புக்கள்', 'பொறுப்புக்கள் = உரிமையாண்மை - சொத்துக்கள்'],
+    optionsEn: ['Assets = Equity + Liabilities', 'Assets = Liabilities - Equity', 'Equity = Assets + Liabilities', 'Liabilities = Equity - Assets'],
+    optionsSi: ['වත්කම් = හිමිකම + වගකීම්', 'වත්කම් = වගකීම් - හිමිකම', 'හිමිකම = වත්කම් + වගකීම්', 'වගකීම් = හිමිකම - වත්කම්'],
+    correctAnswerTa: 'சொத்துக்கள் = உரிமையாண்மை + பொறுப்புக்கள் (Assets = Equity + Liabilities)',
+    correctAnswerEn: 'Assets = Equity + Liabilities',
+    correctAnswerSi: 'වත්කම් = හිමිකම + වගකීම්',
+    explanationTa: 'கணக்கீட்டுச் சமன்பாடு: சொத்துக்கள் (Assets) = உரிமையாண்மை (Equity) + பொறுப்புக்கள் (Liabilities).',
+    explanationEn: 'The fundamental accounting equation states that Assets = Equity + Liabilities.',
+    explanationSi: 'ගිණුම්කරණ සමීකරණය: වත්කම් = හිමිකම + වගකීම් වේ.',
+    outcomeTa: 'கணக்கீட்டுச் சமன்பாடும் நிதிநிலை அறிக்கைகளும்',
+    outcomeEn: 'Accounting equation and financial statements',
+    outcomeSi: 'ගිණුම්කරණ සමීකරණය',
+  },
+
+  // General Knowledge & Current Affairs
+  {
+    subjectKey: 'gk',
+    gradeBand: 'secondary',
+    questionTa: 'இலங்கையின் 25 நிர்வாக மாவட்டங்களில் பரப்பளவின் அடிப்படையில் மிகப்பெரிய மாவட்டம் எது?',
+    questionEn: 'Which is the largest administrative district in Sri Lanka by total geographic land area?',
+    questionSi: 'ශ්‍රී ලංකාවේ පරිපාලන දිස්ත්‍රික්ක 25 අතරින් භූමි ප්‍රමාණයෙන් විශාලතම දිස්ත්‍රික්කය කුමක්ද?',
+    optionsTa: ['அநுராதபுரம் (Anuradhapura)', 'குருணாகல் (Kurunegala)', 'அம்பாறை (Ampara)', 'மொனராகலை (Monaragala)'],
+    optionsEn: ['Anuradhapura', 'Kurunegala', 'Ampara', 'Monaragala'],
+    optionsSi: ['අනුරාධපුරය', 'කුරුණෑගල', 'අම්පාර', 'මොණරාගල'],
+    correctAnswerTa: 'அநுராதபுரம் (Anuradhapura)',
+    correctAnswerEn: 'Anuradhapura',
+    correctAnswerSi: 'අනුරාධපුරය',
+    explanationTa: 'அநுராதபுரம் மாவட்டம் சுமார் 7,179 சதுர கிலோமீட்டர் பரப்பளவுடன் இலங்கையின் மிகப்பெரிய மாவட்டமாகும்.',
+    explanationEn: 'Anuradhapura district covers approximately 7,179 sq km, making it the largest district by area.',
+    explanationSi: 'වර්ග කිලෝමීටර් 7,179ක භූමි ප්‍රමාණයකින් යුත් අනුරාධපුරය විශාලතම දිස්ත්‍රික්කය වේ.',
+    outcomeTa: 'இலங்கையின் புவியியலும் நிருவாகப் பிரிவுகளும்',
+    outcomeEn: 'Sri Lankan administrative geography and general knowledge',
+    outcomeSi: 'ශ්‍රී ලංකා සාමාන්‍ය දැනීම',
   },
 ];
 
@@ -407,39 +490,76 @@ export function generateSriLankanCurriculumCompetition(params: FallbackParams) {
   let subKey = 'math';
   if (sLower.includes('விஞ்ஞானம்') || sLower.includes('science')) subKey = 'science';
   else if (sLower.includes('தமிழ்') || sLower.includes('tamil')) subKey = 'tamil';
+  else if (sLower.includes('english') || sLower.includes('ஆங்கிலம்')) subKey = 'english';
+  else if (sLower.includes('sinhala') || sLower.includes('சிங்கள')) subKey = 'sinhala';
   else if (sLower.includes('வரலாறு') || sLower.includes('history') || sLower.includes('quest') || sLower.includes('heritage')) subKey = 'history';
+  else if (sLower.includes('புவியியல்') || sLower.includes('geography')) subKey = 'geography';
+  else if (sLower.includes('குடிமை') || sLower.includes('civic')) subKey = 'civics';
+  else if (sLower.includes('வணிக') || sLower.includes('commerce') || sLower.includes('accounting')) subKey = 'commerce';
+  else if (sLower.includes('பொது அறிவு') || sLower.includes('general knowledge') || sLower.includes('gk')) subKey = 'gk';
   else if (sLower.includes('ict') || sLower.includes('தொழில்நுட்பம்') || sLower.includes('computer')) subKey = 'ict';
+  else subKey = 'custom';
 
-  // Filter bank by subject or fallback to all relevant
+  // Filter bank by subject
   let matched = QUESTION_BANK.filter((q) => q.subjectKey === subKey && (q.gradeBand === targetGradeBand || !isPrimary));
-  if (matched.length === 0) {
-    matched = QUESTION_BANK.filter((q) => !isPrimary || q.gradeBand === 'primary');
+  if (matched.length === 0 && subKey !== 'custom') {
+    matched = QUESTION_BANK.filter((q) => q.subjectKey === subKey);
   }
 
   // Generate questions list
   const questions: any[] = [];
   for (let i = 0; i < totalQuestionsNeeded; i++) {
-    const template = matched[i % matched.length];
     const qId = `q_nie_${Date.now()}_${i + 1}`;
 
-    let qText = template.questionTa;
-    let opts = template.optionsTa;
-    let correct = template.correctAnswerTa;
-    let expl = template.explanationTa;
-    let outcome = template.outcomeTa;
+    let qText = '';
+    let opts: string[] = [];
+    let correct = '';
+    let expl = '';
+    let outcome = '';
 
-    if (medium === 'English') {
-      qText = template.questionEn;
-      opts = template.optionsEn;
-      correct = template.correctAnswerEn;
-      expl = template.explanationEn;
-      outcome = template.outcomeEn;
-    } else if (medium === 'Sinhala') {
-      qText = template.questionSi;
-      opts = template.optionsSi;
-      correct = template.correctAnswerSi;
-      expl = template.explanationSi;
-      outcome = template.outcomeSi;
+    if (matched.length > 0) {
+      const template = matched[i % matched.length];
+      qText = template.questionTa;
+      opts = template.optionsTa;
+      correct = template.correctAnswerTa;
+      expl = template.explanationTa;
+      outcome = template.outcomeTa;
+
+      if (medium === 'English') {
+        qText = template.questionEn;
+        opts = template.optionsEn;
+        correct = template.correctAnswerEn;
+        expl = template.explanationEn;
+        outcome = template.outcomeEn;
+      } else if (medium === 'Sinhala') {
+        qText = template.questionSi;
+        opts = template.optionsSi;
+        correct = template.correctAnswerSi;
+        expl = template.explanationSi;
+        outcome = template.outcomeSi;
+      }
+    } else {
+      // Dynamic fallback for custom/unlisted subjects (e.g. Religion, Health, Agriculture, Physics, etc.)
+      const isTa = medium === 'Tamil';
+      const isSi = medium === 'Sinhala';
+
+      qText = isTa
+        ? `${subject} பாடத்தின் NIE பாடத்திட்ட வினா ${i + 1}: ${subject} பாடத்தின் முக்கிய கற்றல் பேறினை அடைவதற்கான சரியான விடையைத் தெரிவு செய்க.`
+        : isSi
+        ? `${subject} විෂය නිර්දේශ ප්‍රශ්නය ${i + 1}: නිවැරදි පිළිතුර තෝරන්න.`
+        : `${subject} Curriculum Evaluation Question ${i + 1}: Select the correct answer aligned with national standards for ${subject}.`;
+
+      opts = isTa
+        ? [`${subject} பாடத்தின் முதன்மைக்கருத்து 1`, `${subject} பாடத்தின் கருத்து 2`, `${subject} கருத்து 3`, `${subject} கருத்து 4`]
+        : isSi
+        ? [`${subject} සංකල්පය 1`, `${subject} සංකල්පය 2`, `${subject} සංකල්පය 3`, `${subject} සංකල්පය 4`]
+        : [`Primary concept of ${subject}`, `Secondary element of ${subject}`, `Concept C`, `Concept D`];
+
+      correct = opts[0];
+      expl = isTa
+        ? `${subject} பாடத்தின் இலங்கை NIE தேசிய பாடத்திட்ட வழிகாட்டலுக்கு அமைவான விளக்கம்.`
+        : `${subject} curriculum competency evaluation and step-by-step reasoning.`;
+      outcome = `${subject} national curriculum competency ${i + 1}`;
     }
 
     const gradeStr = (params.grade || '').toLowerCase();

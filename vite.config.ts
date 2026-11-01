@@ -110,7 +110,8 @@ Strict Constraints:
                 contents: prompt,
                 config: {
                   responseMimeType: 'application/json',
-                  temperature: 0.4,
+                  thinkingConfig: { thinkingLevel: 'LOW' },
+                  temperature: 0.3,
                 },
               });
 
@@ -409,18 +410,20 @@ Strict Rules:
 }
 `;
 
-              const candidateModels = ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-3.1-flash-lite'];
+              const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
               let parsed: any = null;
               let lastErrorMsg = '';
 
               for (const mName of candidateModels) {
                 try {
+                  const isThreeEight = mName === 'gemini-3.8-flash';
                   const response = await ai.models.generateContent({
                     model: mName,
                     contents: prompt,
                     config: {
                       responseMimeType: 'application/json',
-                      temperature: 0.4,
+                      ...(isThreeEight ? { thinkingConfig: { thinkingLevel: 'LOW' } } : {}),
+                      temperature: 0.3,
                     },
                   });
                   const text = response.text || '';
@@ -431,7 +434,6 @@ Strict Rules:
                 } catch (mErr: any) {
                   lastErrorMsg = mErr?.message || String(mErr);
                   console.warn(`Dev server model ${mName} notice:`, lastErrorMsg);
-                  await new Promise((r) => setTimeout(r, 400));
                 }
               }
 
@@ -600,17 +602,313 @@ Strict Rules:
           return;
         }
 
+        if (url === '/api/generate-smart-tips' && req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk: any) => {
+            body += chunk;
+          });
+          req.on('end', async () => {
+            try {
+              const apiKey = process.env.GEMINI_API_KEY;
+              if (!apiKey) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: 'GEMINI_API_KEY_NOT_CONFIGURED' }));
+                return;
+              }
+
+              const { GoogleGenAI } = await import('@google/genai');
+              const params = JSON.parse(body || '{}');
+              const ai = new GoogleGenAI({
+                apiKey,
+                httpOptions: {
+                  headers: {
+                    'User-Agent': 'aistudio-build',
+                  },
+                },
+              });
+
+              const promptContext = `
+You are an expert academic coach and exam strategist for Sri Lankan school students competing in national Olympiads, Quizzes, and exams (Grades 1 to 13, O/L, A/L).
+Analyze this student's recent academic profile and generate personalized 'Smart Daily Tips' including a 3-step actionable study plan for today, an exam preparation trick/technique, and diagnostic insight.
+
+Student Profile:
+- Name: ${params.studentName || 'Student'}
+- Grade Level: ${params.studentGrade || 'Grade 10'}
+- District / School: ${params.district || 'Sri Lanka'} / ${params.institution || 'School'}
+- Exams Completed: ${params.completedCount || 0}
+- Overall Average Score: ${params.avgPercentage || 75}%
+- Recent Competition Results: ${JSON.stringify(params.recentExamsList || [])}
+- Preferred Language: ${params.language === 'ta' ? 'Tamil' : params.language === 'si' ? 'Sinhala' : 'English'}
+
+Instructions:
+1. Provide a concise, highly practical, grade-appropriate 3-step study plan for today with realistic durations (15-30 mins).
+2. Provide 1 high-impact exam trick/hack (e.g. elimination method, active recall, diagram mnemonics, time allocation).
+3. Provide a brief 1-sentence diagnostic focus insight based on whether they need to push from credit to distinction (85%+ Gold Medal).
+4. Provide a motivating 1-sentence quote.
+5. Respond strictly in valid JSON format matching this schema:
+{
+  "summary": "Short 1-2 sentence overview in ${params.language === 'ta' ? 'Tamil' : params.language === 'si' ? 'Sinhala' : 'English'}",
+  "focusSubject": "Specific skill/topic to sharpen",
+  "studyPlan": [
+    {
+      "id": "p1",
+      "title": "Action title",
+      "duration": "20 mins",
+      "description": "Clear specific action to do",
+      "category": "Math/Science/English/Review"
+    },
+    {
+      "id": "p2",
+      "title": "Action title",
+      "duration": "25 mins",
+      "description": "Clear specific action to do",
+      "category": "Topic"
+    },
+    {
+      "id": "p3",
+      "title": "Action title",
+      "duration": "15 mins",
+      "description": "Clear specific action to do",
+      "category": "Topic"
+    }
+  ],
+  "examTrick": {
+    "title": "Technique name",
+    "technique": "Why it works",
+    "actionableStep": "Exact way to apply it during exam or study",
+    "tag": "Time Hack / Memory Technique / Trap Avoidance"
+  },
+  "motivationalQuote": "Inspiring closing line"
+}
+`;
+
+              const candidateModels = ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-3.1-flash-lite'];
+              let parsed: any = null;
+              for (const mName of candidateModels) {
+                try {
+                  const response = await ai.models.generateContent({
+                    model: mName,
+                    contents: promptContext,
+                    config: {
+                      responseMimeType: 'application/json',
+                      temperature: 0.6,
+                    },
+                  });
+                  const responseText = response.text || '';
+                  parsed = JSON.parse(responseText);
+                  if (parsed && parsed.studyPlan && parsed.examTrick) {
+                    break;
+                  }
+                } catch {
+                  // try next candidate model
+                }
+              }
+
+              if (parsed && parsed.studyPlan) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, tips: parsed }));
+                return;
+              }
+
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: 'Could not generate tips at this moment' }));
+            } catch (err: any) {
+              console.warn('Dev server Gemini generate smart tips warning:', err.message);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: err.message }));
+            }
+          });
+          return;
+        }
+
+        if (url === '/api/gemini/generate' && req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk: any) => {
+            body += chunk;
+          });
+          req.on('end', async () => {
+            try {
+              const apiKey = process.env.GEMINI_API_KEY;
+              if (!apiKey) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: 'GEMINI_API_KEY_NOT_CONFIGURED' }));
+                return;
+              }
+
+              const { GoogleGenAI } = await import('@google/genai');
+              const params = JSON.parse(body || '{}');
+              const ai = new GoogleGenAI({
+                apiKey,
+                httpOptions: {
+                  headers: {
+                    'User-Agent': 'aistudio-build',
+                  },
+                },
+              });
+
+              const response = await ai.models.generateContent({
+                model: params.model || 'gemini-3.8-flash',
+                contents: params.contents || params.prompt || 'Hello',
+                config: params.config,
+              });
+
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                success: true,
+                text: response.text,
+                candidates: response.candidates,
+              }));
+            } catch (err: any) {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: err.message }));
+            }
+          });
+          return;
+        }
+
+        if (url === '/api/gemini/stream' && req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk: any) => {
+            body += chunk;
+          });
+          req.on('end', async () => {
+            try {
+              const apiKey = process.env.GEMINI_API_KEY;
+              if (!apiKey) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: 'GEMINI_API_KEY_NOT_CONFIGURED' }));
+                return;
+              }
+
+              const { GoogleGenAI } = await import('@google/genai');
+              const params = JSON.parse(body || '{}');
+              const ai = new GoogleGenAI({
+                apiKey,
+                httpOptions: {
+                  headers: {
+                    'User-Agent': 'aistudio-build',
+                  },
+                },
+              });
+
+              res.writeHead(200, {
+                'Content-Type': 'text/event-stream; charset=utf-8',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+              });
+
+              const responseStream = await ai.models.generateContentStream({
+                model: params.model || 'gemini-3.8-flash',
+                contents: params.contents || params.prompt || 'Hello',
+                config: params.config,
+              });
+
+              for await (const chunk of responseStream) {
+                if (chunk.text) {
+                  res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+                }
+              }
+              res.write('data: [DONE]\n\n');
+              res.end();
+            } catch (err: any) {
+              res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+              res.end();
+            }
+          });
+          return;
+        }
+
         next();
       });
+
+      if (server.httpServer) {
+        import('ws').then(({ WebSocketServer }) => {
+          const wss = new WebSocketServer({ noServer: true });
+          server.httpServer.on('upgrade', (request: any, socket: any, head: any) => {
+            const pathname = (request.url || '').split('?')[0];
+            if (pathname === '/live') {
+              wss.handleUpgrade(request, socket, head, (ws: any) => {
+                wss.emit('connection', ws, request);
+              });
+            }
+          });
+
+          wss.on('connection', async (clientWs: any) => {
+            try {
+              const apiKey = process.env.GEMINI_API_KEY;
+              if (!apiKey) {
+                clientWs.send(JSON.stringify({ error: 'GEMINI_API_KEY_NOT_CONFIGURED' }));
+                clientWs.close();
+                return;
+              }
+              const { GoogleGenAI, Modality } = await import('@google/genai');
+              const ai = new GoogleGenAI({
+                apiKey,
+                httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+              });
+
+              const session = await ai.live.connect({
+                model: 'gemini-3.8-live',
+                config: {
+                  responseModalities: [Modality.AUDIO],
+                  speechConfig: {
+                    voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
+                  },
+                  systemInstruction: 'You are an educational assistant for Sri Lankan school students.',
+                },
+                callbacks: {
+                  onmessage: (message: any) => {
+                    const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+                    const text = message.serverContent?.modelTurn?.parts?.[0]?.text;
+                    if (audio) clientWs.send(JSON.stringify({ audio }));
+                    if (text) clientWs.send(JSON.stringify({ text }));
+                    if (message.serverContent?.interrupted) {
+                      clientWs.send(JSON.stringify({ interrupted: true }));
+                    }
+                  },
+                },
+              });
+
+              clientWs.on('message', (data: any) => {
+                try {
+                  const msg = JSON.parse(data.toString());
+                  if (msg.audio) {
+                    session.sendRealtimeInput({
+                      audio: { data: msg.audio, mimeType: 'audio/pcm;rate=16000' },
+                    });
+                  } else if (msg.text) {
+                    session.sendRealtimeInput({
+                      text: msg.text,
+                    });
+                  } else if (msg.video) {
+                    session.sendRealtimeInput({
+                      video: { data: msg.video, mimeType: 'image/jpeg' },
+                    });
+                  }
+                } catch (e: any) {
+                  console.warn('Live API socket message error:', e.message);
+                }
+              });
+
+              clientWs.on('close', () => {
+                try {
+                  session.close();
+                } catch {}
+              });
+            } catch (liveErr: any) {
+              console.warn('Live session connection error:', liveErr.message);
+              clientWs.send(JSON.stringify({ error: liveErr.message }));
+              clientWs.close();
+            }
+          });
+        }).catch(() => {});
+      }
     },
   };
 }
 
 export default defineConfig(() => {
   return {
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || ''),
-    },
     plugins: [
       react(),
       tailwindcss(),
@@ -755,8 +1053,7 @@ export default defineConfig(() => {
           ],
         },
         devOptions: {
-          enabled: true, // Enables service worker in development / AI Studio preview
-          type: 'module',
+          enabled: false, // Disabled in dev mode to eliminate SW request interception overhead
         },
       }),
     ],
@@ -767,7 +1064,16 @@ export default defineConfig(() => {
       dedupe: ['react', 'react-dom'],
     },
     optimizeDeps: {
-      include: ['react', 'react-dom'],
+      include: [
+        'react',
+        'react-dom',
+        'lucide-react',
+        'canvas-confetti',
+        'firebase/app',
+        'firebase/auth',
+        'firebase/firestore',
+        'firebase/storage',
+      ],
     },
     build: {
       target: 'esnext',
@@ -777,6 +1083,9 @@ export default defineConfig(() => {
           manualChunks(id) {
             if (id.includes('node_modules/xlsx')) {
               return 'vendor-xlsx';
+            }
+            if (id.includes('node_modules/jspdf') || id.includes('node_modules/jspdf-autotable')) {
+              return 'vendor-jspdf';
             }
             if (id.includes('node_modules/firebase')) {
               return 'vendor-firebase';
@@ -795,10 +1104,7 @@ export default defineConfig(() => {
       port: 3000,
       host: '0.0.0.0',
       headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-        'Surrogate-Control': 'no-store',
+        'Access-Control-Allow-Origin': '*',
       },
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

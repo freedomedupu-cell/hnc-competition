@@ -140,7 +140,9 @@ export const DynamicAdBillboard: React.FC = () => {
       recordAdClick(ad.id);
     } catch {}
     if (ad.actionUrl) {
-      window.open(ad.actionUrl, '_blank', 'noopener,noreferrer');
+      const url = ad.actionUrl.trim();
+      const targetUrl = url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
     } else if (ad.menuItems && ad.menuItems.length > 0) {
       setShowMenuDropdown((prev) => !prev);
     }
@@ -296,14 +298,34 @@ export const DynamicAdBillboard: React.FC = () => {
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={() => handleActionClick(currentAd)}
-              className="px-5 py-2.5 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-md hover:shadow-lg transition transform hover:-translate-y-0.5 flex items-center gap-2 cursor-pointer shrink-0"
-            >
-              <span>{currentAd.actionButtonText || (language === 'ta' ? 'மேலும் விவரங்கள் ➔' : 'Explore Offer ➔')}</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </button>
+            {currentAd.actionUrl ? (
+              <a
+                href={(() => {
+                  const url = currentAd.actionUrl.trim();
+                  return url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
+                })()}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  try {
+                    recordAdClick(currentAd.id);
+                  } catch {}
+                }}
+                className="px-5 py-2.5 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-md hover:shadow-lg transition transform hover:-translate-y-0.5 flex items-center gap-2 cursor-pointer shrink-0"
+              >
+                <span>{currentAd.actionButtonText || (language === 'ta' ? 'மேலும் விவரங்கள் ➔' : 'Explore Offer ➔')}</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleActionClick(currentAd)}
+                className="px-5 py-2.5 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-md hover:shadow-lg transition transform hover:-translate-y-0.5 flex items-center gap-2 cursor-pointer shrink-0"
+              >
+                <span>{currentAd.actionButtonText || (language === 'ta' ? 'மேலும் விவரங்கள் ➔' : 'Explore Offer ➔')}</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
+            )}
 
             {currentAd.menuItems && currentAd.menuItems.length > 0 && (
               <button

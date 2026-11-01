@@ -97,7 +97,7 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
   const isLocked = submittedAttempt !== null || secondsRemaining <= 0;
 
   // Auto-save debounced ref and real-time save status tracking
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(() => new Date());
 

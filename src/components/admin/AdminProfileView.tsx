@@ -11,10 +11,11 @@ import {
   Calendar,
   Award,
   BookOpen,
+  MessageSquare,
 } from 'lucide-react';
 
 export const AdminProfileView: React.FC = () => {
-  const { currentAdmin, updateAdminProfile } = useApp();
+  const { currentAdmin, updateAdminProfile, setAdminNav } = useApp();
   const [formData, setFormData] = useState({
     name: currentAdmin.name,
     email: currentAdmin.email,
@@ -93,6 +94,17 @@ export const AdminProfileView: React.FC = () => {
               <span className="text-slate-400">Assigned Olympiads:</span>
               <span className="font-bold text-blue-700">{currentAdmin.assignedCompetitionsCount}</span>
             </div>
+          </div>
+
+          <div className="w-full pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setAdminNav('Notifications')}
+              className="w-full py-2 px-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-2xs"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Notifications & WhatsApp Center</span>
+            </button>
           </div>
         </div>
 

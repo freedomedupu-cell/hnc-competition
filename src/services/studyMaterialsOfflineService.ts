@@ -168,3 +168,35 @@ export async function cacheTimetableForOfflineUse(
 
   await cacheStudyMaterialOffline(materialMeta, JSON.stringify(timetableData));
 }
+
+/**
+ * Check Service Worker Cache status for student offline study materials
+ */
+export async function getServiceWorkerCacheInfo(): Promise<{
+  isSupported: boolean;
+  isActive: boolean;
+  cacheCount: number;
+  items: OfflineStudyMaterial[];
+}> {
+  const isSupported = typeof window !== 'undefined' && 'caches' in window && 'serviceWorker' in navigator;
+  const isActive = typeof navigator !== 'undefined' && !!navigator.serviceWorker?.controller;
+  const items = getOfflineMaterialsList();
+  let cacheCount = items.length;
+
+  if (typeof window !== 'undefined' && 'caches' in window) {
+    try {
+      const cache = await caches.open(CACHE_NAME);
+      const keys = await cache.keys();
+      cacheCount = Math.max(cacheCount, keys.length);
+    } catch {
+      // fallback to metadata count
+    }
+  }
+
+  return {
+    isSupported,
+    isActive,
+    cacheCount,
+    items,
+  };
+}

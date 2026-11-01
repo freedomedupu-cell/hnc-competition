@@ -14,6 +14,8 @@ import {
   Share2,
   Eye,
   Coins,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { ShareModal } from './ShareModal';
 import { getStudentDeadlineAlerts } from '../../utils/deadlineNotificationUtils';
@@ -21,6 +23,7 @@ import { isCompetitionInEnrolledSubjects } from '../../utils/subjectNotification
 import { isGradeEligible } from '../../lib/gradeUtils';
 import { NetworkStatusIndicator } from './NetworkStatusIndicator';
 import { PWAInstallButton } from './PWAInstallButton';
+import { OfflineModeIndicator } from './OfflineModeIndicator';
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void;
@@ -44,6 +47,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
     language,
     setLanguage,
     setStudentNav,
+    theme,
+    toggleTheme,
     t,
   } = useApp();
 
@@ -307,6 +312,15 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
                     {t('appName')}
                   </span>
                   <NetworkStatusIndicator language={language} />
+                  <OfflineModeIndicator
+                    language={language}
+                    isStudent={effectivePortal === 'student'}
+                    onNavigateStudyHub={() => {
+                      if (effectivePortal === 'student') {
+                        setStudentNav('Dashboard');
+                      }
+                    }}
+                  />
                 </div>
                 <p className="hidden md:block text-[11px] text-slate-500 font-normal truncate">
                   {t('platformSubtitle')}
@@ -362,6 +376,40 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
                 සිංහල
               </button>
             </div>
+
+            {/* High-Contrast Theme Toggle Switcher (Dark Mode / Academic Light) */}
+            <button
+              id="btn-theme-toggle"
+              type="button"
+              onClick={toggleTheme}
+              className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer border ${
+                theme === 'dark'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                  : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200/80 hover:text-slate-900'
+              }`}
+              title={
+                theme === 'dark'
+                  ? (language === 'ta' ? 'கல்வி ஒளித் தோற்றத்திற்கு மாறுக (Academic Light)' : language === 'si' ? 'ආලෝක ප්‍රකාරයට මාරු වන්න' : 'Switch to Academic Light Theme')
+                  : (language === 'ta' ? 'இருண்ட தோற்றத்திற்கு மாறுக (Dark Mode)' : language === 'si' ? 'අඳුරු ප්‍රකාරයට මාරු වන්න' : 'Switch to High-Contrast Dark Mode')
+              }
+              aria-label="Toggle platform color theme"
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden md:inline font-bold">
+                    {language === 'ta' ? 'ஒளி' : language === 'si' ? 'ආලෝකය' : 'Light'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-3.5 h-3.5 text-slate-700" />
+                  <span className="hidden md:inline font-bold">
+                    {language === 'ta' ? 'இருள்' : language === 'si' ? 'අඳුරු' : 'Dark'}
+                  </span>
+                </>
+              )}
+            </button>
 
             {/* In-App PWA Install Button (Home Screen / Standalone) */}
             <PWAInstallButton language={language} />
