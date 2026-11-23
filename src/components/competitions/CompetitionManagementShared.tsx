@@ -826,7 +826,11 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
                 <div className="grid grid-cols-3 gap-2 py-2.5 px-3 rounded-lg bg-slate-50 border border-slate-100 text-[11px]">
                   <div className="flex items-center gap-1.5 text-slate-700">
                     <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span>{comp.duration || 60} mins</span>
+                    <span className="truncate font-medium">
+                      {comp.hasTimeLimit === false || comp.duration === 0
+                        ? '∞ No Limit'
+                        : `${comp.duration || 60} mins`}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 text-blue-900 bg-blue-50/80 px-2 py-1 rounded border border-blue-200/60 font-semibold truncate">
@@ -845,9 +849,11 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
                 {/* Dates & Prizes line */}
                 <div className="space-y-1 text-[11px] text-slate-500 border-t border-slate-100 pt-2">
                   <div className="flex items-center justify-between">
-                    <span>Registration Deadline:</span>
-                    <span className="font-semibold text-slate-700">
-                      {comp.registrationEnd || comp.registrationDeadline || 'TBD'}
+                    <span>Schedule / Deadline:</span>
+                    <span className={`font-semibold ${comp.scheduleMode === 'open' ? 'text-emerald-700' : 'text-slate-700'}`}>
+                      {comp.scheduleMode === 'open'
+                        ? '🌐 Open Anytime (எந்நேரமும்)'
+                        : (comp.registrationEnd || comp.registrationDeadline || 'TBD')}
                     </span>
                   </div>
                   {comp.prizesEnabled && comp.prizeDetails?.firstPrize && (

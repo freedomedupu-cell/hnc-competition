@@ -250,7 +250,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
       classes: string;
     } | null = null;
 
-    if (!hasSubmitted) {
+    if (!hasSubmitted && !sched.isOpenSchedule) {
       const nowMs = Date.now();
       const regDateStr = c.registrationEnd || c.registrationDeadline;
       if (regDateStr && !isRegistered) {
@@ -291,9 +291,11 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
       }
     }
 
-    let countdownText = 'Active Contest';
+    let countdownText = sched.isOpenSchedule
+      ? (language === 'ta' ? '🌐 எந்நேரமும் (Open)' : language === 'si' ? '🌐 ඕනෑම වේලාවක' : '🌐 Open Anytime')
+      : 'Active Contest';
     const targetEnd = sched.endDateTime;
-    if (targetEnd) {
+    if (!sched.isOpenSchedule && targetEnd) {
       const remainingSec = Math.max(0, Math.floor((targetEnd.getTime() - Date.now()) / 1000));
       if (remainingSec > 0) {
         const days = Math.floor(remainingSec / 86400);
@@ -306,6 +308,8 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
       }
     }
 
+    const isUntimedComp = c.hasTimeLimit === false || c.duration === 0;
+
     return {
       id: c.id,
       title: c.title,
@@ -313,11 +317,15 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
       categoryBadgeClass: badgeClass,
       formatType,
       questionsCount: c.questionsCount || 10,
-      durationMinutes: c.duration || 30,
-      dateDisplay: c.startDate || c.competitionStart || 'Open Now',
+      durationMinutes: isUntimedComp ? 0 : (c.duration || 30),
+      dateDisplay: sched.isOpenSchedule
+        ? (language === 'ta' ? 'திறந்த அட்டவணை (Anytime)' : 'Open Anytime')
+        : (c.startDate || c.competitionStart || 'Open Now'),
       gradeRange: c.grade || 'All Grades',
       countdownText,
-      countdownPillClass: pillClass,
+      countdownPillClass: sched.isOpenSchedule
+        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+        : pillClass,
       iconComponent: iconComp,
       fullCompetition: c,
       deadlineBadge,
@@ -1253,7 +1261,11 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({ onNa
                       <span className="text-slate-300">|</span>
                       <span className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{item.durationMinutes} Minutes</span>
+                        <span>
+                          {item.durationMinutes === 0
+                            ? (language === 'ta' ? '∞ நேர வரம்பில்லை' : '∞ No Time Limit')
+                            : `${item.durationMinutes} Minutes`}
+                        </span>
                       </span>
                       <span className="text-slate-300">|</span>
                       <span className="flex items-center gap-1">

@@ -93,6 +93,7 @@ import {
   purgeLegacyDemoFirestoreData,
   purgeAllDemoCompetitions,
   deleteStudentAccountFromFirestore,
+  deleteMultipleStudentAccountsFromFirestore,
   updateStudentPasswordInFirestore,
   updateStudentDetailsInFirestore,
   deleteResultFromFirestore,
@@ -271,6 +272,10 @@ interface AppContextType {
   dismissSubjectPublicationAlert: (alertId: string) => void;
   triggerManualSubjectPushTest: () => Promise<boolean>;
   deleteStudentAccount: (studentUid: string) => Promise<void>;
+  deleteDuplicateStudentAccounts: (
+    studentUids: string[]
+  ) => Promise<{ deletedCount: number; failedCount: number; error?: string }>;
+  removeDuplicateCompetitionParticipants: (competitionId: string) => Promise<number>;
   updateStudentPassword: (studentUid: string, newPassword: string) => Promise<void>;
   updateStudentByAdmin: (
     studentUid: string,
@@ -1049,6 +1054,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const mapped: Competition[] = realComps.map((c) => {
         const validId = c.competitionId || (c as any).id;
+        const resolvedHasTimeLimit =
+          c.hasTimeLimit !== undefined ? c.hasTimeLimit : c.duration === 0 ? false : true;
         return {
           id: validId,
           competitionId: validId,
@@ -1059,7 +1066,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           competitionType: (c.competitionType as any) || 'Quiz',
           grade: c.grade || 'Open',
           language: (c.language as any) || 'English',
-          duration: c.duration ?? 60,
+          duration: !resolvedHasTimeLimit ? 0 : (c.duration ?? 60),
+          hasTimeLimit: resolvedHasTimeLimit,
+          scheduleMode: c.scheduleMode || 'scheduled',
           entryType: (c.entryType as any) || 'Free',
           entryFee: c.entryFee ?? 0,
           prizesEnabled: c.prizesEnabled ?? true,
@@ -1211,6 +1220,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   entryType: c.entryType,
                   entryFee: c.entryFee,
                   duration: c.duration,
+                  hasTimeLimit: c.hasTimeLimit,
+                  scheduleMode: c.scheduleMode,
                   code: c.code,
                 });
               }
@@ -1921,6 +1932,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const totalMarks = compData.totalMarks ?? questions.reduce((sum, q) => sum + (q.marks || 0), 0);
     const enrolledCount = compData.enrolledCount ?? existing?.enrolledCount ?? (compData.participants?.length || 0);
 
+    const resolvedHasTimeLimit =
+      compData.hasTimeLimit !== undefined
+        ? compData.hasTimeLimit
+        : compData.duration === 0
+        ? false
+        : existing?.hasTimeLimit ?? (existing?.duration === 0 ? false : true);
+
+    const resolvedDuration = !resolvedHasTimeLimit
+      ? 0
+      : compData.duration !== undefined && Number(compData.duration) > 0
+      ? Number(compData.duration)
+      : existing?.duration && existing.duration > 0
+      ? existing.duration
+      : 60;
+
+    const resolvedScheduleMode =
+      compData.scheduleMode || existing?.scheduleMode || 'scheduled';
+
     const updatedComp: Competition = {
       id: compId,
       title: compData.title.trim(),
@@ -1929,7 +1958,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       category: compData.category || existing?.category || 'Mathematics',
       grade: compData.grade || existing?.grade || 'Open',
       language: compData.language || existing?.language || 'English',
-      duration: compData.duration !== undefined ? Number(compData.duration) : (existing?.duration ?? 60),
+      duration: resolvedDuration,
+      hasTimeLimit: resolvedHasTimeLimit,
+      scheduleMode: resolvedScheduleMode,
       entryType: compData.entryType || existing?.entryType || 'Free',
       entryFee: compData.entryFee !== undefined ? Number(compData.entryFee) : (existing?.entryFee ?? 0),
       prizesEnabled: compData.prizesEnabled !== undefined ? compData.prizesEnabled : (existing?.prizesEnabled ?? true),
@@ -1998,6 +2029,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         grade: updatedComp.grade,
         language: updatedComp.language,
         duration: updatedComp.duration,
+        hasTimeLimit: updatedComp.hasTimeLimit,
+        scheduleMode: updatedComp.scheduleMode,
         entryType: updatedComp.entryType,
         entryFee: updatedComp.entryFee,
         prizesEnabled: updatedComp.prizesEnabled,
@@ -2231,8 +2264,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCompetitions((prev) =>
       prev.map((c) => {
         if (c.id === competitionId) {
-          const nextParticipants = [...(c.participants || []), studentRecord];
-          const nextCount = (c.enrolledCount || 0) + 1;
+          const existing = c.participants || [];
+          const alreadyExists = existing.some(
+            (p) =>
+              (studentRecord.studentId && p.studentId === studentRecord.studentId) ||
+              (studentRecord.email && p.email?.toLowerCase() === studentRecord.email.toLowerCase())
+          );
+          if (alreadyExists) {
+            return c;
+          }
+          const nextParticipants = [...existing, studentRecord];
+          const nextCount = nextParticipants.length;
           saveCompetitionToFirestore({
             competitionId: c.id,
             status: c.status,
@@ -2255,6 +2297,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
     );
     return true;
+  };
+
+  const removeDuplicateCompetitionParticipants = async (competitionId: string): Promise<number> => {
+    const comp = competitions.find((c) => c.id === competitionId);
+    if (!comp || !Array.isArray(comp.participants) || comp.participants.length === 0) {
+      return 0;
+    }
+
+    const seenIds = new Set<string>();
+    const seenEmails = new Set<string>();
+    const deduped: typeof comp.participants = [];
+    let removedCount = 0;
+
+    for (const p of comp.participants) {
+      const idKey = (p.studentId || '').trim();
+      const emailKey = (p.email || '').trim().toLowerCase();
+      const isDupId = Boolean(idKey && seenIds.has(idKey));
+      const isDupEmail = Boolean(emailKey && seenEmails.has(emailKey));
+
+      if (isDupId || isDupEmail) {
+        removedCount++;
+        continue;
+      }
+
+      if (idKey) seenIds.add(idKey);
+      if (emailKey) seenEmails.add(emailKey);
+      deduped.push(p);
+    }
+
+    if (removedCount === 0) return 0;
+
+    const nextCount = deduped.length;
+    setCompetitions((prev) =>
+      prev.map((c) =>
+        c.id === competitionId
+          ? { ...c, participants: deduped, enrolledCount: nextCount }
+          : c
+      )
+    );
+
+    await saveCompetitionToFirestore({
+      competitionId: comp.id,
+      status: comp.status,
+      participants: deduped,
+      enrolledCount: nextCount,
+    });
+
+    return removedCount;
   };
 
   const toggleResultPublish = async (resultId: string) => {
@@ -2439,12 +2529,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteStudentAccount = async (studentUid: string) => {
-    try {
-      await deleteStudentAccountFromFirestore(studentUid);
-      setStudents((prev) => prev.filter((s) => s.id !== studentUid));
-    } catch (err) {
-      console.error('Failed to delete student:', err);
+    await deleteStudentAccountFromFirestore(studentUid);
+    setStudents((prev) => prev.filter((s) => s.id !== studentUid));
+  };
+
+  const deleteDuplicateStudentAccounts = async (
+    studentUids: string[]
+  ): Promise<{ deletedCount: number; failedCount: number; error?: string }> => {
+    const result = await deleteMultipleStudentAccountsFromFirestore(studentUids);
+    if (result.deletedUids.length > 0) {
+      const deletedSet = new Set(result.deletedUids);
+      setStudents((prev) => prev.filter((s) => !deletedSet.has(s.id)));
     }
+    return {
+      deletedCount: result.deletedUids.length,
+      failedCount: result.failedUids.length,
+      error: result.error,
+    };
   };
 
   const updateStudentPassword = async (studentUid: string, newPassword: string) => {
@@ -2609,6 +2710,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const questions = getCompetitionQuestions(comp);
     const totalMarks = comp.totalMarks || questions.reduce((sum, q) => sum + (q.marks || 0), 0) || 100;
 
+    const isUntimed = comp.hasTimeLimit === false || comp.duration === 0;
     const newAttempt: DbAttempt = {
       attemptId: `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       competitionId: comp.id,
@@ -2620,7 +2722,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'in-progress',
       score: 0,
       totalMarks: totalMarks,
-      duration: comp.duration || 60,
+      duration: isUntimed ? 0 : (comp.duration || 60),
+      hasTimeLimit: !isUntimed,
     };
 
     setStudentAttempts((prev) => [...prev, newAttempt]);
@@ -2726,6 +2829,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const finalStatus = isTimeout ? 'timeout' : 'submitted';
 
     const current = studentAttempts.find((a) => a.attemptId === attemptId) || activeExamAttempt;
+    const isUntimedComp = comp ? (comp.hasTimeLimit === false || comp.duration === 0) : false;
     const updatedAttempt: DbAttempt = {
       ...(current || {
         attemptId,
@@ -2740,7 +2844,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       totalMarks: totalPossibleMarks,
       competitionTitle: comp?.title || current?.competitionTitle,
       studentName: currentAuthUser?.fullName || currentStudent.name,
-      duration: comp?.duration || 60,
+      duration: isUntimedComp ? 0 : (comp?.duration || 60),
+      hasTimeLimit: !isUntimedComp,
     };
 
     setStudentAttempts((prev) => {
@@ -3569,6 +3674,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dismissSubjectPublicationAlert,
         triggerManualSubjectPushTest,
         deleteStudentAccount,
+        deleteDuplicateStudentAccounts,
+        removeDuplicateCompetitionParticipants,
         updateStudentPassword,
         updateStudentByAdmin,
         updateAdminProfile,

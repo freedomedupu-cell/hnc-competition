@@ -153,7 +153,9 @@ export interface DbCompetition {
   subject?: string;
   grade: string;
   language: 'English' | 'Tamil' | 'Sinhala' | string;
-  duration?: number; // In minutes
+  duration?: number; // In minutes (0 when hasTimeLimit is false)
+  hasTimeLimit?: boolean; // false = untimed / no time limit; defaults to true
+  scheduleMode?: 'scheduled' | 'open'; // 'open' = anytime without date/time locks; defaults to 'scheduled'
   entryType?: 'Free' | 'Paid';
   entryFee?: number; // LKR when paid
   prizesEnabled?: boolean;
@@ -337,6 +339,7 @@ export interface DbAttempt {
   competitionTitle?: string;
   studentName?: string;
   duration?: number; // In minutes
+  hasTimeLimit?: boolean;
 }
 
 export interface BaseUser {
@@ -483,7 +486,9 @@ export interface Competition {
   competitionType?: 'Quiz' | 'Exam' | 'Competition' | 'Island Quest' | 'Edu Arena' | 'District Quiz' | string;
   grade?: string;
   language?: 'English' | 'Tamil' | 'Sinhala' | string;
-  duration?: number; // In minutes
+  duration?: number; // In minutes (0 when hasTimeLimit is false)
+  hasTimeLimit?: boolean; // false = untimed / no time limit; defaults to true
+  scheduleMode?: 'scheduled' | 'open'; // 'open' = available anytime without start/end locks
   entryType?: 'Free' | 'Paid';
   entryFee?: number; // In LKR when paid
   prizesEnabled?: boolean;
@@ -732,6 +737,8 @@ export interface SubjectNotificationAlert {
   entryType?: 'Free' | 'Paid';
   entryFee?: number;
   duration?: number;
+  hasTimeLimit?: boolean;
+  scheduleMode?: 'scheduled' | 'open';
   code?: string;
 }
 

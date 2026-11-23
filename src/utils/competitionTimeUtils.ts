@@ -5,6 +5,7 @@ export interface CompetitionScheduleStatus {
   isUpcoming: boolean;
   isLive: boolean;
   isEnded: boolean;
+  isOpenSchedule: boolean;
   canTakeExam: boolean;
   isRegistrationOpen: boolean;
   isRegistrationClosed: boolean;
@@ -19,6 +20,57 @@ export interface CompetitionScheduleStatus {
   statusBadgeSi: string;
   timeRemainingTextTa: string;
   timeRemainingTextEn: string;
+}
+
+/**
+ * Returns true when competition uses an Open Schedule (always available, no start/end locks)
+ */
+export function isOpenSchedule(comp?: { scheduleMode?: string } | null): boolean {
+  return comp?.scheduleMode === 'open';
+}
+
+/**
+ * Returns true if the competition enforces a countdown time limit, false if untimed
+ */
+export function hasExamTimeLimit(
+  comp?: { hasTimeLimit?: boolean; duration?: number } | null
+): boolean {
+  if (!comp) return true;
+  if (comp.hasTimeLimit === false) return false;
+  if (comp.duration === 0) return false;
+  return true;
+}
+
+/**
+ * Returns the numeric duration in minutes (0 when untimed, fallback 60 only when timed and unset)
+ */
+export function getExamDurationMinutes(
+  comp?: { hasTimeLimit?: boolean; duration?: number } | null,
+  fallbackMinutes: number = 60
+): number {
+  if (!hasExamTimeLimit(comp)) return 0;
+  if (typeof comp?.duration === 'number' && comp.duration > 0) {
+    return comp.duration;
+  }
+  return fallbackMinutes;
+}
+
+/**
+ * Formats exam duration cleanly for cards, modals, and badges
+ */
+export function formatExamDurationLabel(
+  comp?: { hasTimeLimit?: boolean; duration?: number } | null,
+  language: string = 'ta'
+): string {
+  if (!hasExamTimeLimit(comp)) {
+    if (language === 'si') return 'කාල සීමාවක් නැත (Untimed)';
+    if (language === 'en') return 'No Time Limit (Untimed)';
+    return 'நேரக் கட்டுப்பாடு இல்லை (No Limit)';
+  }
+  const mins = getExamDurationMinutes(comp);
+  if (language === 'si') return `මිනිත්තු ${mins}`;
+  if (language === 'en') return `${mins} mins`;
+  return `${mins} நிமிடம் (${mins}m)`;
 }
 
 /**
@@ -103,6 +155,30 @@ export function formatDateTimeReadable(date: Date | null, language: string = 'ta
  * Calculates live real-time schedule status for any competition
  */
 export function getCompetitionScheduleStatus(comp: Competition): CompetitionScheduleStatus {
+  if (isOpenSchedule(comp)) {
+    return {
+      phase: 'live',
+      isUpcoming: false,
+      isLive: true,
+      isEnded: false,
+      isOpenSchedule: true,
+      canTakeExam: true,
+      isRegistrationOpen: true,
+      isRegistrationClosed: false,
+      regEndDateTime: null,
+      startDateTime: null,
+      endDateTime: null,
+      formattedStart: 'எந்நேரமும் திறந்துள்ளது (Open Anytime)',
+      formattedEnd: 'கால வரம்பில்லை (No Closing Date)',
+      formattedRegEnd: 'எந்நேரமும் பதிவு செய்யலாம் (Open Anytime)',
+      statusBadgeTa: '🌐 திறந்த அட்டவணை (Open Anytime)',
+      statusBadgeEn: '🌐 Open Schedule (Available Anytime)',
+      statusBadgeSi: '🌐 විවෘත කාලසටහන (ඕනෑම වේලාවක)',
+      timeRemainingTextTa: 'எப்போது வேண்டுமானாலும் செய்யலாம் (Anytime)',
+      timeRemainingTextEn: 'Available Anytime • No Date Lock',
+    };
+  }
+
   const startDateStr = comp.competitionStart || comp.startDate;
   const startTimeStr = comp.competitionStartTime || '00:00';
 
@@ -180,6 +256,7 @@ export function getCompetitionScheduleStatus(comp: Competition): CompetitionSche
     isUpcoming: phase === 'upcoming',
     isLive: phase === 'live',
     isEnded: phase === 'ended',
+    isOpenSchedule: false,
     canTakeExam: phase === 'live',
     isRegistrationOpen,
     isRegistrationClosed,

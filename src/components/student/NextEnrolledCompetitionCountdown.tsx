@@ -72,7 +72,10 @@ export const NextEnrolledCompetitionCountdown: React.FC<NextEnrolledCompetitionC
         let targetMs = 0;
         let isTargetStart = true;
 
-        if (sched.isUpcoming && sched.startDateTime) {
+        if (sched.isOpenSchedule) {
+          targetMs = nowMs + 365 * 86400 * 1000; // Open anytime, stays available at end of priority queue
+          isTargetStart = false;
+        } else if (sched.isUpcoming && sched.startDateTime) {
           targetMs = sched.startDateTime.getTime();
           isTargetStart = true;
         } else if (sched.isLive && sched.endDateTime) {
@@ -241,14 +244,20 @@ export const NextEnrolledCompetitionCountdown: React.FC<NextEnrolledCompetitionC
 
           <div className="text-[11px] text-slate-300 flex items-center gap-1.5 self-start sm:self-auto">
             <Calendar className="w-3.5 h-3.5 text-blue-300" />
-            <span>
-              {isTargetStart
-                ? (language === 'ta' ? 'தொடக்க நேரம்:' : 'Starts:')
-                : (language === 'ta' ? 'நிறைவு நேரம்:' : 'Closes:')}{' '}
-              <strong className="text-white font-mono font-bold">
-                {isTargetStart ? schedule.formattedStart : schedule.formattedEnd}
+            {schedule.isOpenSchedule ? (
+              <strong className="text-emerald-300 font-bold">
+                🌐 {language === 'ta' ? 'திறந்த அட்டவணை (எப்போது வேண்டுமானாலும்)' : 'Open Schedule (Anytime)'}
               </strong>
-            </span>
+            ) : (
+              <span>
+                {isTargetStart
+                  ? (language === 'ta' ? 'தொடக்க நேரம்:' : 'Starts:')
+                  : (language === 'ta' ? 'நிறைவு நேரம்:' : 'Closes:')}{' '}
+                <strong className="text-white font-mono font-bold">
+                  {isTargetStart ? schedule.formattedStart : schedule.formattedEnd}
+                </strong>
+              </span>
+            )}
           </div>
         </div>
 
@@ -264,7 +273,9 @@ export const NextEnrolledCompetitionCountdown: React.FC<NextEnrolledCompetitionC
               </span>
               <span className="text-[11px] text-slate-400">•</span>
               <span className="text-[11px] text-amber-300 font-bold">
-                {competition.duration || 30} {language === 'ta' ? 'நிமிடங்கள்' : 'Minutes'}
+                {competition.hasTimeLimit === false || competition.duration === 0
+                  ? (language === 'ta' ? '∞ நேரக் கட்டுப்பாடு இல்லை' : '∞ No Time Limit')
+                  : `${competition.duration || 30} ${language === 'ta' ? 'நிமிடங்கள்' : 'Minutes'}`}
               </span>
             </div>
 
@@ -319,59 +330,85 @@ export const NextEnrolledCompetitionCountdown: React.FC<NextEnrolledCompetitionC
           </div>
         </div>
 
-        {/* 4 Digital Glowing Countdown Unit Cards */}
-        <div className="pt-2">
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
-            <span>
-              {isTargetStart
-                ? (language === 'ta' ? 'பரீட்சை தொடங்குவதற்கு மீதமுள்ள நேரம்:' : 'Time Remaining Until Contest Begins:')
-                : (language === 'ta' ? 'பரீட்சை நிறைவடைவதற்கு மீதமுள்ள நேரம்:' : 'Time Remaining Until Contest Closes:')}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-2xl">
-            {/* Days Card */}
-            <div className="p-3 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 text-center shadow-md flex flex-col justify-center">
-              <span className="font-mono font-black text-2xl sm:text-4xl text-white tracking-tight">
-                {String(timeUnits.days).padStart(2, '0')}
-              </span>
-              <span className="text-[10px] sm:text-xs font-bold text-amber-300 uppercase tracking-wider mt-1">
-                {language === 'ta' ? 'நாட்கள்' : language === 'si' ? 'දින' : 'Days'}
-              </span>
-            </div>
-
-            {/* Hours Card */}
-            <div className="p-3 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 text-center shadow-md flex flex-col justify-center">
-              <span className="font-mono font-black text-2xl sm:text-4xl text-white tracking-tight">
-                {String(timeUnits.hours).padStart(2, '0')}
-              </span>
-              <span className="text-[10px] sm:text-xs font-bold text-amber-300 uppercase tracking-wider mt-1">
-                {language === 'ta' ? 'மணி' : language === 'si' ? 'පැය' : 'Hours'}
-              </span>
-            </div>
-
-            {/* Minutes Card */}
-            <div className="p-3 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 text-center shadow-md flex flex-col justify-center">
-              <span className="font-mono font-black text-2xl sm:text-4xl text-white tracking-tight">
-                {String(timeUnits.minutes).padStart(2, '0')}
-              </span>
-              <span className="text-[10px] sm:text-xs font-bold text-amber-300 uppercase tracking-wider mt-1">
-                {language === 'ta' ? 'நிமிடம்' : language === 'si' ? 'මිනිත්තු' : 'Minutes'}
-              </span>
-            </div>
-
-            {/* Seconds Card (Animated glowing pulse) */}
-            <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-amber-400/20 to-orange-500/20 backdrop-blur-md border border-amber-400/40 text-center shadow-md flex flex-col justify-center">
-              <span className="font-mono font-black text-2xl sm:text-4xl text-amber-300 tracking-tight animate-pulse">
-                {String(timeUnits.seconds).padStart(2, '0')}
-              </span>
-              <span className="text-[10px] sm:text-xs font-extrabold text-white uppercase tracking-wider mt-1">
-                {language === 'ta' ? 'நொடி' : language === 'si' ? 'තත්පර' : 'Seconds'}
-              </span>
+        {/* 4 Digital Glowing Countdown Unit Cards (or Open Schedule Ready Banner) */}
+        {schedule.isOpenSchedule ? (
+          <div className="pt-2">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-between gap-3 max-w-2xl">
+              <div className="flex items-center gap-3">
+                <Clock className="w-5 h-5 text-emerald-300 shrink-0" />
+                <div>
+                  <p className="text-xs sm:text-sm font-extrabold text-white">
+                    {language === 'ta'
+                      ? '🌐 திறந்த அட்டவணை: எந்நேரமும் செய்யக்கூடிய தேர்வு'
+                      : '🌐 Open Schedule: Ready Anytime'}
+                  </p>
+                  <p className="text-[11px] text-emerald-200 mt-0.5">
+                    {competition.hasTimeLimit === false || competition.duration === 0
+                      ? (language === 'ta'
+                          ? 'திகதி மற்றும் நேரக் கட்டுப்பாடுகள் இல்லை — அமைதியாக சிந்தித்து விடையளிக்கலாம்.'
+                          : 'No date lock & no time limit — practice or complete at your own pace.')
+                      : (language === 'ta'
+                          ? `திகதி கட்டுப்பாடு இல்லை (${competition.duration || 30} நிமிட தேர்வு)`
+                          : `Available anytime (${competition.duration || 30} min assessment once started)`)}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="pt-2">
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              <span>
+                {isTargetStart
+                  ? (language === 'ta' ? 'பரீட்சை தொடங்குவதற்கு மீதமுள்ள நேரம்:' : 'Time Remaining Until Contest Begins:')
+                  : (language === 'ta' ? 'பரீட்சை நிறைவடைவதற்கு மீதமுள்ள நேரம்:' : 'Time Remaining Until Contest Closes:')}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-2xl">
+              {/* Days Card */}
+              <div className="p-3 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 text-center shadow-md flex flex-col justify-center">
+                <span className="font-mono font-black text-2xl sm:text-4xl text-white tracking-tight">
+                  {String(timeUnits.days).padStart(2, '0')}
+                </span>
+                <span className="text-[10px] sm:text-xs font-bold text-amber-300 uppercase tracking-wider mt-1">
+                  {language === 'ta' ? 'நாட்கள்' : language === 'si' ? 'දින' : 'Days'}
+                </span>
+              </div>
+
+              {/* Hours Card */}
+              <div className="p-3 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 text-center shadow-md flex flex-col justify-center">
+                <span className="font-mono font-black text-2xl sm:text-4xl text-white tracking-tight">
+                  {String(timeUnits.hours).padStart(2, '0')}
+                </span>
+                <span className="text-[10px] sm:text-xs font-bold text-amber-300 uppercase tracking-wider mt-1">
+                  {language === 'ta' ? 'மணி' : language === 'si' ? 'පැය' : 'Hours'}
+                </span>
+              </div>
+
+              {/* Minutes Card */}
+              <div className="p-3 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 text-center shadow-md flex flex-col justify-center">
+                <span className="font-mono font-black text-2xl sm:text-4xl text-white tracking-tight">
+                  {String(timeUnits.minutes).padStart(2, '0')}
+                </span>
+                <span className="text-[10px] sm:text-xs font-bold text-amber-300 uppercase tracking-wider mt-1">
+                  {language === 'ta' ? 'நிமிடம்' : language === 'si' ? 'මිනිත්තු' : 'Minutes'}
+                </span>
+              </div>
+
+              {/* Seconds Card (Animated glowing pulse) */}
+              <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-amber-400/20 to-orange-500/20 backdrop-blur-md border border-amber-400/40 text-center shadow-md flex flex-col justify-center">
+                <span className="font-mono font-black text-2xl sm:text-4xl text-amber-300 tracking-tight animate-pulse">
+                  {String(timeUnits.seconds).padStart(2, '0')}
+                </span>
+                <span className="text-[10px] sm:text-xs font-extrabold text-white uppercase tracking-wider mt-1">
+                  {language === 'ta' ? 'நொடி' : language === 'si' ? 'තත්පර' : 'Seconds'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -17,6 +17,8 @@ interface ExamCountdownTimerProps {
   onTimeUp: () => void;
   language?: 'en' | 'ta' | 'si';
   isSubmitting?: boolean;
+  isUntimed?: boolean;
+  elapsedSeconds?: number;
   className?: string;
 }
 
@@ -27,6 +29,8 @@ export const ExamCountdownTimer: React.FC<ExamCountdownTimerProps> = ({
   onTimeUp,
   language = 'en',
   isSubmitting = false,
+  isUntimed = false,
+  elapsedSeconds = 0,
   className = '',
 }) => {
   const [audioEnabled, setAudioEnabled] = useState<boolean>(false);
@@ -36,21 +40,23 @@ export const ExamCountdownTimer: React.FC<ExamCountdownTimerProps> = ({
 
   // Calculate percentage remaining (0 to 100)
   const percentRemaining = useMemo(() => {
+    if (isUntimed) return 100;
     if (totalSeconds <= 0) return 0;
     return Math.max(0, Math.min(100, (remainingSeconds / totalSeconds) * 100));
-  }, [remainingSeconds, totalSeconds]);
+  }, [isUntimed, remainingSeconds, totalSeconds]);
 
   // Determine alert phase
   const alertPhase = useMemo<'normal' | 'warning' | 'critical' | 'expired'>(() => {
+    if (isUntimed) return 'normal';
     if (remainingSeconds <= 0) return 'expired';
     if (remainingSeconds <= 60) return 'critical'; // < 1 min
     if (remainingSeconds <= 300) return 'warning'; // < 5 mins
     return 'normal';
-  }, [remainingSeconds]);
+  }, [isUntimed, remainingSeconds]);
 
   // Gentle audio beep synthesizer for final 10 seconds (if audio is enabled)
   const playBeep = (freq: number = 880, duration: number = 0.15) => {
-    if (!audioEnabled || typeof window === 'undefined') return;
+    if (isUntimed || !audioEnabled || typeof window === 'undefined') return;
     try {
       if (!audioCtxRef.current) {
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -76,35 +82,38 @@ export const ExamCountdownTimer: React.FC<ExamCountdownTimerProps> = ({
     } catch {}
   };
 
-  // Trigger time up auto-submit once when remainingSeconds reaches 0
+  // Trigger time up auto-submit once when remainingSeconds reaches 0 (timed exams only)
   useEffect(() => {
+    if (isUntimed) return;
     if (remainingSeconds <= 0 && !hasTriggeredTimeUpRef.current && !isLocked) {
       hasTriggeredTimeUpRef.current = true;
       playBeep(440, 0.4);
       onTimeUp();
     }
-  }, [remainingSeconds, isLocked, onTimeUp]);
+  }, [isUntimed, remainingSeconds, isLocked, onTimeUp]);
 
   // Warning toast when 5 mins or 1 min remain
   useEffect(() => {
+    if (isUntimed) return;
     if (remainingSeconds === 300 || remainingSeconds === 60) {
       setShowLowTimeNotice(true);
       playBeep(660, 0.2);
       const timer = setTimeout(() => setShowLowTimeNotice(false), 5000);
       return () => clearTimeout(timer);
     }
-  }, [remainingSeconds]);
+  }, [isUntimed, remainingSeconds]);
 
   // Beep on final 10 seconds
   useEffect(() => {
+    if (isUntimed) return;
     if (remainingSeconds > 0 && remainingSeconds <= 10) {
       playBeep(remainingSeconds === 1 ? 1200 : 880, 0.1);
     }
-  }, [remainingSeconds]);
+  }, [isUntimed, remainingSeconds]);
 
-  // Format time as HH:MM:SS or MM:SS
+  // Format time as HH:MM:SS or MM:SS (shows elapsed time for untimed exams)
   const formatTimeParts = useMemo(() => {
-    const s = Math.max(0, remainingSeconds);
+    const s = Math.max(0, isUntimed ? elapsedSeconds : remainingSeconds);
     const hours = Math.floor(s / 3600);
     const minutes = Math.floor((s % 3600) / 60);
     const seconds = s % 60;
@@ -115,7 +124,7 @@ export const ExamCountdownTimer: React.FC<ExamCountdownTimerProps> = ({
       seconds: seconds.toString().padStart(2, '0'),
       hasHours: hours > 0,
     };
-  }, [remainingSeconds]);
+  }, [isUntimed, elapsedSeconds, remainingSeconds]);
 
   // Circular progress calculations (Radius = 18, circumference = 2 * PI * 18 = 113.097)
   const radius = 17;
@@ -167,7 +176,7 @@ export const ExamCountdownTimer: React.FC<ExamCountdownTimerProps> = ({
       <div
         id="exam-countdown-timer-widget"
         className={`flex items-center gap-2.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-2xl border transition-all duration-300 select-none ${theme.wrapper}`}
-        title={`Exam Duration: ${Math.round(totalSeconds / 60)} minutes`}
+        title={isUntimed ? 'Untimed Exam (No Time Limit)' : `Exam Duration: ${Math.round(totalSeconds / 60)} minutes`}
       >
         {/* SVG Circular Progress Ring */}
         <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center">
@@ -228,7 +237,13 @@ export const ExamCountdownTimer: React.FC<ExamCountdownTimerProps> = ({
 
           <div className="flex items-center justify-between gap-1.5 mt-0.5">
             <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">
-              {alertPhase === 'expired'
+              {isUntimed
+                ? language === 'ta'
+                  ? 'நேர வரம்பில்லை'
+                  : language === 'si'
+                  ? 'කාල සීමාවක් නැත'
+                  : 'No Time Limit'
+                : alertPhase === 'expired'
                 ? language === 'ta'
                   ? 'நேரம் முடிந்தது'
                   : language === 'si'
@@ -249,7 +264,7 @@ export const ExamCountdownTimer: React.FC<ExamCountdownTimerProps> = ({
 
             {/* Subtle percentage pill */}
             <span className="text-[9px] font-bold opacity-60">
-              {Math.round(percentRemaining)}%
+              {isUntimed ? '∞' : `${Math.round(percentRemaining)}%`}
             </span>
           </div>
         </div>

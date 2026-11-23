@@ -486,6 +486,26 @@ export async function registerStudentAccount(data: {
     throw new Error(`Student ID "${trimmedStudentId}" is already registered. Please verify your Student ID or click Generate.`);
   }
 
+  // 2b. Prevent exact duplicate registration (same full name + same email) while still permitting siblings
+  try {
+    const normFullName = data.fullName.trim().toLowerCase().replace(/\s+/g, ' ');
+    const emailDupSnap = await getDocs(query(collection(db, 'students'), where('email', '==', normalizedEmail)));
+    const exactSamePerson = emailDupSnap.docs.some((d) => {
+      const sData = d.data() as DbStudent;
+      const existingName = (sData.fullName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      return existingName === normFullName;
+    });
+    if (exactSamePerson) {
+      throw new Error(
+        `A student named "${data.fullName.trim()}" is already registered with "${normalizedEmail}". Please sign in with your Student ID or Username instead.`
+      );
+    }
+  } catch (dupErr: any) {
+    if (dupErr?.message?.includes('already registered')) {
+      throw dupErr;
+    }
+  }
+
   // 3. Create Firebase Auth account using a unique internal Auth email so siblings sharing the parent's email never collide!
   const internalAuthEmail = `${normalizedUsername}@student.hnceduhub.lk`;
 
@@ -904,6 +924,24 @@ export async function saveCompetitionToFirestore(
       ? competition.totalMarks
       : (existingData?.totalMarks ?? sanitizedQuestions.reduce((acc, q) => acc + (q.marks || 0), 0));
 
+  const resolvedHasTimeLimit =
+    competition.hasTimeLimit !== undefined
+      ? competition.hasTimeLimit
+      : competition.duration === 0
+      ? false
+      : existingData?.hasTimeLimit ?? (existingData?.duration === 0 ? false : true);
+
+  const resolvedDuration = !resolvedHasTimeLimit
+    ? 0
+    : typeof competition.duration === 'number' && competition.duration > 0
+    ? competition.duration
+    : typeof existingData?.duration === 'number' && existingData.duration > 0
+    ? existingData.duration
+    : 60;
+
+  const resolvedScheduleMode =
+    competition.scheduleMode ?? existingData?.scheduleMode ?? 'scheduled';
+
   const record: DbCompetition = {
     competitionId: targetId,
     title: (competition.title ?? existingData?.title ?? 'Untitled Competition').trim(),
@@ -912,7 +950,9 @@ export async function saveCompetitionToFirestore(
     category: competition.category ?? existingData?.category ?? 'General Knowledge',
     grade: competition.grade ?? existingData?.grade ?? 'Open',
     language: competition.language ?? existingData?.language ?? 'English',
-    duration: typeof competition.duration === 'number' ? competition.duration : (existingData?.duration ?? 60),
+    duration: resolvedDuration,
+    hasTimeLimit: resolvedHasTimeLimit,
+    scheduleMode: resolvedScheduleMode,
     entryType: competition.entryType ?? existingData?.entryType ?? 'Free',
     entryFee: typeof competition.entryFee === 'number' ? competition.entryFee : (existingData?.entryFee ?? 0),
     prizesEnabled: competition.prizesEnabled ?? existingData?.prizesEnabled ?? true,
@@ -1063,7 +1103,11 @@ export function subscribeToStudents(
     (snapshot) => {
       const items: DbStudent[] = [];
       snapshot.forEach((docSnap) => {
-        items.push(docSnap.data() as DbStudent);
+        const data = docSnap.data() as DbStudent;
+        items.push({
+          ...data,
+          uid: data.uid || docSnap.id,
+        });
       });
       callback(items);
     },
@@ -1678,20 +1722,55 @@ export async function purgeAllDemoCompetitions(): Promise<{ competitionsDeleted:
  * Delete a student account and related records from Firestore
  */
 export async function deleteStudentAccountFromFirestore(studentUid: string): Promise<void> {
+  if (!studentUid) return;
+
+  let permissionDeniedErr: any = null;
+
+  // 1. Delete from 'students' collection (both direct doc ID and any docs matching uid)
   try {
     const sRef = doc(db, 'students', studentUid);
     await deleteDoc(sRef);
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.code === 'permission-denied') permissionDeniedErr = err;
     console.warn('Error deleting student record:', err);
   }
 
   try {
+    const qStu = query(collection(db, 'students'), where('uid', '==', studentUid));
+    const stuSnap = await getDocs(qStu);
+    for (const d of stuSnap.docs) {
+      await deleteDoc(d.ref);
+    }
+  } catch (err: any) {
+    if (err?.code === 'permission-denied') permissionDeniedErr = err;
+  }
+
+  // 2. Delete from 'users' collection (both direct doc ID and any docs matching uid)
+  try {
     const uRef = doc(db, 'users', studentUid);
     await deleteDoc(uRef);
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.code === 'permission-denied') permissionDeniedErr = err;
     console.warn('Error deleting user record:', err);
   }
 
+  try {
+    const qUsr = query(collection(db, 'users'), where('uid', '==', studentUid));
+    const usrSnap = await getDocs(qUsr);
+    for (const d of usrSnap.docs) {
+      await deleteDoc(d.ref);
+    }
+  } catch (err: any) {
+    if (err?.code === 'permission-denied') permissionDeniedErr = err;
+  }
+
+  if (permissionDeniedErr) {
+    throw new Error(
+      'Permission denied: Please sign in as Super Admin (freedomedupu@gmail.com) to remove student registrations.'
+    );
+  }
+
+  // 3. Clean up related attempts, memberships, and live proctor sessions
   try {
     const attemptsCol = collection(db, 'attempts');
     const q = query(attemptsCol, where('studentId', '==', studentUid));
@@ -1700,6 +1779,50 @@ export async function deleteStudentAccountFromFirestore(studentUid: string): Pro
       await deleteDoc(d.ref);
     }
   } catch (_) {}
+
+  try {
+    const memCol = collection(db, 'memberships');
+    const qMem = query(memCol, where('studentId', '==', studentUid));
+    const memSnap = await getDocs(qMem);
+    for (const d of memSnap.docs) {
+      await deleteDoc(d.ref);
+    }
+  } catch (_) {}
+
+  try {
+    const procCol = collection(db, 'liveProctorSessions');
+    const qProc = query(procCol, where('studentId', '==', studentUid));
+    const procSnap = await getDocs(qProc);
+    for (const d of procSnap.docs) {
+      await deleteDoc(d.ref);
+    }
+  } catch (_) {}
+}
+
+/**
+ * Bulk-delete multiple duplicate student accounts from Firestore cleanly
+ */
+export async function deleteMultipleStudentAccountsFromFirestore(
+  studentUids: string[]
+): Promise<{ deletedUids: string[]; failedUids: string[]; error?: string }> {
+  const uniqueUids = Array.from(new Set(studentUids.filter(Boolean)));
+  const deletedUids: string[] = [];
+  const failedUids: string[] = [];
+  let firstError: string | undefined;
+
+  for (const uid of uniqueUids) {
+    try {
+      await deleteStudentAccountFromFirestore(uid);
+      deletedUids.push(uid);
+    } catch (err: any) {
+      failedUids.push(uid);
+      if (!firstError) {
+        firstError = err?.message || 'Failed to delete duplicate registration';
+      }
+    }
+  }
+
+  return { deletedUids, failedUids, error: firstError };
 }
 
 /**

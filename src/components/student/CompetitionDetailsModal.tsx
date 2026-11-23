@@ -143,13 +143,30 @@ export const CompetitionDetailsModal: React.FC<CompetitionDetailsModalProps> = (
                 <Clock className="h-3.5 w-3.5 text-blue-600" />
                 {language === 'ta' ? 'கால அளவு' : language === 'si' ? 'කාලය' : 'Duration'}
               </span>
-              <p className="mt-1 text-base font-bold text-slate-900">
-                {competition.duration || 60}{' '}
-                {language === 'ta' ? 'நிமிடங்கள்' : language === 'si' ? 'මිනිත්තු' : 'Minutes'}
-              </p>
-              <span className="text-[11px] text-slate-500">
-                {language === 'ta' ? 'நிர்வாக அமைவு' : language === 'si' ? 'පරිපාලක සැකසුම' : 'Admin-Configured'}
-              </span>
+              {competition.hasTimeLimit === false || competition.duration === 0 ? (
+                <>
+                  <p className="mt-1 text-base font-bold text-emerald-800">
+                    {language === 'ta'
+                      ? '∞ நேர வரம்பில்லை'
+                      : language === 'si'
+                      ? '∞ කාල සීමාවක් නැත'
+                      : '∞ No Time Limit'}
+                  </p>
+                  <span className="text-[11px] text-emerald-700 font-medium">
+                    {language === 'ta' ? 'அவசரமின்றி எழுதலாம்' : language === 'si' ? 'නිදහසේ පිළිතුරු දෙන්න' : 'Untimed Self-Paced'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <p className="mt-1 text-base font-bold text-slate-900">
+                    {competition.duration || 60}{' '}
+                    {language === 'ta' ? 'நிமிடங்கள்' : language === 'si' ? 'මිනිත්තු' : 'Minutes'}
+                  </p>
+                  <span className="text-[11px] text-slate-500">
+                    {language === 'ta' ? 'நிர்வாக அமைவு' : language === 'si' ? 'පරිපාලක සැකසුම' : 'Admin-Configured'}
+                  </span>
+                </>
+              )}
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
@@ -352,27 +369,38 @@ export const CompetitionDetailsModal: React.FC<CompetitionDetailsModalProps> = (
               <Calendar className="h-4 w-4 text-blue-600" />
               {language === 'ta' ? 'போட்டி & பதிவு அட்டவணை' : language === 'si' ? 'තරඟ සහ ලියාපදිංචි කාලසටහන' : 'Competition & Registration Schedule'}
             </div>
-            <div className="grid sm:grid-cols-2 gap-3 text-xs text-slate-600 pt-1">
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
-                <span className="text-slate-500 font-medium block mb-1">
-                  {language === 'ta' ? '📅 பதிவு காலம் (Registration Period):' : language === 'si' ? '📅 ලියාපදිංචි කාලය:' : '📅 Registration Window:'}
-                </span>
-                <p className="font-semibold text-slate-800">
-                  {competition.registrationStart || '—'} {language === 'ta' ? 'முதல்' : language === 'si' ? 'සිට' : 'to'} {competition.registrationEnd || competition.registrationDeadline || '—'}
-                </p>
+            {competition.scheduleMode === 'open' ? (
+              <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200 text-xs text-emerald-900 font-semibold">
+                🌐{' '}
+                {language === 'ta'
+                  ? 'திறந்த அட்டவணை: திகதி மற்றும் நேர வரம்புகள் இன்றி எப்போது வேண்டுமானாலும் பதிவு செய்து செய்யலாம்.'
+                  : language === 'si'
+                  ? 'විවෘත කාලසටහන: ඕනෑම වේලාවක ලියාපදිංචි වී සහභාගී විය හැක.'
+                  : 'Open Schedule: Available anytime with no start date or closing deadline.'}
               </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-3 text-xs text-slate-600 pt-1">
+                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
+                  <span className="text-slate-500 font-medium block mb-1">
+                    {language === 'ta' ? '📅 பதிவு காலம் (Registration Period):' : language === 'si' ? '📅 ලියාපදිංචි කාලය:' : '📅 Registration Window:'}
+                  </span>
+                  <p className="font-semibold text-slate-800">
+                    {competition.registrationStart || '—'} {language === 'ta' ? 'முதல்' : language === 'si' ? 'සිට' : 'to'} {competition.registrationEnd || competition.registrationDeadline || '—'}
+                  </p>
+                </div>
 
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
-                <span className="text-slate-500 font-medium block mb-1">
-                  {language === 'ta' ? '⏰ தேர்வு காலம் & நேரம் (Competition Date & Time):' : language === 'si' ? '⏰ තරඟ දිනය සහ වේලාව:' : '⏰ Competition Date & Time:'}
-                </span>
-                <p className="font-semibold text-purple-900">
-                  {competition.competitionStart || competition.startDate || '—'} {competition.competitionStartTime ? `(${competition.competitionStartTime})` : ''} 
-                  {' '}{language === 'ta' ? 'முதல்' : language === 'si' ? 'සිට' : 'to'}{' '}
-                  {competition.competitionEnd || competition.endDate || '—'} {competition.competitionEndTime ? `(${competition.competitionEndTime})` : ''}
-                </p>
+                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
+                  <span className="text-slate-500 font-medium block mb-1">
+                    {language === 'ta' ? '⏰ தேர்வு காலம் & நேரம் (Competition Date & Time):' : language === 'si' ? '⏰ තරඟ දිනය සහ වේලාව:' : '⏰ Competition Date & Time:'}
+                  </span>
+                  <p className="font-semibold text-purple-900">
+                    {competition.competitionStart || competition.startDate || '—'} {competition.competitionStartTime ? `(${competition.competitionStartTime})` : ''} 
+                    {' '}{language === 'ta' ? 'முதல்' : language === 'si' ? 'සිට' : 'to'}{' '}
+                    {competition.competitionEnd || competition.endDate || '—'} {competition.competitionEndTime ? `(${competition.competitionEndTime})` : ''}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
             
             <div className="pt-1 flex items-center justify-between text-xs border-t border-slate-100">
               <span className="text-slate-500">

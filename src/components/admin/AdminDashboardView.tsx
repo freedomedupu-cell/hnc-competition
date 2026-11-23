@@ -356,10 +356,12 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200/60 text-xs">
                     <div>
                       <span className="text-[10px] text-slate-400 block uppercase">
-                        Registration Ends
+                        Schedule / Deadline
                       </span>
-                      <span className="font-semibold text-slate-700">
-                        {comp.registrationEnd || comp.registrationDeadline || 'TBD'}
+                      <span className={`font-semibold ${comp.scheduleMode === 'open' ? 'text-emerald-700' : 'text-slate-700'}`}>
+                        {comp.scheduleMode === 'open'
+                          ? '🌐 Open Anytime'
+                          : (comp.registrationEnd || comp.registrationDeadline || 'TBD')}
                       </span>
                     </div>
                     <div>
@@ -367,7 +369,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                         Duration
                       </span>
                       <span className="font-semibold text-slate-700">
-                        {comp.duration || 60} mins
+                        {comp.hasTimeLimit === false || comp.duration === 0
+                          ? '∞ No Limit'
+                          : `${comp.duration || 60} mins`}
                       </span>
                     </div>
                     <div>

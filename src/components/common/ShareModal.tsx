@@ -63,7 +63,16 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       (competition.questions
         ? competition.questions.reduce((sum, q) => sum + (Number(q.marks) || 0), 0)
         : 100);
-    const duration = competition.duration || 60;
+    const isUntimed = competition.hasTimeLimit === false || competition.duration === 0;
+    const isOpen = competition.scheduleMode === 'open';
+    const duration = isUntimed ? 0 : (competition.duration || 60);
+    const durationLabelTa = isUntimed ? 'நேர வரம்பில்லை (∞)' : `${duration} நிமிடங்கள்`;
+    const durationLabelSi = isUntimed ? 'කාල සීමාවක් නැත (∞)' : `මිනිත්තු ${duration}`;
+    const durationLabelEn = isUntimed ? 'No Time Limit (∞)' : `${duration} Mins`;
+    const scheduleBadgeTa = isOpen ? ' | 🌐 எப்போதும் திறந்தது' : '';
+    const scheduleBadgeSi = isOpen ? ' | 🌐 ඕනෑම වේලාවක විවෘතයි' : '';
+    const scheduleBadgeEn = isOpen ? ' | 🌐 Open Anytime' : '';
+
     const entryFeeText =
       competition.entryType === 'Paid' && competition.entryFee && competition.entryFee > 0
         ? `LKR ${competition.entryFee.toLocaleString()}`
@@ -74,7 +83,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         `📝 *${competition.title}*\n` +
         `🏷️ வகை: ${competition.competitionType || 'Competition'}\n` +
         `📚 தரம்: ${competition.grade || 'அனைத்து தரங்கள்'} | பாடம்: ${competition.category || 'பொது'}\n` +
-        `⏱️ காலம்: ${duration} நிமிடங்கள் | புள்ளிகள்: ${totalMarks}\n` +
+        `⏱️ காலம்: ${durationLabelTa} | புள்ளிகள்: ${totalMarks}${scheduleBadgeTa}\n` +
         `💰 நுழைவு: ${entryFeeText}\n\n` +
         (referralCode ? `🎁 எனது பரிந்துரைக் குறியீடு (Referral Code): *${referralCode}* (உடனடி போனஸ் புள்ளிகள் கிடைக்கும்!)\n\n` : '') +
         `👉 பதிவு செய்து பங்குபற்ற உடனே கிளிக் செய்யவும்:\n` +
@@ -85,7 +94,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         `📝 *${competition.title}*\n` +
         `🏷️ වර්ගය: ${competition.competitionType || 'Competition'}\n` +
         `📚 ශ්‍රේණිය: ${competition.grade || 'සියලුම ශ්‍රේණි'} | විෂයය: ${competition.category || 'සාමාන්‍ය'}\n` +
-        `⏱️ කාලය: මිනිත්තු ${duration} | මුළු ලකුණු: ${totalMarks}\n` +
+        `⏱️ කාලය: ${durationLabelSi} | මුළු ලකුණු: ${totalMarks}${scheduleBadgeSi}\n` +
         `💰 ඇතුල්වීම: ${entryFeeText}\n\n` +
         (referralCode ? `🎁 මගේ යොමු කේතය (Referral Code): *${referralCode}*\n\n` : '') +
         `👉 ලියාපදිංචි වී සහභාගී වීමට මෙතනින් පිවිසෙන්න:\n` +
@@ -96,7 +105,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         `📝 *${competition.title}*\n` +
         `🏷️ Type: ${competition.competitionType || 'Competition'}\n` +
         `📚 Grade: ${competition.grade || 'Open'} | Subject: ${competition.category || 'General'}\n` +
-        `⏱️ Duration: ${duration} Mins | Total Marks: ${totalMarks}\n` +
+        `⏱️ Duration: ${durationLabelEn} | Total Marks: ${totalMarks}${scheduleBadgeEn}\n` +
         `💰 Entry: ${entryFeeText}\n\n` +
         (referralCode ? `🎁 Referral Code: *${referralCode}* (Register with code to get instant bonus points!)\n\n` : '') +
         `👉 Register & Participate Now:\n` +

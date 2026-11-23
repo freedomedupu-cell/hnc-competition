@@ -1520,12 +1520,22 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
                           {comp.competitionType || 'Competition'}
                         </span>
                       </div>
-                      <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                      <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
                         <span>{comp.category}</span>
                         <span>•</span>
                         <span>{comp.enrolledCount} Enrolled Candidates</span>
                         <span>•</span>
-                        <span>{comp.duration || 60} Mins</span>
+                        <span>
+                          {comp.hasTimeLimit === false || comp.duration === 0
+                            ? '∞ No Time Limit'
+                            : `${comp.duration || 60} Mins`}
+                        </span>
+                        {comp.scheduleMode === 'open' && (
+                          <>
+                            <span>•</span>
+                            <span className="text-teal-700 font-semibold">🌐 Open Anytime</span>
+                          </>
+                        )}
                       </div>
                     </div>
 

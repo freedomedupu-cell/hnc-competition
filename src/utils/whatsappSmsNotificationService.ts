@@ -106,7 +106,8 @@ export function formatExam15MinAlertMessage(
   const appBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://hnc-edu.app';
   const directExamUrl = `${appBaseUrl}/?comp=${competition.id}`;
   const compCode = competition.code || `HNC-${competition.id.slice(0, 5).toUpperCase()}`;
-  const durationMins = competition.duration || 30;
+  const isUntimed = competition.hasTimeLimit === false || competition.duration === 0;
+  const durationMins = isUntimed ? 0 : (competition.duration || 30);
 
   if (language === 'ta') {
     return (
@@ -117,7 +118,7 @@ export function formatExam15MinAlertMessage(
       `• பாடம்: ${competition.category || 'Mathematics'}\n` +
       `• தரம்: ${competition.grade || 'Grade 11'}\n` +
       `• குறியீடு: ${compCode}\n` +
-      `• நேரம்: ${durationMins} நிமிடங்கள்\n\n` +
+      `• நேரம்: ${isUntimed ? 'நேரக் கட்டுப்பாடு இல்லை (No Limit)' : `${durationMins} நிமிடங்கள்`}\n\n` +
       `🔗 *உடனடியாக பரீட்சை அரங்கிற்குச் செல்ல கிளிக் செய்யவும்:*\n` +
       `${directExamUrl}\n\n` +
       `வாழ்த்துகள்! 🏆\n` +
@@ -131,7 +132,7 @@ export function formatExam15MinAlertMessage(
       `📌 *විභාග තොරතුරු:*\n` +
       `• විෂයය: ${competition.category}\n` +
       `• ශ්‍රේණිය: ${competition.grade}\n` +
-      `• කාලය: මිනිත්තු ${durationMins}\n\n` +
+      `• කාලය: ${isUntimed ? 'කාල සීමාවක් නැත' : `මිනිත්තු ${durationMins}`}\n\n` +
       `🔗 *විභාගයට පිවිසීමට මෙතැනින් ක්ලික් කරන්න:*\n` +
       `${directExamUrl}\n\n` +
       `සුබ පතමු! 🏆\n` +
@@ -147,7 +148,7 @@ export function formatExam15MinAlertMessage(
     `• Subject: ${competition.category || 'Mathematics'}\n` +
     `• Grade Tier: ${competition.grade || 'Grade 11'}\n` +
     `• Access Code: ${compCode}\n` +
-    `• Duration: ${durationMins} Minutes\n\n` +
+    `• Duration: ${isUntimed ? 'No Time Limit' : `${durationMins} Minutes`}\n\n` +
     `🔗 *Click to join live exam hall now:*\n` +
     `${directExamUrl}\n\n` +
     `Best of Luck! 🏆\n` +
@@ -198,7 +199,8 @@ export function formatUpcomingCompetitionAlertMessage(
   const appBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://hnc-edu.app';
   const directExamUrl = `${appBaseUrl}/?comp=${competition.id}`;
   const compCode = competition.code || `HNC-${competition.id.slice(0, 5).toUpperCase()}`;
-  const durationMins = competition.duration || 30;
+  const isUntimed = competition.hasTimeLimit === false || competition.duration === 0;
+  const durationMins = isUntimed ? 0 : (competition.duration || 30);
   const timeRemainingStr =
     hoursLeft !== undefined
       ? hoursLeft <= 1
@@ -215,7 +217,7 @@ export function formatUpcomingCompetitionAlertMessage(
       `• பாடம்: ${competition.category || 'Mathematics'}\n` +
       `• தரம்: ${competition.grade || 'All Grades'}\n` +
       `• போட்டி குறியீடு: ${compCode}\n` +
-      `• காலம்: ${durationMins} நிமிடங்கள்\n` +
+      `• காலம்: ${isUntimed ? 'நேரக் கட்டுப்பாடு இல்லை (No Limit)' : `${durationMins} நிமிடங்கள்`}\n` +
       `${competition.totalMarks ? `• மொத்த புள்ளிகள்: ${competition.totalMarks}\n` : ''}` +
       `\n🔗 *பதிவு செய்யவும் அல்லது பாடத்திட்டத்தைப் பார்க்கவும்:*\n` +
       `${directExamUrl}\n\n` +
@@ -230,7 +232,7 @@ export function formatUpcomingCompetitionAlertMessage(
       `📌 *තරඟ විස්තර:*\n` +
       `• විෂයය: ${competition.category}\n` +
       `• ශ්‍රේණිය: ${competition.grade}\n` +
-      `• කාලය: මිනිත්තු ${durationMins}\n\n` +
+      `• කාලය: ${isUntimed ? 'කාල සීමාවක් නැත' : `මිනිත්තු ${durationMins}`}\n\n` +
       `🔗 *ලියාපදිංචි වීමට පිවිසෙන්න:*\n` +
       `${directExamUrl}\n\n` +
       `සුබ පැතුම්! 🏆\n` +
@@ -246,7 +248,7 @@ export function formatUpcomingCompetitionAlertMessage(
     `• Subject: ${competition.category || 'Mathematics'}\n` +
     `• Grade Level: ${competition.grade || 'All Grades'}\n` +
     `• Code: ${compCode}\n` +
-    `• Duration: ${durationMins} Minutes\n\n` +
+    `• Duration: ${isUntimed ? 'No Time Limit' : `${durationMins} Minutes`}\n\n` +
     `🔗 *Register / View Syllabi on Portal:*\n` +
     `${directExamUrl}\n\n` +
     `Prepare ahead and achieve national honors! 🏆\n` +

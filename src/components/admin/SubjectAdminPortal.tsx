@@ -524,7 +524,9 @@ export const SubjectAdminPortal: React.FC<SubjectAdminPortalProps> = ({
                         Duration
                       </span>
                       <span className="text-xs font-bold text-slate-800">
-                        {comp.duration || 60}m
+                        {comp.hasTimeLimit === false || comp.duration === 0
+                          ? '∞ No Limit'
+                          : `${comp.duration || 60}m`}
                       </span>
                     </div>
                     <div>

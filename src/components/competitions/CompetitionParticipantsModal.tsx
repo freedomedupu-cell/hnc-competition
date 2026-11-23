@@ -18,6 +18,8 @@ import {
   ExternalLink,
   ZoomIn,
   MessageSquare,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   formatExam15MinAlertMessage,
@@ -38,10 +40,12 @@ export const CompetitionParticipantsModal: React.FC<CompetitionParticipantsModal
   onClose,
   competition,
 }) => {
-  const { payments, verificationPhotos, updatePaymentStatus } = useApp();
+  const { payments, verificationPhotos, updatePaymentStatus, removeDuplicateCompetitionParticipants } = useApp();
   const [activeTab, setActiveTab] = useState<ModalTab>('candidates');
   const [searchTerm, setSearchTerm] = useState('');
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  const [isRemovingDuplicates, setIsRemovingDuplicates] = useState(false);
+  const [dedupSuccessMessage, setDedupSuccessMessage] = useState<string | null>(null);
 
   if (!competition) return null;
 
@@ -51,7 +55,48 @@ export const CompetitionParticipantsModal: React.FC<CompetitionParticipantsModal
     (v) => v.competitionId === competition.id
   );
 
-  const filteredParticipants = participants.filter((p) => {
+  // Detect duplicate participant entries by studentId or normalized email
+  const { duplicateParticipantCount, duplicateParticipantIndices } = React.useMemo(() => {
+    const seenIds = new Set<string>();
+    const seenEmails = new Set<string>();
+    const dupIndices = new Set<number>();
+
+    participants.forEach((p, idx) => {
+      const idKey = (p.studentId || '').trim();
+      const emailKey = (p.email || '').trim().toLowerCase();
+      if ((idKey && seenIds.has(idKey)) || (emailKey && seenEmails.has(emailKey))) {
+        dupIndices.add(idx);
+      } else {
+        if (idKey) seenIds.add(idKey);
+        if (emailKey) seenEmails.add(emailKey);
+      }
+    });
+
+    return {
+      duplicateParticipantCount: dupIndices.size,
+      duplicateParticipantIndices: dupIndices,
+    };
+  }, [participants]);
+
+  const handleRemoveDuplicateParticipants = async () => {
+    if (duplicateParticipantCount === 0 || isRemovingDuplicates) return;
+    setIsRemovingDuplicates(true);
+    try {
+      const removedCount = await removeDuplicateCompetitionParticipants(competition.id);
+      setDedupSuccessMessage(
+        removedCount > 0
+          ? `Removed ${removedCount} duplicate registration${removedCount > 1 ? 's' : ''} from this competition.`
+          : 'No duplicate entries remained.'
+      );
+      setTimeout(() => setDedupSuccessMessage(null), 4000);
+    } finally {
+      setIsRemovingDuplicates(false);
+    }
+  };
+
+  const indexedParticipants = participants.map((p, idx) => ({ participant: p, originalIdx: idx }));
+
+  const filteredParticipants = indexedParticipants.filter(({ participant: p }) => {
     const term = searchTerm.toLowerCase();
     return (
       p.studentName.toLowerCase().includes(term) ||
@@ -215,7 +260,36 @@ export const CompetitionParticipantsModal: React.FC<CompetitionParticipantsModal
 
         {/* 1. CANDIDATES TAB */}
         {activeTab === 'candidates' && (
-          <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+          <div className="space-y-3">
+            {dedupSuccessMessage && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{dedupSuccessMessage}</span>
+              </div>
+            )}
+
+            {duplicateParticipantCount > 0 && (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 text-amber-900">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <div className="text-xs">
+                    <span className="font-bold">{duplicateParticipantCount} duplicate registration{duplicateParticipantCount > 1 ? 's' : ''} detected</span>{' '}
+                    <span className="text-amber-700">in this competition roster (matching Student ID or Email).</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveDuplicateParticipants}
+                  disabled={isRemovingDuplicates}
+                  className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-2xs disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isRemovingDuplicates ? 'Removing...' : `Remove Duplicates (${duplicateParticipantCount})`}</span>
+                </button>
+              </div>
+            )}
+
+            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
             <div className="max-h-96 overflow-y-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 sticky top-0 z-10">
@@ -239,15 +313,29 @@ export const CompetitionParticipantsModal: React.FC<CompetitionParticipantsModal
                       </td>
                     </tr>
                   ) : (
-                    filteredParticipants.map((p, idx) => (
-                      <tr key={p.studentId || idx} className="hover:bg-slate-50/60 transition-colors">
+                    filteredParticipants.map(({ participant: p, originalIdx }) => {
+                      const isDupRow = duplicateParticipantIndices.has(originalIdx);
+                      return (
+                      <tr
+                        key={`${p.studentId || 'row'}-${originalIdx}`}
+                        className={`transition-colors ${
+                          isDupRow ? 'bg-amber-50/70 hover:bg-amber-50' : 'hover:bg-slate-50/60'
+                        }`}
+                      >
                         <td className="px-4 py-3 font-medium text-slate-900">
                           <div className="flex items-center gap-2.5">
                             <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-800 font-bold text-[11px] flex items-center justify-center shrink-0">
                               {p.studentName.charAt(0)}
                             </div>
                             <div>
-                              <div className="font-semibold text-slate-900">{p.studentName}</div>
+                              <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+                                <span>{p.studentName}</span>
+                                {isDupRow && (
+                                  <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 text-[9px] font-bold uppercase">
+                                    Duplicate
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[11px] text-slate-500 font-mono">{p.email}</div>
                             </div>
                           </div>
@@ -299,10 +387,12 @@ export const CompetitionParticipantsModal: React.FC<CompetitionParticipantsModal
                           </div>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
+            </div>
             </div>
           </div>
         )}

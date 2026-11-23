@@ -246,8 +246,14 @@ export function getStudentDeadlineAlerts(
     if (!comp) continue;
 
     const s = (comp.status || '').toLowerCase().trim();
-    // Exclude draft, inactive, closed
-    if (s.includes('draft') || s === 'closed' || s === 'inactive' || s === 'unpublished') {
+    // Exclude draft, inactive, closed, or open-schedule (anytime) exams
+    if (
+      s.includes('draft') ||
+      s === 'closed' ||
+      s === 'inactive' ||
+      s === 'unpublished' ||
+      comp.scheduleMode === 'open'
+    ) {
       continue;
     }
 

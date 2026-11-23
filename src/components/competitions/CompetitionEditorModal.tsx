@@ -45,6 +45,8 @@ import {
   Zap,
   RefreshCw,
   Save,
+  Globe,
+  Infinity as InfinityIcon,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { CompetitionPreviewModal } from './CompetitionPreviewModal';
@@ -356,6 +358,8 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
   const [grade, setGrade] = useState('Grade 10');
   const [language, setLanguage] = useState<SupportedLanguage>('English');
   const [duration, setDuration] = useState<number>(60);
+  const [hasTimeLimit, setHasTimeLimit] = useState<boolean>(true);
+  const [scheduleMode, setScheduleMode] = useState<'scheduled' | 'open'>('scheduled');
   const [requireCameraVerification, setRequireCameraVerification] = useState<boolean>(false);
   const [requireVideoVerification, setRequireVideoVerification] = useState<boolean>(false);
   const [membershipRequired, setMembershipRequired] = useState<boolean>(false);
@@ -484,7 +488,15 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
       setCategory(initialCompetition.category || 'Mathematics');
       setGrade(initialCompetition.grade || 'Grade 10');
       setLanguage((initialCompetition.language as any) || 'English');
-      setDuration(initialCompetition.duration || 60);
+      const initialHasLimit =
+        initialCompetition.hasTimeLimit !== undefined
+          ? initialCompetition.hasTimeLimit
+          : initialCompetition.duration === 0
+          ? false
+          : true;
+      setHasTimeLimit(initialHasLimit);
+      setDuration(initialHasLimit ? (initialCompetition.duration || 60) : 0);
+      setScheduleMode(initialCompetition.scheduleMode || 'scheduled');
 
       setEntryType(initialCompetition.entryType || 'Free');
       setEntryFee(initialCompetition.entryFee || 0);
@@ -551,6 +563,8 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
 
       setEntryType('Free');
       setEntryFee(0);
+      setHasTimeLimit(true);
+      setScheduleMode('scheduled');
       setRegistrationStart(fmt(today));
       setRegistrationEnd(fmt(inTwoWeeks));
       setCompetitionStart(fmt(inThreeWeeks));
@@ -625,7 +639,14 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
     if (availableDraft.category) setCategory(availableDraft.category);
     if (availableDraft.grade) setGrade(availableDraft.grade);
     if (availableDraft.language) setLanguage(availableDraft.language);
-    if (availableDraft.duration) setDuration(availableDraft.duration);
+    if (availableDraft.hasTimeLimit !== undefined) {
+      setHasTimeLimit(availableDraft.hasTimeLimit);
+      setDuration(availableDraft.hasTimeLimit ? (availableDraft.duration || 60) : 0);
+    } else if (availableDraft.duration !== undefined) {
+      setHasTimeLimit(availableDraft.duration > 0);
+      setDuration(availableDraft.duration);
+    }
+    if (availableDraft.scheduleMode) setScheduleMode(availableDraft.scheduleMode);
     if (availableDraft.entryType) setEntryType(availableDraft.entryType);
     if (availableDraft.entryFee !== undefined) setEntryFee(availableDraft.entryFee);
     if (availableDraft.questions && Array.isArray(availableDraft.questions)) {
@@ -666,6 +687,8 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
           grade,
           language,
           duration,
+          hasTimeLimit,
+          scheduleMode,
           requireCameraVerification,
           membershipRequired,
           entryType,
@@ -704,6 +727,8 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
     grade,
     language,
     duration,
+    hasTimeLimit,
+    scheduleMode,
     requireCameraVerification,
     entryType,
     entryFee,
@@ -977,7 +1002,9 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
         category,
         grade,
         language,
-        duration: Number(duration) || 60,
+        duration: hasTimeLimit ? (Number(duration) > 0 ? Number(duration) : 60) : 0,
+        hasTimeLimit,
+        scheduleMode,
         entryType,
         entryFee: entryType === 'Paid' ? Number(entryFee) : 0,
         prizesEnabled,
@@ -1040,7 +1067,9 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
     category,
     grade,
     language,
-    duration,
+    duration: hasTimeLimit ? duration : 0,
+    hasTimeLimit,
+    scheduleMode,
     requireCameraVerification,
     requireVideoVerification,
     membershipRequired,
@@ -1405,17 +1434,60 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-800 mb-1">
-                    Duration (Minutes) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={5}
-                    max={360}
-                    value={duration}
-                    onChange={(e) => setDuration(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-800">
+                      Exam Duration / Time Limit {hasTimeLimit && <span className="text-red-500">*</span>}
+                    </label>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      hasTimeLimit ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {hasTimeLimit ? `⏱️ ${duration || 60} mins` : '∞ No Limit'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 mb-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHasTimeLimit(true);
+                        if (!duration || duration <= 0) setDuration(30);
+                      }}
+                      className={`px-2 py-1.5 rounded-lg border text-[11px] font-bold transition cursor-pointer ${
+                        hasTimeLimit
+                          ? 'bg-blue-50 border-blue-600 text-blue-900 ring-1 ring-blue-600'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      ⏱️ Time Limit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHasTimeLimit(false);
+                        setDuration(0);
+                      }}
+                      className={`px-2 py-1.5 rounded-lg border text-[11px] font-bold transition cursor-pointer ${
+                        !hasTimeLimit
+                          ? 'bg-emerald-50 border-emerald-600 text-emerald-900 ring-1 ring-emerald-600'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      ∞ No Time Limit
+                    </button>
+                  </div>
+                  {hasTimeLimit ? (
+                    <input
+                      type="number"
+                      min={1}
+                      max={360}
+                      value={duration || 60}
+                      onChange={(e) => setDuration(Math.max(1, Number(e.target.value)))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900"
+                    />
+                  ) : (
+                    <div className="px-3 py-2 border border-emerald-200 bg-emerald-50/70 rounded-lg text-[11px] font-semibold text-emerald-800">
+                      நேரக் கட்டுப்பாடு இல்லை — மாணவர்கள் அவசரமின்றி வினாக்களுக்கு விடையளிக்கலாம்.
+                    </div>
+                  )}
                 </div>
 
                 {/* District Scope: All Island or 25 Sri Lankan Districts */}
@@ -2030,6 +2102,141 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
           {/* TAB 2: SCHEDULE & ENTRY FEE */}
           {activeTab === 'schedule' && (
             <div className="space-y-5 text-xs">
+              {/* Schedule Mode & Time Limit Strategy Selector */}
+              <div className="p-4 rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/70 via-blue-50/40 to-white space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-indigo-100">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-indigo-600" />
+                      <span>Schedule Mode & Exam Timing Rules (பரீட்சை அட்டவணை & நேர வரம்பு)</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-600 mt-0.5">
+                      குறிப்பிட்ட நேர அட்டவணையுடன் கூடிய பரீட்சையா அல்லது எந்நேரமும் நேரக் கட்டுப்பாடின்றி செய்யக்கூடிய வினாக்களா என்பதைத் தேர்ந்தெடுக்கவும்.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                      scheduleMode === 'open' ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white'
+                    }`}>
+                      {scheduleMode === 'open' ? '🌐 Open Schedule' : '📅 Scheduled Window'}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                      hasTimeLimit ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-teal-100 text-teal-900 border border-teal-300'
+                    }`}>
+                      {hasTimeLimit ? `⏱️ ${duration || 60} mins` : '∞ No Time Limit'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Schedule Type: Scheduled Window vs Open Schedule */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setScheduleMode('scheduled')}
+                    className={`p-3.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                      scheduleMode === 'scheduled'
+                        ? 'bg-white border-indigo-600 ring-2 ring-indigo-500/20 text-slate-900 shadow-xs'
+                        : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs flex items-center gap-1.5 text-indigo-900">
+                          <Calendar className="w-4 h-4 text-indigo-600" />
+                          <span>Scheduled Time Window (குறிப்பிட்ட நேர அட்டவணை)</span>
+                        </span>
+                        {scheduleMode === 'scheduled' && <Check className="w-4 h-4 text-indigo-600" />}
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-snug">
+                        Enforces strict Start Date/Time, End Date/Time, and Registration deadline. Ideal for formal exams & live contests.
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setScheduleMode('open')}
+                    className={`p-3.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                      scheduleMode === 'open'
+                        ? 'bg-emerald-50 border-emerald-600 ring-2 ring-emerald-500/20 text-emerald-950 shadow-xs'
+                        : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs flex items-center gap-1.5 text-emerald-900">
+                          <Globe className="w-4 h-4 text-emerald-600" />
+                          <span>Open Schedule — Anytime (எப்போது வேண்டுமானாலும்)</span>
+                        </span>
+                        {scheduleMode === 'open' && <Check className="w-4 h-4 text-emerald-600" />}
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-snug">
+                        No start/end date locks! Students can register and answer questions anytime at their own pace.
+                      </p>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Time Limit Toggle (Timed vs Untimed) */}
+                <div className="pt-2 border-t border-indigo-100/80 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHasTimeLimit(true);
+                      if (!duration || duration <= 0) setDuration(45);
+                    }}
+                    className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center justify-between gap-3 ${
+                      hasTimeLimit
+                        ? 'bg-amber-50/70 border-amber-500 ring-1 ring-amber-500 text-amber-950'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                      <div>
+                        <p className="font-bold text-xs">Strict Countdown Timer (நேர வரையறை உண்டு)</p>
+                        <p className="text-[10px] text-slate-600">Auto-submits when allotted minutes reach 00:00.</p>
+                      </div>
+                    </div>
+                    {hasTimeLimit && (
+                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="number"
+                          min={1}
+                          max={360}
+                          value={duration || 60}
+                          onChange={(e) => setDuration(Math.max(1, Number(e.target.value)))}
+                          className="w-16 px-2 py-1 border border-amber-300 rounded-md bg-white text-center font-bold text-slate-900"
+                        />
+                        <span className="text-[10px] font-bold text-amber-900">min</span>
+                      </div>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHasTimeLimit(false);
+                      setDuration(0);
+                    }}
+                    className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center justify-between gap-3 ${
+                      !hasTimeLimit
+                        ? 'bg-teal-50/80 border-teal-600 ring-1 ring-teal-600 text-teal-950'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <InfinityIcon className="w-4 h-4 text-teal-600 shrink-0" />
+                      <div>
+                        <p className="font-bold text-xs">No Time Limit / Untimed (நேரக் கட்டுப்பாடு இல்லை)</p>
+                        <p className="text-[10px] text-slate-600">No countdown clock or timeout auto-submit; ideal for practice.</p>
+                      </div>
+                    </div>
+                    {!hasTimeLimit && <Check className="w-4 h-4 text-teal-600 shrink-0" />}
+                  </button>
+                </div>
+              </div>
+
               {/* Entry Type & Fee */}
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
                 <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
@@ -2084,8 +2291,17 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
                 </div>
               </div>
 
+              {scheduleMode === 'open' && (
+                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center gap-2.5">
+                  <Globe className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <p className="text-[11px] font-semibold">
+                    🌐 Open Schedule இயக்கப்பட்டுள்ளது: மாணவர்கள் கீழே உள்ள திகதி/நேரக் கட்டுப்பாடுகள் இன்றி எப்போது வேண்டுமானாலும் இப்போட்டி/வினாத்தாளைச் செய்ய முடியும். (Date fields below are optional/ignored in Open mode.)
+                  </p>
+                </div>
+              )}
+
               {/* Dates */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 transition-opacity ${scheduleMode === 'open' ? 'opacity-55 pointer-events-none' : ''}`}>
                 {/* Registration Window */}
                 <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
                   <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-sm">
@@ -2335,18 +2551,45 @@ export const CompetitionEditorModal: React.FC<CompetitionEditorModalProps> = ({
 
                     <div>
                       <label className="text-[10px] font-semibold text-slate-600 block">
-                        {currentAppLanguage === 'ta' ? 'நேரம் (Time):' : 'Duration:'}
+                        {currentAppLanguage === 'ta' ? 'நேர வரம்பு (Time Limit):' : 'Time Limit:'}
                       </label>
                       <div className="flex items-center gap-1 mt-0.5">
-                        <input
-                          type="number"
-                          min={5}
-                          max={300}
-                          value={duration}
-                          onChange={(e) => setDuration(Math.max(5, Number(e.target.value)))}
-                          className="w-14 px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-center text-slate-800"
-                        />
-                        <span className="text-[10px] text-slate-500 font-medium">mins</span>
+                        {hasTimeLimit ? (
+                          <>
+                            <input
+                              type="number"
+                              min={1}
+                              max={360}
+                              value={duration || 60}
+                              onChange={(e) => setDuration(Math.max(1, Number(e.target.value)))}
+                              className="w-14 px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-center text-slate-800"
+                            />
+                            <span className="text-[10px] text-slate-500 font-medium">mins</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setHasTimeLimit(false);
+                                setDuration(0);
+                              }}
+                              className="ml-1 px-1.5 py-0.5 rounded bg-slate-100 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-[10px] font-bold text-slate-600 hover:text-emerald-800 cursor-pointer"
+                              title="Switch to No Time Limit (Untimed)"
+                            >
+                              ∞
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setHasTimeLimit(true);
+                              setDuration(30);
+                            }}
+                            className="px-2.5 py-1 bg-emerald-50 border border-emerald-300 rounded-lg text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 cursor-pointer"
+                            title="Click to enable a countdown time limit"
+                          >
+                            ∞ No Limit
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

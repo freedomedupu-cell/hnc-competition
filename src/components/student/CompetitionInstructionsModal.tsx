@@ -37,7 +37,8 @@ export const CompetitionInstructionsModal: React.FC<CompetitionInstructionsModal
   const questions = getCompetitionQuestions(competition);
   const questionCount = questions.length || competition.questionsCount || 10;
   const totalMarks = competition.totalMarks || questions.reduce((sum, q) => sum + (q.marks || 0), 0) || 100;
-  const duration = competition.duration || 60;
+  const isUntimed = competition.hasTimeLimit === false || competition.duration === 0;
+  const duration = isUntimed ? 0 : (competition.duration || 60);
 
   return (
     <div
@@ -97,12 +98,25 @@ export const CompetitionInstructionsModal: React.FC<CompetitionInstructionsModal
                 <Clock className="h-3.5 w-3.5 text-blue-600" />
                 {language === 'ta' ? 'கால அளவு' : language === 'si' ? 'කාලය' : 'Duration'}
               </span>
-              <p className="text-xl font-bold text-blue-900">
-                {duration} {language === 'ta' ? 'நிமிடங்கள்' : language === 'si' ? 'මිනිත්තු' : 'Mins'}
-              </p>
-              <span className="text-[11px] text-blue-600 block">
-                {language === 'ta' ? 'நேரக் கட்டுப்பாடு' : language === 'si' ? 'නියමිත කාල සීමාව' : 'Strict Admin Limit'}
-              </span>
+              {isUntimed ? (
+                <>
+                  <p className="text-lg font-bold text-emerald-700">
+                    {language === 'ta' ? '∞ வரம்பில்லை' : language === 'si' ? '∞ සීමාවක් නැත' : '∞ No Limit'}
+                  </p>
+                  <span className="text-[11px] text-emerald-600 block">
+                    {language === 'ta' ? 'நேரக் கட்டுப்பாடு இல்லை' : language === 'si' ? 'නිදහසේ ලිවිය හැක' : 'Untimed Access'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <p className="text-xl font-bold text-blue-900">
+                    {duration} {language === 'ta' ? 'நிமிடங்கள்' : language === 'si' ? 'මිනිත්තු' : 'Mins'}
+                  </p>
+                  <span className="text-[11px] text-blue-600 block">
+                    {language === 'ta' ? 'நேரக் கட்டுப்பாடு' : language === 'si' ? 'නියමිත කාල සීමාව' : 'Strict Admin Limit'}
+                  </span>
+                </>
+              )}
             </div>
 
             <div className="space-y-1 border-x border-blue-200/60">
@@ -194,12 +208,25 @@ export const CompetitionInstructionsModal: React.FC<CompetitionInstructionsModal
               <li className="flex items-start gap-2.5">
                 <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                 <span>
-                  <strong>{language === 'ta' ? 'நேரக் கணிப்பான்:' : language === 'si' ? 'ගණන් කිරීමේ ටයිමරය:' : 'Countdown Timer:'}</strong>{' '}
-                  {language === 'ta'
-                    ? 'தொடக்க பொத்தானை அழுத்திய உடன் கவுண்ட்டவுன் தொடங்கும்.'
-                    : language === 'si'
-                    ? 'ආරම්භ බොත්තම ක්ලික් කළ වහාම ගණන් කිරීම ආරම්භ වේ.'
-                    : `The countdown timer will start immediately when you click "Start Now". The timer runs continuously (${duration} minutes).`}
+                  {isUntimed ? (
+                    <>
+                      <strong>{language === 'ta' ? 'நேரக் கட்டுப்பாடு இல்லை:' : language === 'si' ? 'කාල සීමාවක් නැත:' : 'No Time Limit:'}</strong>{' '}
+                      {language === 'ta'
+                        ? 'இந்த வினாத்தாளுக்கு நேர வரம்பு இல்லை. அவசரமின்றி அமைதியாக சிந்தித்து விடையளிக்கலாம்.'
+                        : language === 'si'
+                        ? 'මෙම ප්‍රශ්න පත්‍රය සඳහා කාල සීමාවක් නොමැත. නිදහසේ පිළිතුරු සැපයිය හැක.'
+                        : 'There is no countdown time limit on this paper. Take your time and submit when ready.'}
+                    </>
+                  ) : (
+                    <>
+                      <strong>{language === 'ta' ? 'நேரக் கணிப்பான்:' : language === 'si' ? 'ගණන් කිරීමේ ටයිමරය:' : 'Countdown Timer:'}</strong>{' '}
+                      {language === 'ta'
+                        ? 'தொடக்க பொத்தானை அழுத்திய உடன் கவுண்ட்டவுன் தொடங்கும்.'
+                        : language === 'si'
+                        ? 'ආරම්භ බොත්තම ක්ලික් කළ වහාම ගණන් කිරීම ආරම්භ වේ.'
+                        : `The countdown timer will start immediately when you click "Start Now". The timer runs continuously (${duration} minutes).`}
+                    </>
+                  )}
                 </span>
               </li>
               <li className="flex items-start gap-2.5">

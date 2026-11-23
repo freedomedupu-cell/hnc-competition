@@ -80,21 +80,31 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
 
   const [imageZoomUrl, setImageZoomUrl] = useState<string | null>(null);
 
+  const isUntimed = competition.hasTimeLimit === false || competition.duration === 0;
   // Admin-configured duration in minutes. IMPORTANT: NOT calculated from question count!
-  const durationMinutes = competition.duration || 60;
-  const totalDurationSeconds = durationMinutes * 60;
+  const durationMinutes = isUntimed ? 0 : (competition.duration || 60);
+  const totalDurationSeconds = isUntimed ? 0 : durationMinutes * 60;
 
   // Calculate remaining seconds based on attempt startedAt timestamp
   const calculateInitialSeconds = useCallback(() => {
+    if (isUntimed) return 0;
     if (existingAttempt?.startedAt) {
       const elapsed = Math.floor((Date.now() - new Date(existingAttempt.startedAt).getTime()) / 1000);
       return Math.max(0, totalDurationSeconds - elapsed);
     }
     return totalDurationSeconds;
-  }, [existingAttempt?.startedAt, totalDurationSeconds]);
+  }, [existingAttempt?.startedAt, isUntimed, totalDurationSeconds]);
+
+  const calculateInitialElapsed = useCallback(() => {
+    if (existingAttempt?.startedAt) {
+      return Math.max(0, Math.floor((Date.now() - new Date(existingAttempt.startedAt).getTime()) / 1000));
+    }
+    return 0;
+  }, [existingAttempt?.startedAt]);
 
   const [secondsRemaining, setSecondsRemaining] = useState<number>(calculateInitialSeconds);
-  const isLocked = submittedAttempt !== null || secondsRemaining <= 0;
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(calculateInitialElapsed);
+  const isLocked = submittedAttempt !== null || (!isUntimed && secondsRemaining <= 0);
 
   // Auto-save debounced ref and real-time save status tracking
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -228,7 +238,7 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
           tabSwitchesCount: tabSwitchesRef.current,
           questionsAnswered: Object.keys(answers).length,
           totalQuestions,
-          timeRemainingSeconds: secondsRemaining,
+          timeRemainingSeconds: isUntimed ? 0 : secondsRemaining,
         });
       } catch (e) {
         console.warn('Proctor frame sync note:', e);
@@ -316,24 +326,28 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
     [answers, cameraStream, competition.id, endProctorSession, isSubmitting, stopCameraStream, submitCompetitionAttempt, submittedAttempt]
   );
 
-  // Countdown timer effect
+  // Countdown / Elapsed timer effect
   useEffect(() => {
     if (isLocked || submittedAttempt) return;
 
     const timer = setInterval(() => {
-      setSecondsRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          // Auto submit when timer reaches 00:00
-          handleFinalSubmit(true);
-          return 0;
-        }
-        return prev - 1;
-      });
+      if (isUntimed) {
+        setElapsedSeconds((prev) => prev + 1);
+      } else {
+        setSecondsRemaining((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            // Auto submit when timer reaches 00:00
+            handleFinalSubmit(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [handleFinalSubmit, isLocked, submittedAttempt]);
+  }, [handleFinalSubmit, isLocked, isUntimed, submittedAttempt]);
 
   // Format seconds to HH:MM:SS or MM:SS
   const formatTime = (secs: number) => {
@@ -481,6 +495,8 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
             onTimeUp={() => handleFinalSubmit(true)}
             language={language}
             isSubmitting={isSubmitting}
+            isUntimed={isUntimed}
+            elapsedSeconds={elapsedSeconds}
           />
 
           {/* Real-Time Subtle Changes Saved Pulse Indicator in Header */}
@@ -537,14 +553,18 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
       <div className="sticky top-[61px] z-30 w-full bg-slate-800/90 backdrop-blur-xs h-1.5 overflow-hidden">
         <div
           className={`h-full transition-all duration-1000 ease-linear ${
-            secondsRemaining <= 60
+            isUntimed
+              ? 'bg-emerald-400'
+              : secondsRemaining <= 60
               ? 'bg-red-500 animate-pulse'
               : secondsRemaining <= 300
               ? 'bg-amber-400'
               : 'bg-emerald-400'
           }`}
           style={{
-            width: `${Math.max(0, Math.min(100, (secondsRemaining / totalDurationSeconds) * 100))}%`,
+            width: isUntimed
+              ? '100%'
+              : `${Math.max(0, Math.min(100, (secondsRemaining / totalDurationSeconds) * 100))}%`,
           }}
         />
       </div>
@@ -944,7 +964,9 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
 
             {/* Visual Time Status Inside Palette */}
             <div className={`p-3 rounded-2xl border transition-all flex items-center justify-between ${
-              secondsRemaining <= 60
+              isUntimed
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : secondsRemaining <= 60
                 ? 'bg-red-50 border-red-300 text-red-900 animate-pulse'
                 : secondsRemaining <= 300
                 ? 'bg-amber-50 border-amber-300 text-amber-900'
@@ -952,18 +974,22 @@ export const StudentExamInterface: React.FC<StudentExamInterfaceProps> = ({
             }`}>
               <div className="flex items-center gap-2">
                 <Clock className={`w-4 h-4 ${
-                  secondsRemaining <= 60
+                  isUntimed
+                    ? 'text-emerald-600'
+                    : secondsRemaining <= 60
                     ? 'text-red-600'
                     : secondsRemaining <= 300
                     ? 'text-amber-600'
                     : 'text-blue-600'
                 }`} />
                 <span className="text-xs font-bold">
-                  {language === 'ta' ? 'மீதமுள்ள நேரம்' : language === 'si' ? 'ඉතිරි කාලය' : 'Time Left'}
+                  {isUntimed
+                    ? (language === 'ta' ? 'நேர வரம்பில்லை (Elapsed)' : language === 'si' ? 'කාල සීමාවක් නැත' : 'No Time Limit')
+                    : (language === 'ta' ? 'மீதமுள்ள நேரம்' : language === 'si' ? 'ඉතිරි කාලය' : 'Time Left')}
                 </span>
               </div>
               <span className="font-mono font-black text-sm">
-                {formatTime(secondsRemaining)}
+                {formatTime(isUntimed ? elapsedSeconds : secondsRemaining)}
               </span>
             </div>
 

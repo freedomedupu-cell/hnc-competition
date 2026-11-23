@@ -36,6 +36,12 @@ import {
   Medal,
   ChevronLeft,
   ChevronRight,
+  Users,
+  CheckSquare,
+  Square,
+  CheckCircle2,
+  X,
+  RefreshCw,
 } from 'lucide-react';
 import { EditStudentModal } from './EditStudentModal';
 
@@ -45,6 +51,7 @@ export const StudentManagement: React.FC = () => {
     competitions,
     results,
     deleteStudentAccount,
+    deleteDuplicateStudentAccounts,
     updateStudentPassword,
     updateStudentByAdmin,
     adjustStudentPoints,
@@ -52,7 +59,7 @@ export const StudentManagement: React.FC = () => {
   } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [gradeFilter, setGradeFilter] = useState('all');
-  const [duplicateFilter, setDuplicateFilter] = useState<'all' | 'any_dup' | 'email_dup' | 'phone_dup'>('all');
+  const [duplicateFilter, setDuplicateFilter] = useState<'all' | 'any_dup' | 'email_dup' | 'phone_dup' | 'identity_dup'>('all');
   const [sortBy, setSortBy] = useState<'default' | 'points_desc' | 'referrals_desc' | 'awards_desc' | 'name'>('default');
   const [selectedStudent, setSelectedStudent] = useState<StudentUser | null>(null);
   const [studentToEdit, setStudentToEdit] = useState<StudentUser | null>(null);
@@ -61,6 +68,16 @@ export const StudentManagement: React.FC = () => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [editSuccessToast, setEditSuccessToast] = useState<string | null>(null);
+  const [deleteErrorToast, setDeleteErrorToast] = useState<string | null>(null);
+
+  // Bulk table selection & Duplicate Cleanup Manager states
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isDupModalOpen, setIsDupModalOpen] = useState(false);
+  const [dupRemovalSelectedIds, setDupRemovalSelectedIds] = useState<Set<string>>(new Set());
+  const [dupKeepOverrides, setDupKeepOverrides] = useState<Record<string, string>>({});
+  const [dupModalConfirming, setDupModalConfirming] = useState(false);
 
   // Pagination states for high-performance rendering of any number of candidates
   const [currentPage, setCurrentPage] = useState(1);
@@ -199,23 +216,84 @@ export const StudentManagement: React.FC = () => {
   const handleDeleteStudent = async () => {
     if (!studentToDelete) return;
     setIsDeleting(true);
+    setDeleteErrorToast(null);
     try {
       await deleteStudentAccount(studentToDelete.id);
       if (selectedStudent?.id === studentToDelete.id) {
         setSelectedStudent(null);
       }
+      setSelectedRowIds((prev) => {
+        const next = new Set(prev);
+        next.delete(studentToDelete.id);
+        return next;
+      });
+      setDupRemovalSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(studentToDelete.id);
+        return next;
+      });
+      setEditSuccessToast(
+        language === 'ta'
+          ? `"${studentToDelete.name}" பதிவு வெற்றிகரமாக நீக்கப்பட்டது.`
+          : `Removed registration for "${studentToDelete.name}".`
+      );
+      setTimeout(() => setEditSuccessToast(null), 4000);
       setStudentToDelete(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to delete student account:', err);
+      setDeleteErrorToast(err?.message || 'Failed to delete student account.');
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // Pre-calculate duplicate maps for instant O(1) detection of duplicate emails and phones
-  const { emailMap, phoneMap, duplicateStudentsCount, emailDupCount, phoneDupCount } = useMemo(() => {
+  // Pre-index exam results and honors by student identifiers for instant O(1) lookups
+  const studentResultsStatsMap = useMemo(() => {
+    const map = new Map<string, { examCount: number; medalsWon: number; avgPct: number }>();
+
+    results.forEach((r) => {
+      const keys: string[] = [];
+      if (r.studentId) keys.push(r.studentId);
+      if (r.studentName) keys.push(r.studentName.toLowerCase().trim());
+
+      const isMedal = r.award && r.award !== 'Participation';
+      const pct = r.percentile || r.score || 0;
+
+      keys.forEach((key) => {
+        const existing = map.get(key) || ({ examCount: 0, medalsWon: 0, totalPct: 0 } as any);
+        existing.examCount += 1;
+        if (isMedal) existing.medalsWon += 1;
+        existing.totalPct = (existing.totalPct || 0) + pct;
+        existing.avgPct = Math.round(existing.totalPct / existing.examCount);
+        map.set(key, existing);
+      });
+    });
+
+    return map;
+  }, [results]);
+
+  // Pre-calculate duplicate maps & clustered duplicate groups
+  const {
+    emailMap,
+    phoneMap,
+    identityMap,
+    studentIdDupMap,
+    usernameDupMap,
+    duplicateStudentsCount,
+    emailDupCount,
+    phoneDupCount,
+    identityDupCount,
+    duplicateGroups,
+    totalExtraDuplicatesCount,
+  } = useMemo(() => {
     const eMap = new Map<string, string[]>();
     const pMap = new Map<string, string[]>();
+    const idnMap = new Map<string, string[]>();
+    const sidMap = new Map<string, string[]>();
+    const usrMap = new Map<string, string[]>();
+
+    const normalizeName = (name?: string) =>
+      (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
     students.forEach((s) => {
       if (s.email && s.email.trim()) {
@@ -234,19 +312,43 @@ export const StudentManagement: React.FC = () => {
           pMap.set(normPhone, list);
         }
       }
+
+      const normName = normalizeName(s.name);
+      const normGrade = (s.gradeLevel || '').trim().toLowerCase();
+      if (normName && normGrade) {
+        const identityKey = `${normName}|${normGrade}`;
+        const list = idnMap.get(identityKey) || [];
+        list.push(s.id);
+        idnMap.set(identityKey, list);
+      }
+
+      if (s.studentId && s.studentId.trim()) {
+        const normSid = s.studentId.trim().toUpperCase();
+        const list = sidMap.get(normSid) || [];
+        list.push(s.id);
+        sidMap.set(normSid, list);
+      }
+
+      if (s.username && s.username.trim()) {
+        const normUsr = s.username.trim().toLowerCase();
+        const list = usrMap.get(normUsr) || [];
+        list.push(s.id);
+        usrMap.set(normUsr, list);
+      }
     });
 
     let dupTotal = 0;
     let eDupTotal = 0;
     let pDupTotal = 0;
+    let idnDupTotal = 0;
 
     students.forEach((s) => {
       let isEmailDup = false;
       let isPhoneDup = false;
+      let isIdentityDup = false;
 
       if (s.email && s.email.trim()) {
-        const normEmail = s.email.trim().toLowerCase();
-        const list = eMap.get(normEmail);
+        const list = eMap.get(s.email.trim().toLowerCase());
         if (list && list.length > 1) {
           isEmailDup = true;
           eDupTotal++;
@@ -265,19 +367,170 @@ export const StudentManagement: React.FC = () => {
         }
       }
 
-      if (isEmailDup || isPhoneDup) {
+      const normName = normalizeName(s.name);
+      const normGrade = (s.gradeLevel || '').trim().toLowerCase();
+      if (normName && normGrade) {
+        const list = idnMap.get(`${normName}|${normGrade}`);
+        if (list && list.length > 1) {
+          isIdentityDup = true;
+          idnDupTotal++;
+        }
+      }
+
+      const sidDup = s.studentId ? (sidMap.get(s.studentId.trim().toUpperCase())?.length || 0) > 1 : false;
+      const usrDup = s.username ? (usrMap.get(s.username.trim().toLowerCase())?.length || 0) > 1 : false;
+
+      if (isEmailDup || isPhoneDup || isIdentityDup || sidDup || usrDup) {
         dupTotal++;
       }
     });
 
+    // Build connected duplicate clusters via Union-Find
+    const parent = new Map<string, string>();
+    const find = (x: string): string => {
+      let curr = x;
+      while (parent.get(curr) !== curr) {
+        curr = parent.get(curr) || curr;
+      }
+      return curr;
+    };
+    const union = (a: string, b: string) => {
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) parent.set(rb, ra);
+    };
+
+    students.forEach((s) => parent.set(s.id, s.id));
+
+    const connectBuckets = (map: Map<string, string[]>) => {
+      map.forEach((ids) => {
+        if (ids.length > 1) {
+          for (let i = 1; i < ids.length; i++) {
+            union(ids[0], ids[i]);
+          }
+        }
+      });
+    };
+
+    connectBuckets(eMap);
+    connectBuckets(pMap);
+    connectBuckets(idnMap);
+    connectBuckets(sidMap);
+    connectBuckets(usrMap);
+
+    const clustersMap = new Map<string, StudentUser[]>();
+    students.forEach((s) => {
+      const root = find(s.id);
+      const arr = clustersMap.get(root) || [];
+      arr.push(s);
+      clustersMap.set(root, arr);
+    });
+
+    const studentScore = (std: StudentUser) => {
+      const resStats =
+        studentResultsStatsMap.get(std.id) ||
+        studentResultsStatsMap.get(std.studentId) ||
+        { examCount: 0, medalsWon: 0, avgPct: 0 };
+      const pts = std.referralPoints !== undefined ? std.referralPoints : 0;
+      const activeScore = std.status === 'active' ? 500 : 0;
+      const createdTs = std.createdAt ? new Date(std.createdAt).getTime() : Number.MAX_SAFE_INTEGER;
+      return {
+        primaryScore: resStats.examCount * 10000 + activeScore + pts + (std.totalReferrals || 0) * 50,
+        createdTs: isNaN(createdTs) ? Number.MAX_SAFE_INTEGER : createdTs,
+      };
+    };
+
+    const groups: Array<{
+      groupId: string;
+      members: StudentUser[];
+      recommendedKeepId: string;
+      reasons: string[];
+      isLikelySameStudent: boolean;
+      matchSummary: string;
+    }> = [];
+
+    let extraCount = 0;
+
+    clustersMap.forEach((members, root) => {
+      if (members.length <= 1) return;
+
+      // Sort members so best/primary candidate appears first
+      const sorted = [...members].sort((a, b) => {
+        const sa = studentScore(a);
+        const sb = studentScore(b);
+        if (sb.primaryScore !== sa.primaryScore) return sb.primaryScore - sa.primaryScore;
+        return sa.createdTs - sb.createdTs;
+      });
+
+      const emails = new Set(members.map((m) => (m.email || '').trim().toLowerCase()).filter(Boolean));
+      const phones = new Set(
+        members
+          .map((m) => {
+            const d = (m.phone || '').replace(/\D/g, '');
+            return d.length >= 7 ? (d.length >= 9 ? d.slice(-9) : d) : '';
+          })
+          .filter(Boolean)
+      );
+      const names = new Set(members.map((m) => normalizeName(m.name)).filter(Boolean));
+      const identKeys = new Set(
+        members.map((m) => `${normalizeName(m.name)}|${(m.gradeLevel || '').trim().toLowerCase()}`).filter((k) => !k.startsWith('|'))
+      );
+      const sids = new Set(members.map((m) => (m.studentId || '').trim().toUpperCase()).filter(Boolean));
+      const usrs = new Set(members.map((m) => (m.username || '').trim().toLowerCase()).filter(Boolean));
+
+      const reasons: string[] = [];
+      if (identKeys.size < members.length) reasons.push('Same Name & Grade');
+      else if (names.size < members.length) reasons.push('Same Name');
+      if (emails.size < members.length) reasons.push('Shared Email');
+      if (phones.size < members.length) reasons.push('Shared Phone');
+      if (sids.size < members.length) reasons.push('Duplicate Student ID');
+      if (usrs.size < members.length) reasons.push('Duplicate Username');
+
+      const isLikelySameStudent =
+        identKeys.size < members.length ||
+        names.size < members.length ||
+        sids.size < members.length ||
+        usrs.size < members.length;
+
+      const sampleEmail = members.find((m) => m.email)?.email || '';
+      const samplePhone = members.find((m) => m.phone)?.phone || '';
+      const matchSummary =
+        reasons.includes('Same Name & Grade')
+          ? `${sorted[0].name} (${sorted[0].gradeLevel})`
+          : reasons.includes('Shared Email')
+          ? sampleEmail
+          : reasons.includes('Shared Phone')
+          ? samplePhone
+          : sorted[0].name;
+
+      extraCount += sorted.length - 1;
+      groups.push({
+        groupId: root,
+        members: sorted,
+        recommendedKeepId: sorted[0].id,
+        reasons: reasons.length > 0 ? reasons : ['Matching Details'],
+        isLikelySameStudent,
+        matchSummary,
+      });
+    });
+
+    // Sort likely same-student duplicates to the top
+    groups.sort((a, b) => Number(b.isLikelySameStudent) - Number(a.isLikelySameStudent));
+
     return {
       emailMap: eMap,
       phoneMap: pMap,
+      identityMap: idnMap,
+      studentIdDupMap: sidMap,
+      usernameDupMap: usrMap,
       duplicateStudentsCount: dupTotal,
       emailDupCount: eDupTotal,
       phoneDupCount: pDupTotal,
+      identityDupCount: idnDupTotal,
+      duplicateGroups: groups,
+      totalExtraDuplicatesCount: extraCount,
     };
-  }, [students]);
+  }, [students, studentResultsStatsMap]);
 
   const getDuplicateStatus = (std: StudentUser) => {
     let isEmailDup = false;
@@ -305,39 +558,133 @@ export const StudentManagement: React.FC = () => {
       }
     }
 
+    let isIdentityDup = false;
+    let identityClashCount = 0;
+    const normName = (std.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const normGrade = (std.gradeLevel || '').trim().toLowerCase();
+    if (normName && normGrade) {
+      const list = identityMap.get(`${normName}|${normGrade}`);
+      if (list && list.length > 1) {
+        isIdentityDup = true;
+        identityClashCount = list.length;
+      }
+    }
+
+    const isStudentIdDup = std.studentId ? (studentIdDupMap.get(std.studentId.trim().toUpperCase())?.length || 0) > 1 : false;
+    const isUsernameDup = std.username ? (usernameDupMap.get(std.username.trim().toLowerCase())?.length || 0) > 1 : false;
+
     return {
       isEmailDup,
       emailClashCount,
       isPhoneDup,
       phoneClashCount,
-      isAnyDup: isEmailDup || isPhoneDup,
+      isIdentityDup,
+      identityClashCount,
+      isStudentIdDup,
+      isUsernameDup,
+      isAnyDup: isEmailDup || isPhoneDup || isIdentityDup || isStudentIdDup || isUsernameDup,
     };
   };
 
-  // Pre-index exam results and honors by student identifiers for instant O(1) lookups
-  const studentResultsStatsMap = useMemo(() => {
-    const map = new Map<string, { examCount: number; medalsWon: number; avgPct: number }>();
+  // Open Duplicate Removal Manager Modal and pre-select exact same-student duplicates
+  const openDuplicateRemovalModal = (preselectMode: 'exact_only' | 'all_extras' = 'exact_only') => {
+    const initialSelected = new Set<string>();
+    const initialKeeps: Record<string, string> = {};
 
-    results.forEach((r) => {
-      const keys: string[] = [];
-      if (r.studentId) keys.push(r.studentId);
-      if (r.studentName) keys.push(r.studentName.toLowerCase().trim());
+    duplicateGroups.forEach((grp) => {
+      const keepId = dupKeepOverrides[grp.groupId] && grp.members.some((m) => m.id === dupKeepOverrides[grp.groupId])
+        ? dupKeepOverrides[grp.groupId]
+        : grp.recommendedKeepId;
+      initialKeeps[grp.groupId] = keepId;
 
-      const isMedal = r.award && r.award !== 'Participation';
-      const pct = r.percentile || r.score || 0;
-
-      keys.forEach((key) => {
-        const existing = map.get(key) || { examCount: 0, medalsWon: 0, totalPct: 0 } as any;
-        existing.examCount += 1;
-        if (isMedal) existing.medalsWon += 1;
-        existing.totalPct = (existing.totalPct || 0) + pct;
-        existing.avgPct = Math.round(existing.totalPct / existing.examCount);
-        map.set(key, existing);
-      });
+      if (preselectMode === 'all_extras' || grp.isLikelySameStudent) {
+        grp.members.forEach((m) => {
+          if (m.id !== keepId) {
+            initialSelected.add(m.id);
+          }
+        });
+      }
     });
 
-    return map;
-  }, [results]);
+    setDupKeepOverrides(initialKeeps);
+    setDupRemovalSelectedIds(initialSelected);
+    setDupModalConfirming(false);
+    setIsDupModalOpen(true);
+  };
+
+  const handleAutoSelectDuplicatesInModal = (mode: 'exact_only' | 'all_extras') => {
+    const next = new Set<string>();
+    duplicateGroups.forEach((grp) => {
+      const keepId = dupKeepOverrides[grp.groupId] || grp.recommendedKeepId;
+      if (mode === 'all_extras' || grp.isLikelySameStudent) {
+        grp.members.forEach((m) => {
+          if (m.id !== keepId) {
+            next.add(m.id);
+          }
+        });
+      }
+    });
+    setDupRemovalSelectedIds(next);
+    setDupModalConfirming(false);
+  };
+
+  const handleSetPrimaryKeepForGroup = (groupId: string, keepStudentId: string) => {
+    setDupKeepOverrides((prev) => ({ ...prev, [groupId]: keepStudentId }));
+    setDupRemovalSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(keepStudentId);
+      const grp = duplicateGroups.find((g) => g.groupId === groupId);
+      if (grp && grp.isLikelySameStudent) {
+        grp.members.forEach((m) => {
+          if (m.id !== keepStudentId) next.add(m.id);
+        });
+      }
+      return next;
+    });
+    setDupModalConfirming(false);
+  };
+
+  const handleConfirmBulkRemove = async (uidsToRemove: string[], closeDupModalAfter = false) => {
+    if (uidsToRemove.length === 0) return;
+    setIsBulkDeleting(true);
+    setDeleteErrorToast(null);
+    try {
+      const res = await deleteDuplicateStudentAccounts(uidsToRemove);
+      if (res.deletedCount > 0) {
+        setEditSuccessToast(
+          language === 'ta'
+            ? `${res.deletedCount} நகல் மாணவர் பதிவுகள் வெற்றிகரமாக நீக்கப்பட்டன!`
+            : `Successfully removed ${res.deletedCount} duplicate student registration(s)!`
+        );
+        setTimeout(() => setEditSuccessToast(null), 5000);
+      }
+      if (res.failedCount > 0) {
+        setDeleteErrorToast(
+          res.error ||
+            `Could not remove ${res.failedCount} account(s). Please verify Super Admin permissions.`
+        );
+      }
+      setSelectedRowIds((prev) => {
+        const next = new Set(prev);
+        uidsToRemove.forEach((id) => next.delete(id));
+        return next;
+      });
+      setDupRemovalSelectedIds((prev) => {
+        const next = new Set(prev);
+        uidsToRemove.forEach((id) => next.delete(id));
+        return next;
+      });
+      setShowBulkDeleteConfirm(false);
+      setDupModalConfirming(false);
+      if (closeDupModalAfter && res.failedCount === 0) {
+        setIsDupModalOpen(false);
+      }
+    } catch (err: any) {
+      setDeleteErrorToast(err?.message || 'Bulk duplicate deletion failed.');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
 
   const filteredStudents = useMemo(() => {
     return students
@@ -348,6 +695,7 @@ export const StudentManagement: React.FC = () => {
         if (duplicateFilter === 'any_dup' && !dup.isAnyDup) return false;
         if (duplicateFilter === 'email_dup' && !dup.isEmailDup) return false;
         if (duplicateFilter === 'phone_dup' && !dup.isPhoneDup) return false;
+        if (duplicateFilter === 'identity_dup' && !dup.isIdentityDup) return false;
 
         const term = searchTerm.toLowerCase().trim();
         if (!term && gradeFilter === 'all') return true;
@@ -369,16 +717,24 @@ export const StudentManagement: React.FC = () => {
         return matchesSearch && matchesGrade;
       })
       .sort((a, b) => {
-        // If filtering by duplicates, group identical emails or phones directly adjacent to each other!
+        // If filtering by duplicates, group identical emails, phones, or names directly adjacent to each other!
         if (duplicateFilter !== 'all') {
           const aVal =
             duplicateFilter === 'email_dup'
               ? (a.email || '').toLowerCase()
-              : (a.phone || a.email || '').toLowerCase();
+              : duplicateFilter === 'phone_dup'
+              ? (a.phone || a.email || '').toLowerCase()
+              : duplicateFilter === 'identity_dup'
+              ? (a.name || '').toLowerCase()
+              : (a.email || a.phone || a.name || '').toLowerCase();
           const bVal =
             duplicateFilter === 'email_dup'
               ? (b.email || '').toLowerCase()
-              : (b.phone || b.email || '').toLowerCase();
+              : duplicateFilter === 'phone_dup'
+              ? (b.phone || b.email || '').toLowerCase()
+              : duplicateFilter === 'identity_dup'
+              ? (b.name || '').toLowerCase()
+              : (b.email || b.phone || b.name || '').toLowerCase();
           if (aVal !== bVal) return aVal.localeCompare(bVal);
         }
 
@@ -398,7 +754,7 @@ export const StudentManagement: React.FC = () => {
         }
         return 0;
       });
-  }, [students, duplicateFilter, searchTerm, gradeFilter, sortBy, emailMap, phoneMap]);
+  }, [students, duplicateFilter, searchTerm, gradeFilter, sortBy, emailMap, phoneMap, identityMap, studentIdDupMap, usernameDupMap]);
 
   // Compute pagination slices
   const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
@@ -457,6 +813,29 @@ export const StudentManagement: React.FC = () => {
             </span>
           </button>
 
+          {/* Dedicated Duplicate Registration Removal Manager Trigger */}
+          <button
+            id="btn-open-duplicate-cleanup"
+            type="button"
+            onClick={() => openDuplicateRemovalModal('exact_only')}
+            className={`text-xs font-bold px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer ${
+              totalExtraDuplicatesCount > 0
+                ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white border-rose-700 shadow-sm'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+            }`}
+            title={
+              language === 'ta'
+                ? 'நகல் மாணவர் பதிவுகளை ஆய்வு செய்து நீக்குக'
+                : 'Review and remove duplicate student registrations'
+            }
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>
+              {language === 'ta' ? 'நகல் பதிவுகளை நீக்கு' : 'Remove Duplicates'}
+              {totalExtraDuplicatesCount > 0 ? ` (${totalExtraDuplicatesCount})` : ''}
+            </span>
+          </button>
+
           <span className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-300 flex items-center gap-1.5 shadow-2xs">
             <Coins className="w-4 h-4 text-amber-500 fill-amber-400" />
             <span>
@@ -481,6 +860,21 @@ export const StudentManagement: React.FC = () => {
           <button
             onClick={() => setEditSuccessToast(null)}
             className="text-emerald-700 hover:text-emerald-900 text-xs font-semibold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {deleteErrorToast && (
+        <div className="p-3.5 bg-red-50 border border-red-300 rounded-xl text-xs font-bold text-red-900 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+            <span>{deleteErrorToast}</span>
+          </div>
+          <button
+            onClick={() => setDeleteErrorToast(null)}
+            className="text-red-700 hover:text-red-900 text-xs font-semibold"
           >
             ✕
           </button>
@@ -628,23 +1022,55 @@ export const StudentManagement: React.FC = () => {
                 {phoneDupCount}
               </span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setDuplicateFilter('identity_dup')}
+              className={`px-2.5 py-1 rounded-md font-bold transition-all flex items-center gap-1.5 ${
+                duplicateFilter === 'identity_dup'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : identityDupCount > 0
+                  ? 'text-indigo-800 hover:bg-indigo-50'
+                  : 'text-slate-400'
+              }`}
+            >
+              <User className="w-3 h-3" />
+              <span>{language === 'ta' ? 'பெயர் & வகுப்பு நகல்' : 'Same Name & Grade'}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                duplicateFilter === 'identity_dup' ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-900'
+              }`}>
+                {identityDupCount}
+              </span>
+            </button>
           </div>
         </div>
 
-        {duplicateFilter !== 'all' && (
-          <button
-            type="button"
-            onClick={() => setDuplicateFilter('all')}
-            className="text-xs font-semibold text-rose-700 hover:text-rose-900 hover:underline flex items-center gap-1 shrink-0"
-          >
-            <span>✕ {language === 'ta' ? 'வடிகட்டியை மீட்டமை' : 'Clear Duplicate Filter'}</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {duplicateFilter !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setDuplicateFilter('all')}
+              className="text-xs font-semibold text-rose-700 hover:text-rose-900 hover:underline flex items-center gap-1"
+            >
+              <span>✕ {language === 'ta' ? 'வடிகட்டியை மீட்டமை' : 'Clear Filter'}</span>
+            </button>
+          )}
+          {totalExtraDuplicatesCount > 0 && (
+            <button
+              type="button"
+              onClick={() => openDuplicateRemovalModal('exact_only')}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{language === 'ta' ? 'நகல்களை அகற்று' : 'Clean Up Duplicates'} ({totalExtraDuplicatesCount})</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Duplicate Filter Guidance Alert Banner */}
       {duplicateFilter !== 'all' && (
-        <div className="p-3.5 bg-rose-50/90 border-2 border-rose-300 rounded-xl flex items-start justify-between gap-3 text-xs text-rose-950 shadow-2xs animate-in fade-in">
+        <div className="p-3.5 bg-rose-50/90 border-2 border-rose-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-rose-950 shadow-2xs animate-in fade-in">
           <div className="flex items-start gap-2.5">
             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <div>
@@ -655,10 +1081,61 @@ export const StudentManagement: React.FC = () => {
               </span>
               <span className="text-[11px] text-rose-800 mt-0.5 block leading-relaxed">
                 {language === 'ta'
-                  ? 'ஒரே மின்னஞ்சல் அல்லது தொலைபேசி எண்ணைப் பகிர்ந்துகொள்ளும் மாணவர்கள் பக்கத்துப்பக்கமாக தொகுக்கப்பட்டுள்ளனர். தவறான விபரங்களை மாற்ற "திருத்து (Edit)" பொத்தானையோ, தேவையற்ற நகலை அகற்ற "நீக்குக (Trash)" பொத்தானையோ பயன்படுத்தவும்.'
-                  : 'Candidates sharing identical emails or phone numbers are clustered together. Click "Edit" to modify mismatched details or "Delete" to resolve duplicate accounts.'}
+                  ? 'ஒரே மின்னஞ்சல், தொலைபேசி அல்லது பெயர்-வகுப்பைப் பகிர்ந்துகொள்ளும் மாணவர்கள் பக்கத்துப்பக்கமாக தொகுக்கப்பட்டுள்ளனர். தேர்ந்தெடுத்து மொத்தமாகவோ அல்லது ஒவ்வொன்றாகவோ நகல்களை நீக்கலாம்.'
+                  : 'Candidates sharing identical emails, phone numbers, or name & grade are clustered together. Select checkboxes to bulk remove or open the Smart Duplicate Cleanup Tool.'}
               </span>
             </div>
+          </div>
+
+          {duplicateGroups.length > 0 && (
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => openDuplicateRemovalModal('exact_only')}
+                className="px-3 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{language === 'ta' ? 'ஸ்மார்ட் நகல் நீக்கம்' : 'Smart Duplicate Remover'}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bulk Selection Action Bar */}
+      {selectedRowIds.size > 0 && (
+        <div className="p-3 bg-slate-900 text-white rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-md border border-slate-700 animate-in fade-in">
+          <div className="flex items-center gap-2.5 text-xs">
+            <span className="w-6 h-6 rounded-lg bg-rose-600 text-white font-black flex items-center justify-center">
+              {selectedRowIds.size}
+            </span>
+            <span className="font-bold">
+              {language === 'ta'
+                ? `${selectedRowIds.size} மாணவர் பதிவுகள் தேர்ந்தெடுக்கப்பட்டுள்ளன`
+                : `${selectedRowIds.size} registration(s) selected`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedRowIds(new Set())}
+              className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition-colors cursor-pointer"
+            >
+              {language === 'ta' ? 'தேர்வை நீக்கு' : 'Clear Selection'}
+            </button>
+            <button
+              id="btn-bulk-remove-selected"
+              type="button"
+              onClick={() => setShowBulkDeleteConfirm(true)}
+              className="px-3.5 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>
+                {language === 'ta'
+                  ? `தேர்ந்தெடுத்தவற்றை நீக்கு (${selectedRowIds.size})`
+                  : `Remove Selected (${selectedRowIds.size})`}
+              </span>
+            </button>
           </div>
         </div>
       )}
@@ -669,7 +1146,33 @@ export const StudentManagement: React.FC = () => {
           <table className="w-full text-left text-xs text-slate-600">
             <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               <tr>
-                <th className="px-5 py-3.5">Candidate & ID</th>
+                <th className="pl-4 pr-2 py-3.5 w-8">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pageIds = paginatedStudents.map((s) => s.id);
+                      const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedRowIds.has(id));
+                      setSelectedRowIds((prev) => {
+                        const next = new Set(prev);
+                        if (allSelected) {
+                          pageIds.forEach((id) => next.delete(id));
+                        } else {
+                          pageIds.forEach((id) => next.add(id));
+                        }
+                        return next;
+                      });
+                    }}
+                    className="text-slate-400 hover:text-blue-600 transition-colors flex items-center justify-center cursor-pointer"
+                    title="Select / Deselect all on current page"
+                  >
+                    {paginatedStudents.length > 0 && paginatedStudents.every((s) => selectedRowIds.has(s.id)) ? (
+                      <CheckSquare className="w-4 h-4 text-blue-600" />
+                    ) : (
+                      <Square className="w-4 h-4" />
+                    )}
+                  </button>
+                </th>
+                <th className="px-4 py-3.5">Candidate & ID</th>
                 <th className="px-5 py-3.5">Educational Institution</th>
                 <th className="px-5 py-3.5">Grade Level</th>
                 <th className="px-5 py-3.5 text-center">
@@ -691,7 +1194,7 @@ export const StudentManagement: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-8 text-center text-slate-400">
+                  <td colSpan={9} className="px-5 py-8 text-center text-slate-400">
                     {duplicateFilter !== 'all'
                       ? (language === 'ta' ? 'தேர்ந்தெடுக்கப்பட்ட வகைக்குரிய நகல் பதிவுகள் எதுவும் இல்லை.' : 'No duplicate records found for the selected filter.')
                       : 'No student records match your query.'}
@@ -701,17 +1204,41 @@ export const StudentManagement: React.FC = () => {
                 paginatedStudents.map((std) => {
                   const points = std.referralPoints !== undefined ? std.referralPoints : 25;
                   const dup = getDuplicateStatus(std);
+                  const isRowSelected = selectedRowIds.has(std.id);
 
                   return (
                     <tr
                       key={std.id}
                       className={`transition-colors ${
-                        dup.isAnyDup
+                        isRowSelected
+                          ? 'bg-blue-50/70'
+                          : dup.isAnyDup
                           ? 'bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-500'
                           : 'hover:bg-slate-50/70'
                       }`}
                     >
-                      <td className="px-5 py-3.5">
+                      <td className="pl-4 pr-2 py-3.5 align-top">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedRowIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(std.id)) next.delete(std.id);
+                              else next.add(std.id);
+                              return next;
+                            });
+                          }}
+                          className="mt-1 text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
+                          aria-label={`Select ${std.name}`}
+                        >
+                          {isRowSelected ? (
+                            <CheckSquare className="w-4 h-4 text-blue-600" />
+                          ) : (
+                            <Square className="w-4 h-4" />
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3.5">
                         <div className="flex items-start gap-3">
                           <div
                             className={`w-8 h-8 rounded-full border font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 ${
@@ -728,7 +1255,7 @@ export const StudentManagement: React.FC = () => {
                               {dup.isAnyDup && (
                                 <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-rose-700 bg-rose-100/90 px-1.5 py-0.2 rounded border border-rose-300">
                                   <AlertTriangle className="w-2.5 h-2.5 text-rose-600" />
-                                  <span>Duplicate Entry</span>
+                                  <span>{dup.isIdentityDup ? 'Same Name & Grade' : 'Duplicate Entry'}</span>
                                 </span>
                               )}
                             </div>
@@ -1615,6 +2142,447 @@ export const StudentManagement: React.FC = () => {
           onSave={handleSaveStudentEdit}
           language={language}
         />
+      )}
+
+      {/* Bulk Remove Selected Confirmation Modal */}
+      {showBulkDeleteConfirm && (
+        <Modal
+          isOpen={showBulkDeleteConfirm}
+          onClose={() => !isBulkDeleting && setShowBulkDeleteConfirm(false)}
+          title={
+            language === 'ta'
+              ? `தேர்ந்தெடுக்கப்பட்ட ${selectedRowIds.size} பதிவுகளை நீக்குக`
+              : `Remove ${selectedRowIds.size} Selected Registration(s)`
+          }
+        >
+          <div className="space-y-4">
+            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-xs">
+                <p className="font-bold text-rose-950">
+                  {language === 'ta'
+                    ? `தேர்ந்தெடுக்கப்பட்ட ${selectedRowIds.size} மாணவர் பதிவுகளையும் நிரந்தரமாக நீக்க விரும்புகிறீர்களா?`
+                    : `Are you sure you want to permanently remove ${selectedRowIds.size} selected student registration(s)?`}
+                </p>
+                <p className="text-[11px] text-rose-800">
+                  {language === 'ta'
+                    ? 'நீக்கப்படும் கணக்குகளின் தரவுகள், உள்நுழைவு மற்றும் பரீட்சை முயற்சிகள் தரவுத்தளத்திலிருந்து அகற்றப்படும்.'
+                    : 'Selected accounts, login credentials, and related incomplete attempts will be permanently deleted from Firestore.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-slate-50">
+              {students
+                .filter((s) => selectedRowIds.has(s.id))
+                .map((s) => (
+                  <div key={s.id} className="px-3 py-2 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="font-bold text-slate-900">{s.name}</span>
+                      <span className="ml-2 font-mono text-[10px] text-slate-500">{s.studentId}</span>
+                    </div>
+                    <span className="text-[11px] text-slate-500">{s.email || s.phone}</span>
+                  </div>
+                ))}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={isBulkDeleting}
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
+              >
+                {language === 'ta' ? 'ரத்து செய்க' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                disabled={isBulkDeleting}
+                onClick={() => handleConfirmBulkRemove(Array.from(selectedRowIds), false)}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg flex items-center gap-1.5 cursor-pointer"
+              >
+                {isBulkDeleting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>
+                  {isBulkDeleting
+                    ? language === 'ta'
+                      ? 'நீக்கப்படுகிறது...'
+                      : 'Removing...'
+                    : language === 'ta'
+                    ? `ஆம், ${selectedRowIds.size} பதிவுகளை நீக்குக`
+                    : `Yes, Remove ${selectedRowIds.size} Account(s)`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Smart Duplicate Registration Manager & Removal Modal */}
+      {isDupModalOpen && (
+        <Modal
+          isOpen={isDupModalOpen}
+          onClose={() => !isBulkDeleting && setIsDupModalOpen(false)}
+          title={
+            language === 'ta'
+              ? 'நகல் பதிவுகள் மேலாளர் & நீக்கம் (Duplicate Registrations Remover)'
+              : 'Duplicate Registrations Manager & Removal Tool'
+          }
+          subtitle={
+            language === 'ta'
+              ? 'ஒரே மின்னஞ்சல், தொலைபேசி அல்லது பெயர்-வகுப்பு கொண்ட கணக்குகளை ஒப்பிட்டு தேவையற்ற நகல்களை நீக்குக'
+              : 'Compare clustered accounts by email, phone, or name & grade and remove duplicate registrations safely'
+          }
+          maxWidthClass="max-w-5xl"
+        >
+          <div className="space-y-4 text-xs">
+            {/* Summary KPI Strip */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-slate-800 text-white flex items-center justify-center shrink-0">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                    {language === 'ta' ? 'நகல் தொகுப்புகள்' : 'Duplicate Clusters'}
+                  </span>
+                  <span className="text-base font-black text-slate-900">{duplicateGroups.length} Groups</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-amber-800 block">
+                    {language === 'ta' ? 'கூடுதல் நகல் கணக்குகள்' : 'Extra Registrations'}
+                  </span>
+                  <span className="text-base font-black text-amber-950">{totalExtraDuplicatesCount} Extra</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0">
+                  <Trash2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-rose-800 block">
+                    {language === 'ta' ? 'நீக்கத் தேர்ந்தெடுக்கப்பட்டவை' : 'Marked for Removal'}
+                  </span>
+                  <span className="text-base font-black text-rose-950">{dupRemovalSelectedIds.size} Selected</span>
+                </div>
+              </div>
+            </div>
+
+            {duplicateGroups.length === 0 ? (
+              <div className="p-10 text-center bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
+                <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
+                <h4 className="text-sm font-bold text-emerald-950">
+                  {language === 'ta'
+                    ? 'நகல் மாணவர் பதிவுகள் எதுவும் இல்லை!'
+                    : 'No Duplicate Registrations Found!'}
+                </h4>
+                <p className="text-xs text-emerald-800 max-w-md mx-auto">
+                  {language === 'ta'
+                    ? 'அனைத்து மாணவர் பதிவுகளும் தனித்துவமான மின்னஞ்சல், தொலைபேசி மற்றும் பெயர்களுடன் சுத்தமாக உள்ளன.'
+                    : 'All registered candidate accounts appear unique across email, phone, name & grade, and Student ID.'}
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Smart Selection Controls */}
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAutoSelectDuplicatesInModal('exact_only')}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>
+                        {language === 'ta'
+                          ? 'ஒரே மாணவர் நகல்களை மட்டும் தேர்ந்தெடு'
+                          : 'Auto-Select Exact Duplicates (Same Student)'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAutoSelectDuplicatesInModal('all_extras')}
+                      className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                    >
+                      <CheckSquare className="w-3.5 h-3.5" />
+                      <span>
+                        {language === 'ta'
+                          ? 'அனைத்து தொகுப்புகளிலும் 1 பிரதான கணக்கை மட்டும் வைத்து மற்றவற்றைத் தேர்ந்தெடு'
+                          : 'Auto-Select All Extras (Keep 1 Best per Group)'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDupRemovalSelectedIds(new Set());
+                        setDupModalConfirming(false);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold text-[11px] cursor-pointer"
+                    >
+                      {language === 'ta' ? 'தேர்வை அழி' : 'Clear Selection'}
+                    </button>
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    {language === 'ta'
+                      ? 'குறிப்பு: சகோதரர்கள் ஒரே பெற்றோர் மின்னஞ்சலைப் பகிரலாம்'
+                      : 'Tip: Siblings may share parent email/phone; verify names before deleting'}
+                  </span>
+                </div>
+
+                {/* Clustered Duplicate Groups */}
+                <div className="space-y-4 max-h-[52vh] overflow-y-auto pr-1">
+                  {duplicateGroups.map((grp, gIdx) => {
+                    const keepId =
+                      dupKeepOverrides[grp.groupId] && grp.members.some((m) => m.id === dupKeepOverrides[grp.groupId])
+                        ? dupKeepOverrides[grp.groupId]
+                        : grp.recommendedKeepId;
+
+                    return (
+                      <div
+                        key={grp.groupId}
+                        className={`rounded-2xl border-2 overflow-hidden ${
+                          grp.isLikelySameStudent ? 'border-rose-300 bg-rose-50/30' : 'border-amber-200 bg-amber-50/20'
+                        }`}
+                      >
+                        <div
+                          className={`px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b ${
+                            grp.isLikelySameStudent
+                              ? 'bg-rose-100/70 border-rose-200'
+                              : 'bg-amber-100/60 border-amber-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-900 text-white font-black text-[10px]">
+                              #{gIdx + 1}
+                            </span>
+                            <span className="font-extrabold text-slate-900 text-xs">{grp.matchSummary}</span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                grp.isLikelySameStudent
+                                  ? 'bg-rose-600 text-white border-rose-700'
+                                  : 'bg-amber-200 text-amber-950 border-amber-300'
+                              }`}
+                            >
+                              {grp.isLikelySameStudent
+                                ? language === 'ta'
+                                  ? 'ஒரே மாணவர் நகல்'
+                                  : 'Likely Same Student'
+                                : language === 'ta'
+                                ? 'பகிரப்பட்ட தொடர்பு (சகோதரர்களாக இருக்கலாம்)'
+                                : 'Shared Contact (Verify Names)'}
+                            </span>
+                            {grp.reasons.map((reason) => (
+                              <span
+                                key={reason}
+                                className="px-2 py-0.5 rounded bg-white/90 border border-slate-200 text-[10px] font-semibold text-slate-700"
+                              >
+                                {reason}
+                              </span>
+                            ))}
+                          </div>
+                          <span className="text-[11px] font-bold text-slate-700">
+                            {grp.members.length} Accounts
+                          </span>
+                        </div>
+
+                        <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          {grp.members.map((m) => {
+                            const isKept = m.id === keepId;
+                            const isMarkedRemove = dupRemovalSelectedIds.has(m.id);
+                            const mStats =
+                              studentResultsStatsMap.get(m.id) ||
+                              studentResultsStatsMap.get(m.studentId) || { examCount: 0, medalsWon: 0, avgPct: 0 };
+                            const mPoints = m.referralPoints !== undefined ? m.referralPoints : 0;
+
+                            return (
+                              <div
+                                key={m.id}
+                                className={`p-3 rounded-xl border-2 transition-all flex flex-col justify-between gap-2.5 ${
+                                  isMarkedRemove
+                                    ? 'bg-rose-50 border-rose-500 shadow-xs'
+                                    : isKept
+                                    ? 'bg-emerald-50/70 border-emerald-400 shadow-xs'
+                                    : 'bg-white border-slate-200'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-extrabold text-slate-900 text-xs truncate">
+                                        {m.name}
+                                      </span>
+                                      {isKept && (
+                                        <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-black uppercase">
+                                          {language === 'ta' ? 'பிரதான கணக்கு (Keep)' : 'Primary Keep'}
+                                        </span>
+                                      )}
+                                      {isMarkedRemove && (
+                                        <span className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9px] font-black uppercase">
+                                          {language === 'ta' ? 'நீக்கப்படும்' : 'Will Remove'}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] font-mono text-slate-500 mt-0.5">
+                                      {m.studentId} {m.username ? `• @${m.username}` : ''} • {m.gradeLevel}
+                                    </p>
+                                    <p className="text-[10px] text-slate-600 truncate mt-0.5">
+                                      {m.institution}
+                                    </p>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {!isKept && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetPrimaryKeepForGroup(grp.groupId, m.id)}
+                                        className="px-2 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold text-[10px] border border-emerald-300 cursor-pointer"
+                                        title="Keep this account as Primary"
+                                      >
+                                        Keep This
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDupRemovalSelectedIds((prev) => {
+                                          const next = new Set(prev);
+                                          if (next.has(m.id)) next.delete(m.id);
+                                          else next.add(m.id);
+                                          return next;
+                                        });
+                                        setDupModalConfirming(false);
+                                      }}
+                                      className={`px-2 py-1 rounded-lg font-bold text-[10px] border flex items-center gap-1 cursor-pointer ${
+                                        isMarkedRemove
+                                          ? 'bg-rose-600 text-white border-rose-700'
+                                          : 'bg-white hover:bg-rose-50 text-rose-700 border-rose-300'
+                                      }`}
+                                    >
+                                      {isMarkedRemove ? (
+                                        <>
+                                          <CheckSquare className="w-3 h-3" />
+                                          <span>Selected</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Square className="w-3 h-3" />
+                                          <span>Remove</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/70 text-[10px]">
+                                  <div className="flex flex-wrap items-center gap-2 text-slate-600">
+                                    {m.email && <span className="truncate max-w-[160px]">✉ {m.email}</span>}
+                                    {m.phone && <span className="font-mono">📞 {m.phone}</span>}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 font-bold">
+                                      {mStats.examCount} Exams
+                                    </span>
+                                    <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-bold">
+                                      {mPoints} pts
+                                    </span>
+                                    <span className="text-slate-400 font-mono">{m.createdAt}</span>
+                                    <button
+                                      type="button"
+                                      disabled={isDeleting || isBulkDeleting}
+                                      onClick={() => setStudentToDelete(m)}
+                                      className="p-1 text-rose-600 hover:bg-rose-100 rounded cursor-pointer"
+                                      title="Delete this single registration immediately"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* Modal Footer */}
+            <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+              <button
+                type="button"
+                disabled={isBulkDeleting}
+                onClick={() => {
+                  setIsDupModalOpen(false);
+                  setDupModalConfirming(false);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
+              >
+                {language === 'ta' ? 'மூடு' : 'Close'}
+              </button>
+
+              {duplicateGroups.length > 0 && (
+                <div className="flex items-center gap-2">
+                  {dupModalConfirming ? (
+                    <div className="flex items-center gap-2 bg-rose-50 border border-rose-300 px-3 py-1.5 rounded-xl">
+                      <span className="text-xs font-bold text-rose-900">
+                        {language === 'ta'
+                          ? `${dupRemovalSelectedIds.size} நகல் கணக்குகளை நிரந்தரமாக நீக்கவா?`
+                          : `Permanently delete ${dupRemovalSelectedIds.size} duplicate(s)?`}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={isBulkDeleting}
+                        onClick={() => setDupModalConfirming(false)}
+                        className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        id="btn-confirm-dup-cleanup"
+                        type="button"
+                        disabled={isBulkDeleting || dupRemovalSelectedIds.size === 0}
+                        onClick={() =>
+                          handleConfirmBulkRemove(Array.from(dupRemovalSelectedIds), true)
+                        }
+                        className="px-3.5 py-1 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {isBulkDeleting ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                        <span>{isBulkDeleting ? 'Removing...' : 'Confirm Remove'}</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      id="btn-trigger-dup-cleanup"
+                      type="button"
+                      disabled={dupRemovalSelectedIds.size === 0 || isBulkDeleting}
+                      onClick={() => setDupModalConfirming(true)}
+                      className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-40 rounded-xl shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>
+                        {language === 'ta'
+                          ? `தேர்ந்தெடுக்கப்பட்ட நகல்களை நீக்கு (${dupRemovalSelectedIds.size})`
+                          : `Remove Selected Duplicates (${dupRemovalSelectedIds.size})`}
+                      </span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

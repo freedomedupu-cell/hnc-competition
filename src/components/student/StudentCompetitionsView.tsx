@@ -531,12 +531,13 @@ export const StudentCompetitionsView: React.FC = () => {
             const questionCount = questions.length || comp.questionsCount || 10;
             const totalMarks =
               comp.totalMarks || questions.reduce((sum, q) => sum + (q.marks || 0), 0) || 100;
-            const duration = comp.duration || 60;
+            const isUntimed = comp.hasTimeLimit === false || comp.duration === 0;
+            const duration = isUntimed ? 0 : (comp.duration || 60);
             const sched = getCompetitionScheduleStatus(comp);
 
-            // Dynamic Deadline Badge
+            // Dynamic Deadline Badge (skip for Open Schedule anytime exams)
             let deadlineBadge: { text: string; classes: string; isCrit: boolean } | null = null;
-            if (!isSubmitted) {
+            if (!isSubmitted && !sched.isOpenSchedule) {
               const nowMs = Date.now();
               const regDateStr = comp.registrationEnd || comp.registrationDeadline;
               if (regDateStr && !isRegistered) {
@@ -668,10 +669,12 @@ export const StudentCompetitionsView: React.FC = () => {
                     <div className="flex items-center justify-between text-slate-500">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Duration:</span>
+                        <span>{language === 'ta' ? 'நேர வரம்பு:' : language === 'si' ? 'කාලය:' : 'Time Limit:'}</span>
                       </span>
-                      <span className="font-semibold text-slate-800">
-                        {duration} mins
+                      <span className={`font-semibold ${isUntimed ? 'text-emerald-700' : 'text-slate-800'}`}>
+                        {isUntimed
+                          ? (language === 'ta' ? '∞ நேரக் கட்டுப்பாடு இல்லை' : language === 'si' ? '∞ කාල සීමාවක් නැත' : '∞ No Time Limit')
+                          : `${duration} mins`}
                       </span>
                     </div>
 
@@ -702,14 +705,16 @@ export const StudentCompetitionsView: React.FC = () => {
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
                         <span>
                           {language === 'ta'
-                            ? 'திகதி / காலம்:'
+                            ? 'திகதி / அட்டவணை:'
                             : language === 'si'
                             ? 'දිනය / කාලය:'
-                            : 'Date / Window:'}
+                            : 'Schedule / Window:'}
                         </span>
                       </span>
-                      <span className="font-semibold text-slate-800">
-                        {comp.competitionStart || comp.startDate || (language === 'ta' ? 'இப்போது திறக்கப்பட்டுள்ளது' : language === 'si' ? 'දැන් විවෘතයි' : 'Open Now')}
+                      <span className={`font-semibold ${sched.isOpenSchedule ? 'text-emerald-700' : 'text-slate-800'}`}>
+                        {sched.isOpenSchedule
+                          ? (language === 'ta' ? '🌐 எந்நேரமும் (Open)' : language === 'si' ? '🌐 ඕනෑම වේලාවක' : '🌐 Open Anytime')
+                          : (comp.competitionStart || comp.startDate || (language === 'ta' ? 'இப்போது திறக்கப்பட்டுள்ளது' : language === 'si' ? 'දැන් විවෘතයි' : 'Open Now'))}
                       </span>
                     </div>
 

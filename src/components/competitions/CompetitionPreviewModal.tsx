@@ -48,7 +48,9 @@ export const CompetitionPreviewModal: React.FC<CompetitionPreviewModalProps> = (
   const totalMarks =
     competition.totalMarks ??
     questions.reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
-  const duration = competition.duration ?? 60;
+  const isUntimed = competition.hasTimeLimit === false || competition.duration === 0;
+  const isOpenSched = competition.scheduleMode === 'open';
+  const duration = isUntimed ? 0 : (competition.duration ?? 60);
   const entryFee = competition.entryType === 'Paid' ? `LKR ${competition.entryFee?.toLocaleString()}` : 'Free Entry';
 
   const handleSelectAnswer = (questionId: string, answer: string) => {
@@ -131,7 +133,7 @@ export const CompetitionPreviewModal: React.FC<CompetitionPreviewModalProps> = (
               <Clock className="w-4 h-4 text-blue-400 shrink-0" />
               <div>
                 <span className="text-slate-400 block text-[10px] uppercase font-bold">Duration</span>
-                <span className="font-semibold">{duration} Minutes</span>
+                <span className="font-semibold">{isUntimed ? 'No Time Limit (Untimed)' : `${duration} Minutes`}</span>
               </div>
             </div>
 
@@ -155,7 +157,7 @@ export const CompetitionPreviewModal: React.FC<CompetitionPreviewModalProps> = (
               <Calendar className="w-4 h-4 text-purple-400 shrink-0" />
               <div>
                 <span className="text-slate-400 block text-[10px] uppercase font-bold">Assessment Window</span>
-                <span className="font-semibold">{competition.competitionStart || 'TBD'}</span>
+                <span className="font-semibold">{isOpenSched ? '🌐 Open Anytime' : (competition.competitionStart || 'TBD')}</span>
               </div>
             </div>
           </div>
@@ -173,13 +175,15 @@ export const CompetitionPreviewModal: React.FC<CompetitionPreviewModalProps> = (
               <div className="flex justify-between py-1 border-b border-slate-200/60">
                 <span className="text-slate-500">Registration Period:</span>
                 <span className="font-semibold text-slate-800">
-                  {competition.registrationStart || '—'} to {competition.registrationEnd || '—'}
+                  {isOpenSched ? 'Open Anytime (No Deadline)' : `${competition.registrationStart || '—'} to ${competition.registrationEnd || '—'}`}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-200/60">
                 <span className="text-slate-500">Assessment Window:</span>
                 <span className="font-semibold text-slate-800 text-right">
-                  {competition.competitionStart || '—'} {competition.competitionStartTime ? `(${competition.competitionStartTime})` : ''} to {competition.competitionEnd || '—'} {competition.competitionEndTime ? `(${competition.competitionEndTime})` : ''}
+                  {isOpenSched
+                    ? 'Available Anytime (Open Schedule)'
+                    : `${competition.competitionStart || '—'} ${competition.competitionStartTime ? `(${competition.competitionStartTime})` : ''} to ${competition.competitionEnd || '—'} ${competition.competitionEndTime ? `(${competition.competitionEndTime})` : ''}`}
                 </span>
               </div>
               <div className="flex justify-between py-1">

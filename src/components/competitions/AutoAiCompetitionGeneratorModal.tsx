@@ -412,6 +412,8 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
   const [questionCount, setQuestionCount] = useState<number>(15);
   const [customQuestionInput, setCustomQuestionInput] = useState<string>('15');
   const [duration, setDuration] = useState<number>(30);
+  const [hasTimeLimit, setHasTimeLimit] = useState<boolean>(true);
+  const [scheduleMode, setScheduleMode] = useState<'scheduled' | 'open'>('scheduled');
   const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard' | 'Challenging'>('Medium');
   const [customPromptNote, setCustomPromptNote] = useState('');
   const [customOptionE, setCustomOptionE] = useState<string>('');
@@ -434,7 +436,9 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
     setCustomOptionsInput(String(newConfig.optionsCount));
     setQuestionCount(newConfig.defaultQuestionCount);
     setCustomQuestionInput(String(newConfig.defaultQuestionCount));
-    setDuration(newConfig.defaultDuration);
+    if (hasTimeLimit) {
+      setDuration(newConfig.defaultDuration);
+    }
   };
 
   const handleOptionCountChange = (val: number) => {
@@ -595,7 +599,9 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
       category: generatedData.category || generatedData.subject || selectedSubject,
       grade: effectiveGrade,
       language: selectedMedium as any,
-      duration: generatedData.duration || duration,
+      duration: hasTimeLimit ? (generatedData.duration || duration || 30) : 0,
+      hasTimeLimit,
+      scheduleMode,
       entryType: 'Free',
       entryFee: 0,
       prizesEnabled: true,
@@ -1224,17 +1230,27 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
                 </select>
               </div>
 
-              {/* Duration */}
+              {/* Duration & Time Limit */}
               <div className="space-y-1">
                 <label className="font-bold text-slate-700 flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Duration (நேரம்)</span>
+                  <span>Duration / Time Limit (நேர வரம்பு)</span>
                 </label>
                 <select
-                  value={duration}
-                  onChange={(e) => setDuration(Number(e.target.value))}
+                  value={hasTimeLimit ? duration : 0}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (val === 0) {
+                      setHasTimeLimit(false);
+                      setDuration(0);
+                    } else {
+                      setHasTimeLimit(true);
+                      setDuration(val);
+                    }
+                  }}
                   className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
+                  <option value={0}>∞ No Time Limit (நேரக் கட்டுப்பாடு இல்லை / Anytime Practice)</option>
                   <option value={10}>10 Minutes (Speed Test / ஆரம்பம்)</option>
                   <option value={15}>15 Minutes (Short Quiz)</option>
                   <option value={20}>20 Minutes (Standard)</option>
@@ -1244,6 +1260,22 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
                   <option value={60}>60 Minutes (National Olympiad)</option>
                   <option value={90}>90 Minutes (A/L 50 MCQ Standard)</option>
                   <option value={120}>120 Minutes (Open Marathon Exam)</option>
+                </select>
+              </div>
+
+              {/* Schedule Type */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Schedule Mode (பரீட்சை அட்டவணை)</span>
+                </label>
+                <select
+                  value={scheduleMode}
+                  onChange={(e) => setScheduleMode(e.target.value as 'scheduled' | 'open')}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="scheduled">📅 Scheduled Window (14-Day Exam Window)</option>
+                  <option value="open">🌐 Open Schedule (எப்போது வேண்டுமானாலும் செய்யலாம்)</option>
                 </select>
               </div>
 
@@ -1314,7 +1346,15 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
                 <div className="flex items-center gap-2 text-[11px] font-bold text-slate-700 bg-white/95 px-3 py-1.5 rounded-lg border border-slate-200/80 shrink-0">
                   <span className="text-blue-700">தெரிவுகள்: {getOptionLettersForCount(optionsCount).join(', ')}</span>
                   <span>•</span>
-                  <span className="text-indigo-700">{questionCount} வினாக்கள் ({duration} நிமி)</span>
+                  <span className="text-indigo-700">
+                    {questionCount} வினாக்கள் ({hasTimeLimit ? `${duration} நிமி` : '∞ நேர வரம்பில்லை'})
+                  </span>
+                  {scheduleMode === 'open' && (
+                    <>
+                      <span>•</span>
+                      <span className="text-emerald-700">🌐 Open Anytime</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1375,10 +1415,14 @@ export const AutoAiCompetitionGeneratorModal: React.FC<AutoAiCompetitionGenerato
                   )}
                 </div>
 
-                <div className="flex items-center gap-3 text-xs text-slate-300">
+                <div className="flex items-center gap-3 text-xs text-slate-300 flex-wrap">
                   <span className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{generatedData.duration || duration} mins</span>
+                    <span>{hasTimeLimit ? `${generatedData.duration || duration} mins` : '∞ No Time Limit'}</span>
+                  </span>
+                  <span>•</span>
+                  <span className="text-emerald-300 font-semibold">
+                    {scheduleMode === 'open' ? '🌐 Open Schedule (Anytime)' : '📅 Scheduled Window'}
                   </span>
                   <span>•</span>
                   <span className="flex items-center gap-1">
