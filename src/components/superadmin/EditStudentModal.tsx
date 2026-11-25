@@ -91,15 +91,17 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
   // Sync state whenever selected student changes
   useEffect(() => {
     if (student) {
-      setFullName(student.name || student.fullName || '');
-      setStudentId(student.studentId || '');
-      setUsername(student.username || '');
-      setEmail(student.email || '');
-      setPhone(student.phone || '');
-      setGrade(student.gradeLevel || student.grade || 'Grade 11 (O/L)');
-      setSchool(student.institution || student.school || '');
-      
-      const stdDistrict = student.district || 'Jaffna';
+      const asStr = (v: unknown, fb = '') => (v === null || v === undefined ? fb : String(v));
+      const safeSid = asStr(student.studentId);
+      setFullName(asStr(student.name) || asStr(student.fullName));
+      setStudentId(safeSid);
+      setUsername(asStr(student.username));
+      setEmail(asStr(student.email));
+      setPhone(asStr(student.phone));
+      setGrade(asStr(student.gradeLevel) || asStr(student.grade) || 'Grade 11 (O/L)');
+      setSchool(asStr(student.institution) || asStr(student.school));
+
+      const stdDistrict = asStr(student.district, 'Jaffna');
       if (SRI_LANKA_DISTRICTS.includes(stdDistrict)) {
         setDistrict(stdDistrict);
         setIsCustomDistrict(false);
@@ -111,16 +113,18 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
         setIsCustomDistrict(false);
       }
 
-      setAddress(student.address || '');
-      setDateOfBirth(student.dateOfBirth || '');
-      setGuardianName(student.guardianName || '');
+      setAddress(asStr(student.address));
+      setDateOfBirth(asStr(student.dateOfBirth));
+      setGuardianName(asStr(student.guardianName));
       setStatus(student.status === 'inactive' ? 'inactive' : 'active');
       setReferralPoints(
-        student.referralPoints !== undefined ? student.referralPoints : 25
+        student.referralPoints !== undefined && !Number.isNaN(Number(student.referralPoints))
+          ? Number(student.referralPoints)
+          : 25
       );
       setReferralCode(
-        student.referralCode ||
-          `HNC-${student.studentId.toUpperCase().replace(/[^A-Z0-9]/g, '')}`
+        asStr(student.referralCode) ||
+          `HNC-${(safeSid || asStr(student.id)).toUpperCase().replace(/[^A-Z0-9]/g, '')}`
       );
       setNewPassword('');
       setErrorMsg(null);

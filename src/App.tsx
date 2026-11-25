@@ -84,31 +84,80 @@ export class PortalErrorBoundary extends React.Component<ErrorBoundaryProps, Err
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('PortalErrorBoundary caught an error:', error, errorInfo);
+    const msg = error?.message || '';
+    const isChunkOrModuleError =
+      msg.includes('Failed to fetch dynamically imported module') ||
+      msg.includes('Importing a module script failed') ||
+      msg.includes('Loading chunk') ||
+      msg.includes('error loading dynamically imported module');
+
+    if (isChunkOrModuleError && typeof window !== 'undefined') {
+      try {
+        const retryKey = 'hnc_chunk_reload_attempted';
+        if (!sessionStorage.getItem(retryKey)) {
+          sessionStorage.setItem(retryKey, '1');
+          this.clearCachesAndReload();
+        }
+      } catch {
+        // Ignore sessionStorage errors
+      }
+    }
   }
+
+  clearCachesAndReload = async () => {
+    try {
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        const names = await window.caches.keys();
+        await Promise.all(names.map((name) => window.caches.delete(name)));
+      }
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister().catch(() => {})));
+      }
+    } catch {
+      // Ignore cache cleanup failures
+    }
+    window.location.reload();
+  };
 
   handleReload = () => {
     this.setState({ hasError: false, error: null });
-    window.location.reload();
+    this.clearCachesAndReload();
   };
 
   render() {
     if (this.state.hasError) {
+      const errorMessage = this.state.error?.message || '';
+      const isNetworkOrModuleError =
+        errorMessage.includes('Failed to fetch dynamically imported module') ||
+        errorMessage.includes('Importing a module script failed') ||
+        errorMessage.includes('Loading chunk');
+
       return (
         <div className="w-full min-h-[400px] flex flex-col items-center justify-center p-6 text-center space-y-4 bg-white rounded-2xl border border-slate-200 shadow-sm my-4">
           <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center text-xl">
             ⚠️
           </div>
-          <div className="max-w-md space-y-1">
+          <div className="max-w-md space-y-1.5">
             <h3 className="text-base font-bold text-slate-900">
               பக்கத்தை ஏற்றுவதில் தற்காலிக இடையூறு (Display Notice)
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              பக்கத்தை மீண்டும் ஏற்றுவதன் மூலம் தடையின்றி தொடரலாம்.
+              {isNetworkOrModuleError
+                ? 'புதிய பதிப்பு அல்லது இணைய இணைப்பு மாற்றத்தால் பழைய கோப்பு ஏற்றப்படவில்லை. பக்கத்தைப் புதுப்பிக்கவும்.'
+                : 'பக்கத்தை மீண்டும் ஏற்றுவதன் மூலம் தடையின்றி தொடரலாம்.'}
               <br />
               <span className="text-[11px] text-slate-500">
-                (A display issue occurred. Please click below to refresh and continue.)
+                {isNetworkOrModuleError
+                  ? '(App assets were updated or connection dropped. Click Reload to fetch the latest version.)'
+                  : '(A display issue occurred. Please click below to refresh and continue.)'}
               </span>
             </p>
+            {errorMessage && (
+              <div className="mt-2 p-2 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-mono text-rose-700 break-words text-left">
+                {errorMessage}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button

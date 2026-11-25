@@ -19,6 +19,8 @@ import {
   signOut as fbSignOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup,
   User as FirebaseUser,
 } from 'firebase/auth';
 import { initializeApp, deleteApp } from 'firebase/app';
@@ -121,8 +123,86 @@ export function getSavedActiveUser(): DbUser | null {
 }
 
 /**
- * Sign in existing user and verify active status and role from Firestore
+ * Authenticate Super Admin via Firebase Auth Google Sign-In so Firestore security rules
+ * (isSuperAdmin()) receive a verified Firebase Auth ID token.
  */
+export async function signInSuperAdminWithGoogle(options?: {
+  preserveExistingSessionUid?: boolean;
+}): Promise<{ firebaseUser: FirebaseUser; userProfile: DbUser }> {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({
+    prompt: 'select_account',
+    login_hint: 'freedomedupu@gmail.com',
+  });
+
+  // Keep signInWithPopup as the very first await to preserve browser user-gesture activation
+  const result = await signInWithPopup(auth, provider);
+  const fbUser = result.user;
+  const email = (fbUser.email || '').trim().toLowerCase();
+
+  let userProfile: DbUser | null = null;
+  const targetRef = doc(db, 'users', fbUser.uid);
+
+  try {
+    const snap = await getDoc(targetRef);
+    if (snap.exists()) {
+      userProfile = snap.data() as DbUser;
+    } else if (email) {
+      const byEmailSnap = await getDocs(
+        query(collection(db, 'users'), where('email', '==', email))
+      );
+      if (!byEmailSnap.empty) {
+        userProfile = byEmailSnap.docs[0].data() as DbUser;
+      }
+    }
+  } catch (err) {
+    console.warn('Super Admin Google profile lookup notice:', err);
+  }
+
+  const isDesignatedSuperAdmin = email === 'freedomedupu@gmail.com';
+  const isStoredSuperAdmin =
+    userProfile?.role === 'super_admin' && userProfile?.status !== 'inactive';
+
+  if (!isDesignatedSuperAdmin && !isStoredSuperAdmin) {
+    try {
+      await fbSignOut(auth);
+    } catch {}
+    throw new Error(
+      `Account (${email || 'unknown'}) is not authorized as Super Admin. Please select freedomedupu@gmail.com.`
+    );
+  }
+
+  const existingSaved = options?.preserveExistingSessionUid ? getSavedActiveUser() : null;
+  const firestoreProfile: DbUser = {
+    ...(userProfile || {}),
+    uid: fbUser.uid,
+    fullName:
+      userProfile?.fullName ||
+      existingSaved?.fullName ||
+      fbUser.displayName ||
+      'Chief Academic Registrar (Super Admin)',
+    email: email || 'freedomedupu@gmail.com',
+    phone: userProfile?.phone || existingSaved?.phone || '+94 77 123 4567',
+    role: 'super_admin',
+    status: 'active',
+    createdAt: userProfile?.createdAt || existingSaved?.createdAt || new Date().toISOString(),
+  };
+
+  try {
+    await setDoc(targetRef, firestoreProfile, { merge: true });
+  } catch (err) {
+    console.warn('Super Admin profile sync notice:', err);
+  }
+
+  const activeProfile =
+    existingSaved && existingSaved.role === 'super_admin'
+      ? { ...existingSaved, email: firestoreProfile.email }
+      : firestoreProfile;
+
+  saveActiveUser(activeProfile);
+  return { firebaseUser: fbUser, userProfile: activeProfile };
+}
+
 /**
  * Sign in existing user using Student ID, Username, or Email, and verify active status and role from Firestore
  */
@@ -455,6 +535,7 @@ export async function registerStudentAccount(data: {
   username: string;
   password: string;
   referralCode?: string;
+  skipFirebaseAuthSignIn?: boolean;
 }): Promise<{ firebaseUser: FirebaseUser | null; userProfile: DbUser }> {
   const normalizedEmail = data.email.trim().toLowerCase();
   const normalizedUsername = data.username.trim().toLowerCase();
@@ -509,18 +590,20 @@ export async function registerStudentAccount(data: {
   // 3. Create Firebase Auth account using a unique internal Auth email so siblings sharing the parent's email never collide!
   const internalAuthEmail = `${normalizedUsername}@student.hnceduhub.lk`;
 
-  try {
-    const cred = await createUserWithEmailAndPassword(auth, internalAuthEmail, data.password);
-    firebaseUser = cred.user;
-    uid = cred.user.uid;
-  } catch (err: any) {
-    if (isAuthUnavailableError(err)) {
-      console.warn('Firebase Auth email/password provider not enabled in console; saving student directly to Firestore.');
-    } else if (err.code === 'auth/email-already-in-use') {
-      // Internal auth email collided - fall back to resilient Firestore document
-      console.warn('Internal auth email already exists, continuing with resilient Firestore candidate record.');
-    } else {
-      console.warn('Firebase Auth registration warning, continuing with Firestore storage:', err);
+  if (!data.skipFirebaseAuthSignIn) {
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, internalAuthEmail, data.password);
+      firebaseUser = cred.user;
+      uid = cred.user.uid;
+    } catch (err: any) {
+      if (isAuthUnavailableError(err)) {
+        console.warn('Firebase Auth email/password provider not enabled in console; saving student directly to Firestore.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        // Internal auth email collided - fall back to resilient Firestore document
+        console.warn('Internal auth email already exists, continuing with resilient Firestore candidate record.');
+      } else {
+        console.warn('Firebase Auth registration warning, continuing with Firestore storage:', err);
+      }
     }
   }
 
@@ -1724,6 +1807,12 @@ export async function purgeAllDemoCompetitions(): Promise<{ competitionsDeleted:
 export async function deleteStudentAccountFromFirestore(studentUid: string): Promise<void> {
   if (!studentUid) return;
 
+  if (!auth.currentUser) {
+    throw new Error(
+      'Permission denied: Please verify with Super Admin Google Sign-In (freedomedupu@gmail.com) to remove student registrations.'
+    );
+  }
+
   let permissionDeniedErr: any = null;
 
   // 1. Delete from 'students' collection (both direct doc ID and any docs matching uid)
@@ -1732,7 +1821,7 @@ export async function deleteStudentAccountFromFirestore(studentUid: string): Pro
     await deleteDoc(sRef);
   } catch (err: any) {
     if (err?.code === 'permission-denied') permissionDeniedErr = err;
-    console.warn('Error deleting student record:', err);
+    else console.warn('Error deleting student record:', err);
   }
 
   try {

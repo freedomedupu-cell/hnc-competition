@@ -534,7 +534,7 @@ export const StudentProfileView: React.FC = () => {
               ) : activeAvatar ? (
                 <span className="text-4xl">{activeAvatar}</span>
               ) : (
-                <span>{currentStudent.name.charAt(0)}</span>
+                <span>{(String(currentStudent?.name || '').trim() || 'S').charAt(0).toUpperCase()}</span>
               )}
             </div>
             <button
@@ -2008,7 +2008,7 @@ export const StudentProfileView: React.FC = () => {
                 ) : activeAvatar ? (
                   <span className="text-3xl">{activeAvatar}</span>
                 ) : (
-                  <span>{currentStudent.name.charAt(0)}</span>
+                  <span>{(String(currentStudent?.name || '').trim() || 'S').charAt(0).toUpperCase()}</span>
                 )}
               </div>
               <p className="text-[11px] text-slate-500 font-medium">

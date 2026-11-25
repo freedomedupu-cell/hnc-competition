@@ -169,11 +169,11 @@ export const AdminManagement: React.FC = () => {
   const filteredAdmins = admins.filter((admin) => {
     const term = searchTerm.toLowerCase();
     const matchesSearch =
-      admin.name.toLowerCase().includes(term) ||
-      admin.email.toLowerCase().includes(term) ||
+      (admin.name || '').toLowerCase().includes(term) ||
+      (admin.email || '').toLowerCase().includes(term) ||
       (admin.username && admin.username.toLowerCase().includes(term)) ||
-      admin.department.toLowerCase().includes(term) ||
-      admin.staffId.toLowerCase().includes(term) ||
+      (admin.department || '').toLowerCase().includes(term) ||
+      (admin.staffId || '').toLowerCase().includes(term) ||
       (admin.assignedSubject && admin.assignedSubject.toLowerCase().includes(term));
 
     const matchesStatus =
@@ -485,7 +485,7 @@ export const AdminManagement: React.FC = () => {
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 font-bold text-xs flex items-center justify-center shrink-0">
-                            {admin.name.charAt(0)}
+                            {(String(admin?.name || '').trim() || 'A').charAt(0).toUpperCase()}
                           </div>
                           <div>
                             <p className="font-bold text-slate-900">{admin.name}</p>

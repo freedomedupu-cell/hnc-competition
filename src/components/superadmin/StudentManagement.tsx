@@ -42,8 +42,56 @@ import {
   CheckCircle2,
   X,
   RefreshCw,
+  UserPlus,
 } from 'lucide-react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
+import { registerStudentAccount, signInSuperAdminWithGoogle } from '../../services/firebaseService';
+import { AVAILABLE_GRADES } from '../../lib/gradeUtils';
+import { SRI_LANKA_DISTRICTS } from '../../data/sriLankaDistricts';
 import { EditStudentModal } from './EditStudentModal';
+
+const safeStr = (val: unknown): string => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  return '';
+};
+
+const formatDateLabel = (val: unknown): string => {
+  if (!val) return '';
+  if (typeof val === 'string') return val.includes('T') ? val.split('T')[0] : val;
+  if (typeof val === 'number') {
+    const d = new Date(val);
+    return Number.isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+  }
+  if (typeof val === 'object') {
+    const obj = val as any;
+    if (typeof obj.toDate === 'function') {
+      const d = obj.toDate();
+      return Number.isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+    }
+    if (typeof obj.seconds === 'number') {
+      const d = new Date(obj.seconds * 1000);
+      return Number.isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+    }
+  }
+  return '';
+};
+
+const toEpochMs = (val: unknown): number => {
+  if (!val) return Number.MAX_SAFE_INTEGER;
+  if (typeof val === 'object' && val !== null) {
+    const obj = val as any;
+    if (typeof obj.toDate === 'function') {
+      const ms = obj.toDate().getTime();
+      return Number.isNaN(ms) ? Number.MAX_SAFE_INTEGER : ms;
+    }
+    if (typeof obj.seconds === 'number') return obj.seconds * 1000;
+  }
+  const ms = new Date(val as any).getTime();
+  return Number.isNaN(ms) ? Number.MAX_SAFE_INTEGER : ms;
+};
 
 export const StudentManagement: React.FC = () => {
   const {
@@ -69,6 +117,19 @@ export const StudentManagement: React.FC = () => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [editSuccessToast, setEditSuccessToast] = useState<string | null>(null);
   const [deleteErrorToast, setDeleteErrorToast] = useState<string | null>(null);
+  const [deleteModalError, setDeleteModalError] = useState<string | null>(null);
+  const [fbAuthEmail, setFbAuthEmail] = useState<string | null>(
+    () => auth.currentUser?.email?.toLowerCase() || null
+  );
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (fbUser) => {
+      setFbAuthEmail(fbUser?.email?.toLowerCase() || null);
+    });
+    return () => unsub();
+  }, []);
+
+  const isFirebaseSuperAdminVerified = fbAuthEmail === 'freedomedupu@gmail.com';
 
   // Bulk table selection & Duplicate Cleanup Manager states
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
@@ -98,6 +159,102 @@ export const StudentManagement: React.FC = () => {
   const [pointsReason, setPointsReason] = useState('');
   const [pointAdjustToast, setPointAdjustToast] = useState<string | null>(null);
   const [isAdjustingPoints, setIsAdjustingPoints] = useState(false);
+
+  // Add New Student modal state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isCreatingStudent, setIsCreatingStudent] = useState(false);
+  const [addStudentError, setAddStudentError] = useState<string | null>(null);
+  const [addForm, setAddForm] = useState({
+    fullName: '',
+    studentId: '',
+    username: '',
+    email: '',
+    phone: '',
+    grade: 'Grade 10',
+    school: '',
+    district: 'Jaffna',
+    password: '',
+  });
+
+  const openAddStudentModal = () => {
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    setAddForm({
+      fullName: '',
+      studentId: `STU-2026-${randNum}`,
+      username: '',
+      email: '',
+      phone: '',
+      grade: 'Grade 10',
+      school: '',
+      district: 'Jaffna',
+      password: `HNC@${Math.floor(1000 + Math.random() * 9000)}`,
+    });
+    setAddStudentError(null);
+    setIsAddModalOpen(true);
+  };
+
+  const fillSampleStudentForm = () => {
+    const suffix = Math.floor(100 + Math.random() * 900);
+    setAddForm({
+      fullName: `Demo Candidate ${suffix}`,
+      studentId: `STU-2026-${1000 + suffix}`,
+      username: `demo_student_${suffix}`,
+      email: `demo.student.${suffix}@example.com`,
+      phone: `+94 77 ${Math.floor(100 + Math.random() * 900)} ${Math.floor(1000 + Math.random() * 9000)}`,
+      grade: 'Grade 10',
+      school: 'Jaffna Hindu College',
+      district: 'Jaffna',
+      password: `HNC@${suffix}9`,
+    });
+    setAddStudentError(null);
+  };
+
+  const handleCreateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddStudentError(null);
+    const fullName = addForm.fullName.trim();
+    const studentId = addForm.studentId.trim();
+    const username = addForm.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const email = addForm.email.trim();
+    const school = addForm.school.trim();
+    const password = addForm.password.trim();
+
+    if (!fullName || !studentId || username.length < 3 || !email || !school || password.length < 4) {
+      setAddStudentError(
+        language === 'ta'
+          ? 'பெயர், மாணவர் எண், பயனர்பெயர் (குறைந்தது 3 எழுத்துகள்), மின்னஞ்சல், பாடசாலை மற்றும் கடவுச்சொல் (குறைந்தது 4 எழுத்துகள்) ஆகியவற்றைச் சரியாக நிரப்பவும்.'
+          : 'Please complete Name, Student ID, Username (min 3 chars), Email, School, and Password (min 4 chars).'
+      );
+      return;
+    }
+
+    setIsCreatingStudent(true);
+    try {
+      await registerStudentAccount({
+        fullName,
+        studentId,
+        username,
+        email,
+        phone: addForm.phone.trim(),
+        grade: addForm.grade,
+        school,
+        district: addForm.district,
+        password,
+        skipFirebaseAuthSignIn: true,
+      });
+      setIsAddModalOpen(false);
+      setEditSuccessToast(
+        language === 'ta'
+          ? `"${fullName}" (${studentId}) புதிய மாணவர் வெற்றிகரமாக சேர்க்கப்பட்டார்!`
+          : `Student "${fullName}" (${studentId}) registered successfully!`
+      );
+      setTimeout(() => setEditSuccessToast(null), 4500);
+    } catch (err: any) {
+      setAddStudentError(err?.message || 'Failed to add student.');
+    } finally {
+      setIsCreatingStudent(false);
+    }
+  };
 
   const handleCopyText = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -181,10 +338,10 @@ export const StudentManagement: React.FC = () => {
   };
 
   const totalCirculatingPoints = students.reduce(
-    (acc, s) => acc + (s.referralPoints !== undefined ? s.referralPoints : 25),
+    (acc, s) => acc + (s?.referralPoints !== undefined && !Number.isNaN(Number(s.referralPoints)) ? Number(s.referralPoints) : 25),
     0
   );
-  const totalReferralsCount = students.reduce((acc, s) => acc + (s.totalReferrals || 0), 0);
+  const totalReferralsCount = students.reduce((acc, s) => acc + (Number(s?.totalReferrals) || 0), 0);
 
   const handleAdjustPoints = async (studentId: string, delta: number, reason?: string) => {
     setIsAdjustingPoints(true);
@@ -213,11 +370,32 @@ export const StudentManagement: React.FC = () => {
     }
   };
 
+  const formatAuthOrDeleteError = (err: any): string => {
+    const code = err?.code || '';
+    const rawMsg = err?.message || '';
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      return language === 'ta'
+        ? 'Google சரிபார்ப்பு ரத்து செய்யப்பட்டது. மாணவரை நீக்க freedomedupu@gmail.com கணக்கில் Google சரிபார்ப்பை முடிக்கவும்.'
+        : 'Google verification popup was closed. Please complete Google Sign-In as freedomedupu@gmail.com to delete student registrations.';
+    }
+    if (code === 'auth/popup-blocked') {
+      return language === 'ta'
+        ? 'உலாவி popup சாளரத்தைத் தடுத்துள்ளது. Popup-ஐ அனுமதித்து மீண்டும் முயற்சிக்கவும்.'
+        : 'Browser blocked the Google sign-in popup. Allow popups for this site and click Retry.';
+    }
+    return rawMsg || 'Failed to delete student account.';
+  };
+
   const handleDeleteStudent = async () => {
     if (!studentToDelete) return;
     setIsDeleting(true);
     setDeleteErrorToast(null);
+    setDeleteModalError(null);
     try {
+      // Ensure Firebase Auth session holds Super Admin token before Firestore delete
+      if (!auth.currentUser || auth.currentUser.email?.toLowerCase() !== 'freedomedupu@gmail.com') {
+        await signInSuperAdminWithGoogle({ preserveExistingSessionUid: true });
+      }
       await deleteStudentAccount(studentToDelete.id);
       if (selectedStudent?.id === studentToDelete.id) {
         setSelectedStudent(null);
@@ -239,9 +417,12 @@ export const StudentManagement: React.FC = () => {
       );
       setTimeout(() => setEditSuccessToast(null), 4000);
       setStudentToDelete(null);
+      setDeleteModalError(null);
     } catch (err: any) {
-      console.error('Failed to delete student account:', err);
-      setDeleteErrorToast(err?.message || 'Failed to delete student account.');
+      console.warn('Student delete requires Super Admin verification:', err?.message || err);
+      const msg = formatAuthOrDeleteError(err);
+      setDeleteModalError(msg);
+      setDeleteErrorToast(msg);
     } finally {
       setIsDeleting(false);
     }
@@ -252,12 +433,15 @@ export const StudentManagement: React.FC = () => {
     const map = new Map<string, { examCount: number; medalsWon: number; avgPct: number }>();
 
     results.forEach((r) => {
+      if (!r) return;
       const keys: string[] = [];
-      if (r.studentId) keys.push(r.studentId);
-      if (r.studentName) keys.push(r.studentName.toLowerCase().trim());
+      const rSid = safeStr(r.studentId).trim();
+      const rName = safeStr(r.studentName).toLowerCase().trim();
+      if (rSid) keys.push(rSid);
+      if (rName) keys.push(rName);
 
       const isMedal = r.award && r.award !== 'Participation';
-      const pct = r.percentile || r.score || 0;
+      const pct = Number(r.percentile || r.score) || 0;
 
       keys.forEach((key) => {
         const existing = map.get(key) || ({ examCount: 0, medalsWon: 0, totalPct: 0 } as any);
@@ -292,19 +476,22 @@ export const StudentManagement: React.FC = () => {
     const sidMap = new Map<string, string[]>();
     const usrMap = new Map<string, string[]>();
 
-    const normalizeName = (name?: string) =>
-      (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const normalizeName = (name?: unknown) =>
+      safeStr(name).trim().toLowerCase().replace(/\s+/g, ' ');
 
     students.forEach((s) => {
-      if (s.email && s.email.trim()) {
-        const normEmail = s.email.trim().toLowerCase();
+      if (!s || !s.id) return;
+      const emailStr = safeStr(s.email).trim();
+      if (emailStr) {
+        const normEmail = emailStr.toLowerCase();
         const list = eMap.get(normEmail) || [];
         list.push(s.id);
         eMap.set(normEmail, list);
       }
 
-      if (s.phone && s.phone.trim()) {
-        const digits = s.phone.replace(/\D/g, '');
+      const phoneStr = safeStr(s.phone).trim();
+      if (phoneStr) {
+        const digits = phoneStr.replace(/\D/g, '');
         if (digits.length >= 7) {
           const normPhone = digits.length >= 9 ? digits.slice(-9) : digits;
           const list = pMap.get(normPhone) || [];
@@ -314,7 +501,7 @@ export const StudentManagement: React.FC = () => {
       }
 
       const normName = normalizeName(s.name);
-      const normGrade = (s.gradeLevel || '').trim().toLowerCase();
+      const normGrade = safeStr(s.gradeLevel).trim().toLowerCase();
       if (normName && normGrade) {
         const identityKey = `${normName}|${normGrade}`;
         const list = idnMap.get(identityKey) || [];
@@ -322,15 +509,17 @@ export const StudentManagement: React.FC = () => {
         idnMap.set(identityKey, list);
       }
 
-      if (s.studentId && s.studentId.trim()) {
-        const normSid = s.studentId.trim().toUpperCase();
+      const sidStr = safeStr(s.studentId).trim();
+      if (sidStr) {
+        const normSid = sidStr.toUpperCase();
         const list = sidMap.get(normSid) || [];
         list.push(s.id);
         sidMap.set(normSid, list);
       }
 
-      if (s.username && s.username.trim()) {
-        const normUsr = s.username.trim().toLowerCase();
+      const usrStr = safeStr(s.username).trim();
+      if (usrStr) {
+        const normUsr = usrStr.toLowerCase();
         const list = usrMap.get(normUsr) || [];
         list.push(s.id);
         usrMap.set(normUsr, list);
@@ -343,20 +532,23 @@ export const StudentManagement: React.FC = () => {
     let idnDupTotal = 0;
 
     students.forEach((s) => {
+      if (!s || !s.id) return;
       let isEmailDup = false;
       let isPhoneDup = false;
       let isIdentityDup = false;
 
-      if (s.email && s.email.trim()) {
-        const list = eMap.get(s.email.trim().toLowerCase());
+      const emailStr = safeStr(s.email).trim();
+      if (emailStr) {
+        const list = eMap.get(emailStr.toLowerCase());
         if (list && list.length > 1) {
           isEmailDup = true;
           eDupTotal++;
         }
       }
 
-      if (s.phone && s.phone.trim()) {
-        const digits = s.phone.replace(/\D/g, '');
+      const phoneStr = safeStr(s.phone).trim();
+      if (phoneStr) {
+        const digits = phoneStr.replace(/\D/g, '');
         if (digits.length >= 7) {
           const normPhone = digits.length >= 9 ? digits.slice(-9) : digits;
           const list = pMap.get(normPhone);
@@ -368,7 +560,7 @@ export const StudentManagement: React.FC = () => {
       }
 
       const normName = normalizeName(s.name);
-      const normGrade = (s.gradeLevel || '').trim().toLowerCase();
+      const normGrade = safeStr(s.gradeLevel).trim().toLowerCase();
       if (normName && normGrade) {
         const list = idnMap.get(`${normName}|${normGrade}`);
         if (list && list.length > 1) {
@@ -377,20 +569,32 @@ export const StudentManagement: React.FC = () => {
         }
       }
 
-      const sidDup = s.studentId ? (sidMap.get(s.studentId.trim().toUpperCase())?.length || 0) > 1 : false;
-      const usrDup = s.username ? (usrMap.get(s.username.trim().toLowerCase())?.length || 0) > 1 : false;
+      const sidStr = safeStr(s.studentId).trim();
+      const usrStr = safeStr(s.username).trim();
+      const sidDup = sidStr ? (sidMap.get(sidStr.toUpperCase())?.length || 0) > 1 : false;
+      const usrDup = usrStr ? (usrMap.get(usrStr.toLowerCase())?.length || 0) > 1 : false;
 
       if (isEmailDup || isPhoneDup || isIdentityDup || sidDup || usrDup) {
         dupTotal++;
       }
     });
 
-    // Build connected duplicate clusters via Union-Find
+    // Build connected duplicate clusters via Union-Find (cycle & missing-key safe)
     const parent = new Map<string, string>();
+    students.forEach((s) => {
+      if (s && s.id) parent.set(s.id, s.id);
+    });
+
     const find = (x: string): string => {
+      if (!parent.has(x)) parent.set(x, x);
       let curr = x;
-      while (parent.get(curr) !== curr) {
-        curr = parent.get(curr) || curr;
+      let steps = 0;
+      const limit = parent.size + 1;
+      while (parent.has(curr) && parent.get(curr) !== curr && steps < limit) {
+        const next = parent.get(curr);
+        if (!next || next === curr) break;
+        curr = next;
+        steps++;
       }
       return curr;
     };
@@ -399,8 +603,6 @@ export const StudentManagement: React.FC = () => {
       const rb = find(b);
       if (ra !== rb) parent.set(rb, ra);
     };
-
-    students.forEach((s) => parent.set(s.id, s.id));
 
     const connectBuckets = (map: Map<string, string[]>) => {
       map.forEach((ids) => {
@@ -420,6 +622,7 @@ export const StudentManagement: React.FC = () => {
 
     const clustersMap = new Map<string, StudentUser[]>();
     students.forEach((s) => {
+      if (!s || !s.id) return;
       const root = find(s.id);
       const arr = clustersMap.get(root) || [];
       arr.push(s);
@@ -428,15 +631,15 @@ export const StudentManagement: React.FC = () => {
 
     const studentScore = (std: StudentUser) => {
       const resStats =
-        studentResultsStatsMap.get(std.id) ||
-        studentResultsStatsMap.get(std.studentId) ||
+        studentResultsStatsMap.get(safeStr(std.id)) ||
+        studentResultsStatsMap.get(safeStr(std.studentId)) ||
         { examCount: 0, medalsWon: 0, avgPct: 0 };
-      const pts = std.referralPoints !== undefined ? std.referralPoints : 0;
+      const pts = std.referralPoints !== undefined ? Number(std.referralPoints) || 0 : 0;
       const activeScore = std.status === 'active' ? 500 : 0;
-      const createdTs = std.createdAt ? new Date(std.createdAt).getTime() : Number.MAX_SAFE_INTEGER;
+      const createdTs = toEpochMs(std.createdAt);
       return {
-        primaryScore: resStats.examCount * 10000 + activeScore + pts + (std.totalReferrals || 0) * 50,
-        createdTs: isNaN(createdTs) ? Number.MAX_SAFE_INTEGER : createdTs,
+        primaryScore: resStats.examCount * 10000 + activeScore + pts + (Number(std.totalReferrals) || 0) * 50,
+        createdTs,
       };
     };
 
@@ -462,21 +665,21 @@ export const StudentManagement: React.FC = () => {
         return sa.createdTs - sb.createdTs;
       });
 
-      const emails = new Set(members.map((m) => (m.email || '').trim().toLowerCase()).filter(Boolean));
+      const emails = new Set(members.map((m) => safeStr(m.email).trim().toLowerCase()).filter(Boolean));
       const phones = new Set(
         members
           .map((m) => {
-            const d = (m.phone || '').replace(/\D/g, '');
+            const d = safeStr(m.phone).replace(/\D/g, '');
             return d.length >= 7 ? (d.length >= 9 ? d.slice(-9) : d) : '';
           })
           .filter(Boolean)
       );
       const names = new Set(members.map((m) => normalizeName(m.name)).filter(Boolean));
       const identKeys = new Set(
-        members.map((m) => `${normalizeName(m.name)}|${(m.gradeLevel || '').trim().toLowerCase()}`).filter((k) => !k.startsWith('|'))
+        members.map((m) => `${normalizeName(m.name)}|${safeStr(m.gradeLevel).trim().toLowerCase()}`).filter((k) => !k.startsWith('|'))
       );
-      const sids = new Set(members.map((m) => (m.studentId || '').trim().toUpperCase()).filter(Boolean));
-      const usrs = new Set(members.map((m) => (m.username || '').trim().toLowerCase()).filter(Boolean));
+      const sids = new Set(members.map((m) => safeStr(m.studentId).trim().toUpperCase()).filter(Boolean));
+      const usrs = new Set(members.map((m) => safeStr(m.username).trim().toLowerCase()).filter(Boolean));
 
       const reasons: string[] = [];
       if (identKeys.size < members.length) reasons.push('Same Name & Grade');
@@ -492,22 +695,25 @@ export const StudentManagement: React.FC = () => {
         sids.size < members.length ||
         usrs.size < members.length;
 
-      const sampleEmail = members.find((m) => m.email)?.email || '';
-      const samplePhone = members.find((m) => m.phone)?.phone || '';
+      const sampleEmail = safeStr(members.find((m) => safeStr(m.email))?.email);
+      const samplePhone = safeStr(members.find((m) => safeStr(m.phone))?.phone);
+      const primary = sorted[0];
+      const primaryName = safeStr(primary?.name) || 'Candidate';
+      const primaryGrade = safeStr(primary?.gradeLevel);
       const matchSummary =
         reasons.includes('Same Name & Grade')
-          ? `${sorted[0].name} (${sorted[0].gradeLevel})`
+          ? `${primaryName}${primaryGrade ? ` (${primaryGrade})` : ''}`
           : reasons.includes('Shared Email')
-          ? sampleEmail
+          ? sampleEmail || primaryName
           : reasons.includes('Shared Phone')
-          ? samplePhone
-          : sorted[0].name;
+          ? samplePhone || primaryName
+          : primaryName;
 
       extraCount += sorted.length - 1;
       groups.push({
         groupId: root,
         members: sorted,
-        recommendedKeepId: sorted[0].id,
+        recommendedKeepId: primary.id,
         reasons: reasons.length > 0 ? reasons : ['Matching Details'],
         isLikelySameStudent,
         matchSummary,
@@ -535,8 +741,9 @@ export const StudentManagement: React.FC = () => {
   const getDuplicateStatus = (std: StudentUser) => {
     let isEmailDup = false;
     let emailClashCount = 0;
-    if (std.email && std.email.trim()) {
-      const normEmail = std.email.trim().toLowerCase();
+    const emailStr = safeStr(std?.email).trim();
+    if (emailStr) {
+      const normEmail = emailStr.toLowerCase();
       const list = emailMap.get(normEmail);
       if (list && list.length > 1) {
         isEmailDup = true;
@@ -546,8 +753,9 @@ export const StudentManagement: React.FC = () => {
 
     let isPhoneDup = false;
     let phoneClashCount = 0;
-    if (std.phone && std.phone.trim()) {
-      const digits = std.phone.replace(/\D/g, '');
+    const phoneStr = safeStr(std?.phone).trim();
+    if (phoneStr) {
+      const digits = phoneStr.replace(/\D/g, '');
       if (digits.length >= 7) {
         const normPhone = digits.length >= 9 ? digits.slice(-9) : digits;
         const list = phoneMap.get(normPhone);
@@ -560,8 +768,8 @@ export const StudentManagement: React.FC = () => {
 
     let isIdentityDup = false;
     let identityClashCount = 0;
-    const normName = (std.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
-    const normGrade = (std.gradeLevel || '').trim().toLowerCase();
+    const normName = safeStr(std?.name).trim().toLowerCase().replace(/\s+/g, ' ');
+    const normGrade = safeStr(std?.gradeLevel).trim().toLowerCase();
     if (normName && normGrade) {
       const list = identityMap.get(`${normName}|${normGrade}`);
       if (list && list.length > 1) {
@@ -570,8 +778,10 @@ export const StudentManagement: React.FC = () => {
       }
     }
 
-    const isStudentIdDup = std.studentId ? (studentIdDupMap.get(std.studentId.trim().toUpperCase())?.length || 0) > 1 : false;
-    const isUsernameDup = std.username ? (usernameDupMap.get(std.username.trim().toLowerCase())?.length || 0) > 1 : false;
+    const sidStr = safeStr(std?.studentId).trim();
+    const usrStr = safeStr(std?.username).trim();
+    const isStudentIdDup = sidStr ? (studentIdDupMap.get(sidStr.toUpperCase())?.length || 0) > 1 : false;
+    const isUsernameDup = usrStr ? (usernameDupMap.get(usrStr.toLowerCase())?.length || 0) > 1 : false;
 
     return {
       isEmailDup,
@@ -648,7 +858,12 @@ export const StudentManagement: React.FC = () => {
     if (uidsToRemove.length === 0) return;
     setIsBulkDeleting(true);
     setDeleteErrorToast(null);
+    setDeleteModalError(null);
     try {
+      // Ensure Firebase Auth session holds Super Admin token before bulk Firestore delete
+      if (!auth.currentUser || auth.currentUser.email?.toLowerCase() !== 'freedomedupu@gmail.com') {
+        await signInSuperAdminWithGoogle({ preserveExistingSessionUid: true });
+      }
       const res = await deleteDuplicateStudentAccounts(uidsToRemove);
       if (res.deletedCount > 0) {
         setEditSuccessToast(
@@ -659,10 +874,11 @@ export const StudentManagement: React.FC = () => {
         setTimeout(() => setEditSuccessToast(null), 5000);
       }
       if (res.failedCount > 0) {
-        setDeleteErrorToast(
+        const msg =
           res.error ||
-            `Could not remove ${res.failedCount} account(s). Please verify Super Admin permissions.`
-        );
+          `Could not remove ${res.failedCount} account(s). Please verify Super Admin permissions.`;
+        setDeleteErrorToast(msg);
+        setDeleteModalError(msg);
       }
       setSelectedRowIds((prev) => {
         const next = new Set(prev);
@@ -674,13 +890,17 @@ export const StudentManagement: React.FC = () => {
         uidsToRemove.forEach((id) => next.delete(id));
         return next;
       });
-      setShowBulkDeleteConfirm(false);
-      setDupModalConfirming(false);
-      if (closeDupModalAfter && res.failedCount === 0) {
-        setIsDupModalOpen(false);
+      if (res.failedCount === 0) {
+        setShowBulkDeleteConfirm(false);
+        setDupModalConfirming(false);
+        if (closeDupModalAfter) {
+          setIsDupModalOpen(false);
+        }
       }
     } catch (err: any) {
-      setDeleteErrorToast(err?.message || 'Bulk duplicate deletion failed.');
+      const msg = formatAuthOrDeleteError(err);
+      setDeleteModalError(msg);
+      setDeleteErrorToast(msg);
     } finally {
       setIsBulkDeleting(false);
     }
@@ -689,6 +909,7 @@ export const StudentManagement: React.FC = () => {
   const filteredStudents = useMemo(() => {
     return students
       .filter((std) => {
+        if (!std) return false;
         const dup = getDuplicateStatus(std);
 
         // Apply duplicate filtering
@@ -702,17 +923,17 @@ export const StudentManagement: React.FC = () => {
 
         const matchesSearch =
           !term ||
-          std.name.toLowerCase().includes(term) ||
-          std.studentId.toLowerCase().includes(term) ||
-          (std.username && std.username.toLowerCase().includes(term)) ||
-          (std.district && std.district.toLowerCase().includes(term)) ||
-          std.institution.toLowerCase().includes(term) ||
-          std.email.toLowerCase().includes(term) ||
-          (std.phone && std.phone.toLowerCase().includes(term)) ||
-          (std.referralCode && std.referralCode.toLowerCase().includes(term));
+          safeStr(std.name).toLowerCase().includes(term) ||
+          safeStr(std.studentId).toLowerCase().includes(term) ||
+          safeStr(std.username).toLowerCase().includes(term) ||
+          safeStr(std.district).toLowerCase().includes(term) ||
+          safeStr(std.institution).toLowerCase().includes(term) ||
+          safeStr(std.email).toLowerCase().includes(term) ||
+          safeStr(std.phone).toLowerCase().includes(term) ||
+          safeStr(std.referralCode).toLowerCase().includes(term);
 
         const matchesGrade =
-          gradeFilter === 'all' ? true : std.gradeLevel.includes(gradeFilter);
+          gradeFilter === 'all' ? true : safeStr(std.gradeLevel).includes(gradeFilter);
 
         return matchesSearch && matchesGrade;
       })
@@ -721,36 +942,36 @@ export const StudentManagement: React.FC = () => {
         if (duplicateFilter !== 'all') {
           const aVal =
             duplicateFilter === 'email_dup'
-              ? (a.email || '').toLowerCase()
+              ? safeStr(a.email).toLowerCase()
               : duplicateFilter === 'phone_dup'
-              ? (a.phone || a.email || '').toLowerCase()
+              ? (safeStr(a.phone) || safeStr(a.email)).toLowerCase()
               : duplicateFilter === 'identity_dup'
-              ? (a.name || '').toLowerCase()
-              : (a.email || a.phone || a.name || '').toLowerCase();
+              ? safeStr(a.name).toLowerCase()
+              : (safeStr(a.email) || safeStr(a.phone) || safeStr(a.name)).toLowerCase();
           const bVal =
             duplicateFilter === 'email_dup'
-              ? (b.email || '').toLowerCase()
+              ? safeStr(b.email).toLowerCase()
               : duplicateFilter === 'phone_dup'
-              ? (b.phone || b.email || '').toLowerCase()
+              ? (safeStr(b.phone) || safeStr(b.email)).toLowerCase()
               : duplicateFilter === 'identity_dup'
-              ? (b.name || '').toLowerCase()
-              : (b.email || b.phone || b.name || '').toLowerCase();
+              ? safeStr(b.name).toLowerCase()
+              : (safeStr(b.email) || safeStr(b.phone) || safeStr(b.name)).toLowerCase();
           if (aVal !== bVal) return aVal.localeCompare(bVal);
         }
 
         if (sortBy === 'points_desc') {
-          const ptsA = a.referralPoints !== undefined ? a.referralPoints : 25;
-          const ptsB = b.referralPoints !== undefined ? b.referralPoints : 25;
+          const ptsA = a.referralPoints !== undefined ? Number(a.referralPoints) || 0 : 25;
+          const ptsB = b.referralPoints !== undefined ? Number(b.referralPoints) || 0 : 25;
           return ptsB - ptsA;
         }
         if (sortBy === 'referrals_desc') {
-          return (b.totalReferrals || 0) - (a.totalReferrals || 0);
+          return (Number(b.totalReferrals) || 0) - (Number(a.totalReferrals) || 0);
         }
         if (sortBy === 'awards_desc') {
-          return (b.awardsCount || 0) - (a.awardsCount || 0);
+          return (Number(b.awardsCount) || 0) - (Number(a.awardsCount) || 0);
         }
         if (sortBy === 'name') {
-          return a.name.localeCompare(b.name);
+          return safeStr(a.name).localeCompare(safeStr(b.name));
         }
         return 0;
       });
@@ -788,6 +1009,16 @@ export const StudentManagement: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            id="btn-add-student"
+            type="button"
+            onClick={openAddStudentModal}
+            className="text-xs font-bold px-3.5 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white border border-blue-800 flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>{language === 'ta' ? '+ புதிய மாணவர்' : '+ Add Student'}</span>
+          </button>
+
           <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-800 border border-blue-200">
             {language === 'ta' ? 'மொத்த மாணவர்கள்: ' : 'Total Candidates: '}
             <span className="font-bold">{students.length}</span>
@@ -1202,7 +1433,7 @@ export const StudentManagement: React.FC = () => {
                 </tr>
               ) : (
                 paginatedStudents.map((std) => {
-                  const points = std.referralPoints !== undefined ? std.referralPoints : 25;
+                  const points = std.referralPoints !== undefined && !Number.isNaN(Number(std.referralPoints)) ? Number(std.referralPoints) : 25;
                   const dup = getDuplicateStatus(std);
                   const isRowSelected = selectedRowIds.has(std.id);
 
@@ -1247,11 +1478,11 @@ export const StudentManagement: React.FC = () => {
                                 : 'bg-slate-100 border-slate-300 text-slate-800'
                             }`}
                           >
-                            {std.name.charAt(0)}
+                            {(safeStr(std.name).trim() || 'S').charAt(0).toUpperCase()}
                           </div>
                           <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <p className="font-bold text-slate-900">{std.name}</p>
+                              <p className="font-bold text-slate-900">{safeStr(std.name) || 'Unnamed Student'}</p>
                               {dup.isAnyDup && (
                                 <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-rose-700 bg-rose-100/90 px-1.5 py-0.2 rounded border border-rose-300">
                                   <AlertTriangle className="w-2.5 h-2.5 text-rose-600" />
@@ -1318,12 +1549,12 @@ export const StudentManagement: React.FC = () => {
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-1.5 text-slate-700">
                           <School className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate max-w-[180px]">{std.institution}</span>
+                          <span className="truncate max-w-[180px]">{safeStr(std.institution) || '—'}</span>
                         </div>
                       </td>
 
                       <td className="px-5 py-3.5 text-slate-700 font-medium">
-                        {std.gradeLevel}
+                        {safeStr(std.gradeLevel) || '—'}
                       </td>
 
                       {/* Student Total Points & Referral Stats Column */}
@@ -1344,9 +1575,9 @@ export const StudentManagement: React.FC = () => {
                       {/* Live Auto-Counted Exam Submissions & Medals via Pre-Indexed Map */}
                       {(() => {
                         const stats =
-                          studentResultsStatsMap.get(std.id) ||
-                          studentResultsStatsMap.get(std.studentId) ||
-                          (std.name ? studentResultsStatsMap.get(std.name.toLowerCase().trim()) : null) ||
+                          studentResultsStatsMap.get(safeStr(std.id)) ||
+                          studentResultsStatsMap.get(safeStr(std.studentId)) ||
+                          (safeStr(std.name) ? studentResultsStatsMap.get(safeStr(std.name).toLowerCase().trim()) : null) ||
                           { examCount: 0, medalsWon: 0, avgPct: 0 };
                         const examCount = stats.examCount;
                         const medalsWon = stats.medalsWon;
@@ -1559,7 +1790,7 @@ export const StudentManagement: React.FC = () => {
             {/* Candidate Summary */}
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-4">
               <div className="w-12 h-12 rounded-xl bg-blue-700 text-white font-bold text-base flex items-center justify-center shrink-0 shadow-xs">
-                {selectedStudent.name.charAt(0)}
+                {(safeStr(selectedStudent.name).trim() || 'S').charAt(0).toUpperCase()}
               </div>
               <div className="space-y-1">
                 <div className="flex items-center justify-between gap-2">
@@ -1617,11 +1848,11 @@ export const StudentManagement: React.FC = () => {
                   </span>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="font-mono font-bold text-xs text-slate-800">
-                      {selectedStudent.referralCode || `HNC-${selectedStudent.studentId.replace(/[^A-Z0-9]/g, '')}`}
+                      {safeStr(selectedStudent.referralCode) || `HNC-${safeStr(selectedStudent.studentId || selectedStudent.id).toUpperCase().replace(/[^A-Z0-9]/g, '')}`}
                     </span>
                     <button
                       onClick={() => {
-                        const code = selectedStudent.referralCode || `HNC-${selectedStudent.studentId.replace(/[^A-Z0-9]/g, '')}`;
+                        const code = safeStr(selectedStudent.referralCode) || `HNC-${safeStr(selectedStudent.studentId || selectedStudent.id).toUpperCase().replace(/[^A-Z0-9]/g, '')}`;
                         navigator.clipboard.writeText(code);
                         setCopiedCode(true);
                         setTimeout(() => setCopiedCode(false), 2000);
@@ -1791,7 +2022,7 @@ export const StudentManagement: React.FC = () => {
                   (r) =>
                     r.studentId === selectedStudent.id ||
                     r.studentId === selectedStudent.studentId ||
-                    (r.studentName && r.studentName.toLowerCase() === selectedStudent.name?.toLowerCase())
+                    (r.studentName && safeStr(r.studentName).toLowerCase() === safeStr(selectedStudent.name).toLowerCase())
                 );
                 const dossierExamsCompleted = dossierResults.length;
                 const dossierMedals = dossierResults.filter((r) => r.award && r.award !== 'Participation').length;
@@ -1850,7 +2081,7 @@ export const StudentManagement: React.FC = () => {
                 (r) =>
                   r.studentId === selectedStudent.id ||
                   r.studentId === selectedStudent.studentId ||
-                  (r.studentName && r.studentName.toLowerCase() === selectedStudent.name?.toLowerCase())
+                  (r.studentName && safeStr(r.studentName).toLowerCase() === safeStr(selectedStudent.name).toLowerCase())
               );
               const totalExamsCount = dossierResults.length;
               const totalMedalsCount = dossierResults.filter((r) => r.award && r.award !== 'Participation').length;
@@ -1938,10 +2169,10 @@ export const StudentManagement: React.FC = () => {
                               <span>
                                 Score: <b className="text-slate-800">{res.score} / {res.maxScore || res.totalMarks}</b> ({res.percentage}%)
                               </span>
-                              {res.submittedAt && (
+                              {res.submittedAt && formatDateLabel(res.submittedAt) && (
                                 <>
                                   <span>•</span>
-                                  <span>{new Date(res.submittedAt).toLocaleDateString()}</span>
+                                  <span>{formatDateLabel(res.submittedAt)}</span>
                                 </>
                               )}
                             </div>
@@ -2071,7 +2302,12 @@ export const StudentManagement: React.FC = () => {
       {studentToDelete && (
         <Modal
           isOpen={!!studentToDelete}
-          onClose={() => !isDeleting && setStudentToDelete(null)}
+          onClose={() => {
+            if (!isDeleting) {
+              setStudentToDelete(null);
+              setDeleteModalError(null);
+            }
+          }}
           title={
             language === 'ta'
               ? 'மாணவர் கணக்கை நீக்குவதை உறுதிப்படுத்தவும்'
@@ -2101,11 +2337,32 @@ export const StudentManagement: React.FC = () => {
               </div>
             </div>
 
+            {!isFirebaseSuperAdminVerified && !deleteModalError && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-2.5 text-[11px] text-blue-900">
+                <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <span>
+                  {language === 'ta'
+                    ? 'பாதுகாப்பு உறுதிப்படுத்தல்: "ஆம், நீக்குக" என்பதை அழுத்தும்போது Super Admin Google கணக்கு (freedomedupu@gmail.com) சரிபார்ப்புக் கேட்கப்படும்.'
+                    : 'Security Check: Clicking Delete will ask you to confirm via Google Sign-In (freedomedupu@gmail.com) once for this session.'}
+                </span>
+              </div>
+            )}
+
+            {deleteModalError && (
+              <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl flex items-start gap-2.5 text-xs text-rose-900">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span className="font-semibold leading-relaxed">{deleteModalError}</span>
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 disabled={isDeleting}
-                onClick={() => setStudentToDelete(null)}
-                className="px-4 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                onClick={() => {
+                  setStudentToDelete(null);
+                  setDeleteModalError(null);
+                }}
+                className="px-4 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
               >
                 {language === 'ta' ? 'ரத்து செய்க' : language === 'si' ? 'අවලංගු කරන්න' : 'Cancel'}
               </button>
@@ -2113,12 +2370,14 @@ export const StudentManagement: React.FC = () => {
                 id="btn-confirm-delete-student"
                 disabled={isDeleting}
                 onClick={handleDeleteStudent}
-                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>
                   {isDeleting
                     ? (language === 'ta' ? 'நீக்கப்படுகிறது...' : language === 'si' ? 'ඉවත් කරමින්...' : 'Deleting...')
+                    : deleteModalError
+                    ? (language === 'ta' ? 'Google சரிபார்த்து நீக்குக' : 'Verify Google & Retry')
                     : (language === 'ta' ? 'ஆம், நீக்குக' : language === 'si' ? 'ඔව්, ඉවත් කරන්න' : 'Yes, Remove Candidate')}
                 </span>
               </button>
@@ -2186,11 +2445,21 @@ export const StudentManagement: React.FC = () => {
                 ))}
             </div>
 
+            {deleteModalError && (
+              <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl flex items-start gap-2.5 text-xs text-rose-900">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span className="font-semibold leading-relaxed">{deleteModalError}</span>
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
                 disabled={isBulkDeleting}
-                onClick={() => setShowBulkDeleteConfirm(false)}
+                onClick={() => {
+                  setShowBulkDeleteConfirm(false);
+                  setDeleteModalError(null);
+                }}
                 className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
               >
                 {language === 'ta' ? 'ரத்து செய்க' : 'Cancel'}
@@ -2415,7 +2684,7 @@ export const StudentManagement: React.FC = () => {
                                   <div className="min-w-0">
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                       <span className="font-extrabold text-slate-900 text-xs truncate">
-                                        {m.name}
+                                        {safeStr(m.name) || 'Unnamed Student'}
                                       </span>
                                       {isKept && (
                                         <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-black uppercase">
@@ -2491,7 +2760,7 @@ export const StudentManagement: React.FC = () => {
                                     <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-bold">
                                       {mPoints} pts
                                     </span>
-                                    <span className="text-slate-400 font-mono">{m.createdAt}</span>
+                                    <span className="text-slate-400 font-mono">{formatDateLabel(m.createdAt)}</span>
                                     <button
                                       type="button"
                                       disabled={isDeleting || isBulkDeleting}
@@ -2514,6 +2783,13 @@ export const StudentManagement: React.FC = () => {
               </>
             )}
 
+            {deleteModalError && (
+              <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl flex items-start gap-2.5 text-xs text-rose-900">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span className="font-semibold leading-relaxed">{deleteModalError}</span>
+              </div>
+            )}
+
             {/* Modal Footer */}
             <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
               <button
@@ -2522,6 +2798,7 @@ export const StudentManagement: React.FC = () => {
                 onClick={() => {
                   setIsDupModalOpen(false);
                   setDupModalConfirming(false);
+                  setDeleteModalError(null);
                 }}
                 className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
               >
@@ -2582,6 +2859,192 @@ export const StudentManagement: React.FC = () => {
               )}
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* Add New Student Registration Modal */}
+      {isAddModalOpen && (
+        <Modal
+          isOpen={isAddModalOpen}
+          onClose={() => !isCreatingStudent && setIsAddModalOpen(false)}
+          title={
+            language === 'ta'
+              ? 'புதிய மாணவரைச் சேர்க்க (Add Student)'
+              : 'Register New Student Candidate'
+          }
+          subtitle={
+            language === 'ta'
+              ? 'மாணவர் விபரங்களை நேரடியாகத் தரவுத்தளத்தில் பதிவு செய்க'
+              : 'Create a student account directly in Firestore without leaving Super Admin'
+          }
+        >
+          <form onSubmit={handleCreateStudent} className="space-y-4 text-xs">
+            <div className="flex items-center justify-between gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-xl">
+              <span className="text-[11px] text-blue-900 font-medium">
+                {language === 'ta'
+                  ? 'சோதனைக்காக விரைவாக மாதிரி மாணவர் விபரங்களை நிரப்ப வேண்டுமா?'
+                  : 'Need a quick test/demo candidate entry?'}
+              </span>
+              <button
+                type="button"
+                onClick={fillSampleStudentForm}
+                className="px-2.5 py-1 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-bold text-[11px] shrink-0 flex items-center gap-1 cursor-pointer"
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>{language === 'ta' ? 'சோதனை விபரம் நிரப்பு' : 'Fill Sample Student'}</span>
+              </button>
+            </div>
+
+            {addStudentError && (
+              <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl flex items-start gap-2 text-rose-900 font-semibold">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span>{addStudentError}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className="block font-bold text-slate-700 mb-1">
+                  {language === 'ta' ? 'முழுப் பெயர் *' : 'Full Name *'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={addForm.fullName}
+                  onChange={(e) => setAddForm({ ...addForm, fullName: e.target.value })}
+                  placeholder="e.g. Kavinraj S."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Student ID *</label>
+                <input
+                  type="text"
+                  required
+                  value={addForm.studentId}
+                  onChange={(e) => setAddForm({ ...addForm, studentId: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Username *</label>
+                <input
+                  type="text"
+                  required
+                  value={addForm.username}
+                  onChange={(e) => setAddForm({ ...addForm, username: e.target.value })}
+                  placeholder="e.g. kavin_2026"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Email *</label>
+                <input
+                  type="email"
+                  required
+                  value={addForm.email}
+                  onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                  placeholder="student@example.com"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Phone</label>
+                <input
+                  type="text"
+                  value={addForm.phone}
+                  onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
+                  placeholder="+94 77 123 4567"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Grade *</label>
+                <select
+                  value={addForm.grade}
+                  onChange={(e) => setAddForm({ ...addForm, grade: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                  {AVAILABLE_GRADES.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">District *</label>
+                <select
+                  value={addForm.district}
+                  onChange={(e) => setAddForm({ ...addForm, district: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                  {SRI_LANKA_DISTRICTS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">School / Institution *</label>
+                <input
+                  type="text"
+                  required
+                  value={addForm.school}
+                  onChange={(e) => setAddForm({ ...addForm, school: e.target.value })}
+                  placeholder="e.g. Jaffna Hindu College"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Initial Password *</label>
+                <input
+                  type="text"
+                  required
+                  value={addForm.password}
+                  onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                disabled={isCreatingStudent}
+                onClick={() => setIsAddModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
+              >
+                {language === 'ta' ? 'ரத்து செய்க' : 'Cancel'}
+              </button>
+              <button
+                id="btn-submit-add-student"
+                type="submit"
+                disabled={isCreatingStudent}
+                className="px-4 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 disabled:opacity-50 rounded-lg flex items-center gap-1.5 cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>
+                  {isCreatingStudent
+                    ? language === 'ta'
+                      ? 'சேர்க்கப்படுகிறது...'
+                      : 'Adding...'
+                    : language === 'ta'
+                    ? 'மாணவரைச் சேர்க்க'
+                    : 'Register Student'}
+                </span>
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
     </div>

@@ -134,15 +134,15 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
   // Filter competitions
   const filteredCompetitions = competitions.filter((comp) => {
     const matchesSearch =
-      comp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (comp.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (comp.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      comp.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (comp.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (comp.grade && comp.grade.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesCategory =
       categoryFilter === 'all' || !categoryFilter.trim()
         ? true
-        : comp.category.toLowerCase().includes(categoryFilter.toLowerCase().trim());
+        : (comp.category || '').toLowerCase().includes(categoryFilter.toLowerCase().trim());
     const matchesGrade =
       gradeFilter === 'all' || !gradeFilter.trim()
         ? true
@@ -154,11 +154,11 @@ export const CompetitionManagementShared: React.FC<CompetitionManagementSharedPr
         ? comp.approvalStatus === 'pending_approval' || (comp.status || '').toLowerCase() === 'pending approval'
         : statusFilter === 'rejected'
         ? comp.approvalStatus === 'rejected' || (comp.status || '').toLowerCase() === 'rejected'
-        : comp.status.toLowerCase() === statusFilter.toLowerCase();
+        : (comp.status || '').toLowerCase() === statusFilter.toLowerCase();
     const matchesType =
       typeFilter === 'all'
         ? true
-        : comp.competitionType?.toLowerCase() === typeFilter.toLowerCase();
+        : (comp.competitionType || '').toLowerCase() === typeFilter.toLowerCase();
 
     const matchesDistrict =
       districtFilter === 'all'

@@ -100,10 +100,10 @@ export const StudentInfoView: React.FC = () => {
 
     return students.filter((std) => {
       return (
-        std.name.toLowerCase().includes(term) ||
-        std.studentId.toLowerCase().includes(term) ||
-        std.institution.toLowerCase().includes(term) ||
-        (std.referralCode && std.referralCode.toLowerCase().includes(term))
+        String(std.name || '').toLowerCase().includes(term) ||
+        String(std.studentId || '').toLowerCase().includes(term) ||
+        String(std.institution || '').toLowerCase().includes(term) ||
+        String(std.referralCode || '').toLowerCase().includes(term)
       );
     });
   }, [students, searchTerm]);
@@ -211,10 +211,10 @@ export const StudentInfoView: React.FC = () => {
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-200 text-blue-800 font-bold text-xs flex items-center justify-center shrink-0">
-                          {std.name.charAt(0)}
+                          {(String(std.name || '').trim() || 'S').charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-900">{std.name}</p>
+                          <p className="font-bold text-slate-900">{std.name || 'Unnamed Student'}</p>
                           <p className="text-[11px] font-mono text-slate-500">
                             {std.studentId} {std.username ? `(@${std.username})` : ''}
                           </p>

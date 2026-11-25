@@ -325,7 +325,7 @@ export const CompetitionParticipantsModal: React.FC<CompetitionParticipantsModal
                         <td className="px-4 py-3 font-medium text-slate-900">
                           <div className="flex items-center gap-2.5">
                             <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-800 font-bold text-[11px] flex items-center justify-center shrink-0">
-                              {p.studentName.charAt(0)}
+                              {(String(p?.studentName || '').trim() || 'S').charAt(0).toUpperCase()}
                             </div>
                             <div>
                               <div className="font-semibold text-slate-900 flex items-center gap-1.5">

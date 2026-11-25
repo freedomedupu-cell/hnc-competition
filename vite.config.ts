@@ -956,6 +956,9 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2,json,pdf,xlsx,csv}'],
           maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // 6MB to cache study materials, revision sheets & docs
           runtimeCaching: [

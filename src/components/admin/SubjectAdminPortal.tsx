@@ -121,9 +121,9 @@ export const SubjectAdminPortal: React.FC<SubjectAdminPortalProps> = ({
   // Filtered by search, grade, status
   const displayedItems = currentTabPool.filter((comp) => {
     const matchesSearch =
-      comp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (comp.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (comp.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      comp.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (comp.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (comp.grade && comp.grade.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesGrade =
@@ -134,7 +134,7 @@ export const SubjectAdminPortal: React.FC<SubjectAdminPortalProps> = ({
     const matchesStatus =
       statusFilter === 'all'
         ? true
-        : comp.status.toLowerCase() === statusFilter.toLowerCase();
+        : (comp.status || '').toLowerCase() === statusFilter.toLowerCase();
 
     return matchesSearch && matchesGrade && matchesStatus;
   });

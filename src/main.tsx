@@ -4,12 +4,25 @@ import App from './App.tsx';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
-// Register PWA Service Worker for offline student study materials and application caching
+// Register PWA Service Worker for offline student study materials and automatic build updates
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  registerSW({
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    try {
+      const key = 'hnc_sw_reloaded_once';
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch {}
+    refreshing = true;
+    window.location.reload();
+  });
+
+  const updateSW = registerSW({
     immediate: true,
     onNeedRefresh() {
-      console.log('HNC EduHub: App update / new curriculum materials available.');
+      console.log('HNC EduHub: Activating latest platform update...');
+      updateSW(true).catch(() => {});
     },
     onOfflineReady() {
       console.log('HNC EduHub: Offline study materials cache is active.');

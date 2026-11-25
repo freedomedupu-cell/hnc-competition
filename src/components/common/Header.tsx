@@ -54,6 +54,95 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const notifContainerRef = React.useRef<HTMLDivElement | null>(null);
+
+  const notifIdentity = (
+    currentAuthUser?.email ||
+    currentAuthUser?.uid ||
+    currentStudent?.email ||
+    currentStudent?.id ||
+    currentAdmin?.email ||
+    currentAdmin?.id ||
+    'guest'
+  )
+    .toString()
+    .trim()
+    .toLowerCase();
+
+  const notifStorageKey = `hnc_read_notifications_${notifIdentity}`;
+
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
+    try {
+      if (typeof window === 'undefined') return [];
+      const raw = localStorage.getItem(notifStorageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const raw = localStorage.getItem(notifStorageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setReadNotificationIds(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setReadNotificationIds([]);
+    }
+  }, [notifStorageKey]);
+
+  const markNotificationsAsRead = React.useCallback(
+    (ids: string[]) => {
+      if (!ids || ids.length === 0) return;
+      setReadNotificationIds((prev) => {
+        const nextSet = new Set([...prev, ...ids]);
+        const nextArr = Array.from(nextSet).slice(-250);
+        try {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(notifStorageKey, JSON.stringify(nextArr));
+          }
+        } catch {
+          // Ignore storage quota errors
+        }
+        return nextArr;
+      });
+    },
+    [notifStorageKey]
+  );
+
+  const formatNotifDate = (val: unknown, fallback: string): string => {
+    if (!val) return fallback;
+    if (typeof val === 'string') return val.includes('T') ? val.split('T')[0] : val;
+    if (typeof val === 'number') {
+      const d = new Date(val);
+      return Number.isNaN(d.getTime()) ? fallback : d.toISOString().split('T')[0];
+    }
+    if (typeof val === 'object') {
+      const obj = val as any;
+      if (typeof obj.toDate === 'function') {
+        const d = obj.toDate();
+        return Number.isNaN(d.getTime()) ? fallback : d.toISOString().split('T')[0];
+      }
+      if (typeof obj.seconds === 'number') {
+        const d = new Date(obj.seconds * 1000);
+        return Number.isNaN(d.getTime()) ? fallback : d.toISOString().split('T')[0];
+      }
+    }
+    return fallback;
+  };
+
+  useEffect(() => {
+    if (!showNotifications) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (notifContainerRef.current && !notifContainerRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [showNotifications]);
 
   // Live points listener so header points balance updates instantly across tabs and spins
   const [liveHeaderPoints, setLiveHeaderPoints] = useState<number>(() => {
@@ -181,7 +270,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
               ? `🎯 உங்கள் பாடம்: ${spa.subject}`
               : `🎯 Enrolled Subject: ${spa.subject}`,
           subtitle: `${spa.competitionTitle} (${spa.competitionType || 'Quiz'})`,
-          time: spa.publishedAt ? spa.publishedAt.split('T')[0] : (language === 'ta' ? 'இப்போது' : 'Just now'),
+          time: formatNotifDate(spa.publishedAt, language === 'ta' ? 'இப்போது' : 'Just now'),
           read: spa.read,
           isEnrolledSubject: true,
           subjectName: spa.subject,
@@ -206,7 +295,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
                 ? `📚 ${matchedSubject} போட்டி வெளியீடு`
                 : `📚 ${matchedSubject} Competition Live`,
             subtitle: `${c.title} — ${language === 'ta' ? 'பதிவு திறக்கப்பட்டுள்ளது' : 'Open for Registration'}`,
-            time: c.startDate || (language === 'ta' ? 'அண்மையில்' : 'Recent'),
+            time: formatNotifDate(c.startDate, language === 'ta' ? 'அண்மையில்' : 'Recent'),
             read: false,
             isEnrolledSubject: true,
             subjectName: matchedSubject,
@@ -257,7 +346,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
             : language === 'si'
             ? `තරඟ නිවේදනය: ${c.title}`
             : `Active Contest: ${c.title} is open for registration`,
-        time: c.startDate || (language === 'ta' ? 'அண்மையில்' : language === 'si' ? 'මෑතකදී' : 'Recent'),
+        time: formatNotifDate(c.startDate, language === 'ta' ? 'அண்மையில்' : language === 'si' ? 'මෑතකදී' : 'Recent'),
         read: false,
         competitionId: c.id,
       });
@@ -276,20 +365,44 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
             : language === 'si'
             ? `ප්‍රතිඵල ප්‍රකාශයට පත් කරන ලදී: ${r.competitionTitle}`
             : `Results Published: ${r.competitionTitle}`,
-        time: r.publishedAt || r.submittedAt || 'Recent',
+        time: formatNotifDate(r.publishedAt || (r as any).submittedAt, 'Recent'),
         read: true,
       });
     });
 
-  const unreadCount = notificationsList.filter((n) => !n.read).length;
-  const hasCriticalDeadline = notificationsList.some((n) => n.isDeadline && n.urgency === 'critical');
+  const readSet = new Set(readNotificationIds);
+  const resolvedNotifications = notificationsList.map((n) => ({
+    ...n,
+    read: Boolean(n.read || readSet.has(n.id)),
+  }));
+
+  const unreadCount = resolvedNotifications.filter((n) => !n.read).length;
+  const hasCriticalDeadline = resolvedNotifications.some((n) => !n.read && n.isDeadline && n.urgency === 'critical');
+
+  // Keep any notifications arriving while the dropdown is open marked as read
+  useEffect(() => {
+    if (!showNotifications) return;
+    const unreadIds = resolvedNotifications.filter((n) => !n.read).map((n) => n.id);
+    if (unreadIds.length > 0) {
+      markNotificationsAsRead(unreadIds);
+    }
+  }, [showNotifications, unreadCount, markNotificationsAsRead]);
+
+  const handleToggleNotifications = () => {
+    const nextOpen = !showNotifications;
+    setShowNotifications(nextOpen);
+    if (nextOpen && resolvedNotifications.length > 0) {
+      const allIds = resolvedNotifications.map((n) => n.id);
+      markNotificationsAsRead(allIds);
+    }
+  };
 
   return (
     <header id="hnc-header" className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-2xs w-full">
       <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16 gap-1.5 sm:gap-3">
           {/* Left: Brand Identity and Mobile Toggle */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1 overflow-hidden">
             <button
               id="btn-mobile-menu"
               onClick={onToggleMobileSidebar}
@@ -299,28 +412,30 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
               <Menu className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
               <img
                 src={APP_LOGO}
                 alt="HNC Competition Logo"
                 className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl object-contain shadow-xs shrink-0 border border-slate-200/80 bg-white p-0.5"
                 referrerPolicy="no-referrer"
               />
-              <div className="min-w-0 shrink-0">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <span className="text-[12px] min-[380px]:text-[13px] sm:text-base font-extrabold tracking-tight text-slate-900 whitespace-nowrap">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                  <span className="text-[12px] sm:text-base font-extrabold tracking-tight text-slate-900 truncate block">
                     {t('appName')}
                   </span>
-                  <NetworkStatusIndicator language={language} />
-                  <OfflineModeIndicator
-                    language={language}
-                    isStudent={effectivePortal === 'student'}
-                    onNavigateStudyHub={() => {
-                      if (effectivePortal === 'student') {
-                        setStudentNav('Dashboard');
-                      }
-                    }}
-                  />
+                  <div className="hidden lg:flex items-center gap-1.5 shrink-0">
+                    <NetworkStatusIndicator language={language} />
+                    <OfflineModeIndicator
+                      language={language}
+                      isStudent={effectivePortal === 'student'}
+                      onNavigateStudyHub={() => {
+                        if (effectivePortal === 'student') {
+                          setStudentNav('Dashboard');
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
                 <p className="hidden md:block text-[11px] text-slate-500 font-normal truncate">
                   {t('platformSubtitle')}
@@ -412,7 +527,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
             </button>
 
             {/* In-App PWA Install Button (Home Screen / Standalone) */}
-            <PWAInstallButton language={language} />
+            <PWAInstallButton language={language} className="hidden sm:inline-flex" />
 
             {/* Quick Platform Share Button */}
             <button
@@ -429,14 +544,14 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
             </button>
 
             {/* Notification Bell */}
-            <div className="relative shrink-0">
+            <div className="relative shrink-0" ref={notifContainerRef}>
               <button
                 id="btn-notifications"
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={handleToggleNotifications}
                 className="relative p-1.5 sm:p-2 rounded-lg sm:rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                 aria-label="View notifications"
               >
-                <Bell className={`w-4 h-4 sm:w-5 h-5 ${hasCriticalDeadline ? 'text-rose-600' : 'text-slate-700'}`} />
+                <Bell className={`w-4 h-4 sm:w-5 sm:h-5 ${hasCriticalDeadline ? 'text-rose-600' : 'text-slate-700'}`} />
                 {hasCriticalDeadline && (
                   <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
                 )}
@@ -456,17 +571,30 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
                   id="notifications-dropdown"
                   className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-1rem)] bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95"
                 >
-                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 gap-2">
                     <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                       <Bell className="w-3.5 h-3.5 text-blue-600" />
                       {t('platformAlerts')}
                     </span>
-                    <span className="text-[11px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-                      {unreadCount} {t('unread')}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {unreadCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => markNotificationsAsRead(resolvedNotifications.map((n) => n.id))}
+                          className="text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded-full border border-rose-200 transition cursor-pointer"
+                        >
+                          {unreadCount} {t('unread')}
+                        </button>
+                      ) : (
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          {language === 'ta' ? 'பார்க்கப்பட்டது' : language === 'si' ? 'බැලූ' : 'All Read'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-                    {notificationsList.length === 0 ? (
+                    {resolvedNotifications.length === 0 ? (
                       <div className="py-8 px-4 text-center">
                         <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto mb-1.5" />
                         <p className="text-xs font-bold text-slate-700">
@@ -477,14 +605,19 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
                         </p>
                       </div>
                     ) : (
-                      notificationsList.map((item) => (
+                      resolvedNotifications.map((item) => (
                         <div
                           key={item.id}
                           onClick={() => {
+                            markNotificationsAsRead([item.id]);
                             setShowNotifications(false);
                             try {
                               const targetEl = document.getElementById('upcoming-competitions-section');
-                              if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth' });
+                              if (targetEl) {
+                                targetEl.scrollIntoView({ behavior: 'smooth' });
+                              } else if (isStudentPortal && item.competitionId) {
+                                setStudentNav('Competitions');
+                              }
                             } catch {}
                           }}
                           className={`p-3 transition-colors cursor-pointer ${
@@ -599,7 +732,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
             ) : (
               <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200">
                 <div className="w-8 h-8 rounded-full bg-blue-100 border border-blue-300 text-blue-800 font-bold text-xs flex items-center justify-center">
-                  {(activeUser?.name || 'A').charAt(0)}
+                  {(String(activeUser?.name || '').trim() || 'A').charAt(0).toUpperCase()}
                 </div>
                 <div className="text-left">
                   <div className="flex items-center gap-1.5">

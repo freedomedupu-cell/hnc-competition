@@ -262,7 +262,7 @@ export const AnimatedHeroLeaderboard: React.FC<AnimatedHeroLeaderboardProps> = (
                 <div className="flex items-center gap-2">
                   <div className="relative">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 via-amber-300 to-yellow-200 text-slate-950 font-black text-sm flex items-center justify-center shadow-md animate-pulse-ring">
-                      {top3[0].name.charAt(0)}
+                      {(String(top3[0]?.name || '').trim() || 'S').charAt(0).toUpperCase()}
                     </div>
                     <div className="absolute -top-2.5 -right-1 text-amber-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
                       <Crown className="w-5 h-5 fill-amber-400 stroke-amber-200" />
@@ -311,7 +311,7 @@ export const AnimatedHeroLeaderboard: React.FC<AnimatedHeroLeaderboardProps> = (
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-slate-300 to-slate-100 text-slate-900 font-black text-xs flex items-center justify-center shadow-xs">
-                    {top3[1].name.charAt(0)}
+                    {(String(top3[1]?.name || '').trim() || 'S').charAt(0).toUpperCase()}
                   </div>
                   <div>
                     <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-300 flex items-center gap-1">
@@ -349,7 +349,7 @@ export const AnimatedHeroLeaderboard: React.FC<AnimatedHeroLeaderboardProps> = (
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-700 to-amber-500 text-white font-black text-xs flex items-center justify-center shadow-xs">
-                    {top3[2].name.charAt(0)}
+                    {(String(top3[2]?.name || '').trim() || 'S').charAt(0).toUpperCase()}
                   </div>
                   <div>
                     <span className="text-[9px] font-extrabold uppercase tracking-wider text-amber-500 flex items-center gap-1">

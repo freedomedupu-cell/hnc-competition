@@ -498,8 +498,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [adminNav, setAdminNav] = useState<AdminNav>('Dashboard');
   const [studentNav, setStudentNav] = useState<StudentNav>('Dashboard');
 
-  // Last authenticated user ID ref to detect immediate login/logout transitions
+  // Last authenticated user ID & role refs to detect immediate login/logout transitions
   const lastAuthUidRef = useRef<string | null>(getSavedActiveUser()?.uid || null);
+  const lastAuthRoleRef = useRef<string | null>(getSavedActiveUser()?.role || null);
 
   // Synchronized setter for authenticated user that immediately updates active portal & storage
   const setCurrentAuthUser = useCallback(
@@ -522,15 +523,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         const nextUser = userOrUpdater;
         if (nextUser) {
+          const isSameSuperAdminSession =
+            lastAuthRoleRef.current === 'super_admin' && nextUser.role === 'super_admin';
+          const isNewAuthSession =
+            !isSameSuperAdminSession &&
+            (!lastAuthUidRef.current || lastAuthUidRef.current !== nextUser.uid);
           saveActiveUser(nextUser);
           setInternalPortal(nextUser.role);
-          if (nextUser.role === 'student') {
-            setStudentNav('Dashboard');
-          } else if (nextUser.role === 'admin') {
-            const isSubj = nextUser.adminType === 'subject_admin' || Boolean(nextUser.assignedSubject);
-            setAdminNav(isSubj ? 'Quiz' : 'Dashboard');
-          } else if (nextUser.role === 'super_admin') {
-            setSuperAdminNav('Dashboard');
+          if (isNewAuthSession) {
+            if (nextUser.role === 'student') {
+              setStudentNav('Dashboard');
+            } else if (nextUser.role === 'admin') {
+              const isSubj = nextUser.adminType === 'subject_admin' || Boolean(nextUser.assignedSubject);
+              setAdminNav(isSubj ? 'Quiz' : 'Dashboard');
+            } else if (nextUser.role === 'super_admin') {
+              setSuperAdminNav('Dashboard');
+            }
           }
         } else {
           logoutUserSession();
@@ -545,8 +553,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Automatically enforce portal to match authenticated user role whenever login or auth changes
   useEffect(() => {
     if (currentAuthUser?.uid) {
-      const isNewLogin = currentAuthUser.uid !== lastAuthUidRef.current;
+      const isSameSuperAdminSession =
+        lastAuthRoleRef.current === 'super_admin' && currentAuthUser.role === 'super_admin';
+      const isNewLogin = !isSameSuperAdminSession && currentAuthUser.uid !== lastAuthUidRef.current;
       lastAuthUidRef.current = currentAuthUser.uid;
+      lastAuthRoleRef.current = currentAuthUser.role;
 
       if (isNewLogin) {
         // Immediate switch to the logged-in user's authorized portal on new login
@@ -568,6 +579,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } else {
       lastAuthUidRef.current = null;
+      lastAuthRoleRef.current = null;
     }
   }, [currentAuthUser?.uid, currentAuthUser?.role, currentPortal]);
 
@@ -1034,11 +1046,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         'HNC-GR7-SCI-2026',
       ]);
 
+      const safeCompStr = (v: unknown, fb = ''): string => {
+        if (v === null || v === undefined) return fb;
+        if (typeof v === 'string') return v;
+        if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+        return fb;
+      };
+      const safeCompDate = (v: unknown, fb = ''): string => {
+        if (!v) return fb;
+        if (typeof v === 'string') return v.includes('T') ? v.split('T')[0] : v;
+        if (typeof v === 'number') {
+          const d = new Date(v);
+          return Number.isNaN(d.getTime()) ? fb : d.toISOString().split('T')[0];
+        }
+        if (typeof v === 'object') {
+          const obj = v as any;
+          if (typeof obj.toDate === 'function') {
+            const d = obj.toDate();
+            return Number.isNaN(d.getTime()) ? fb : d.toISOString().split('T')[0];
+          }
+          if (typeof obj.seconds === 'number') {
+            const d = new Date(obj.seconds * 1000);
+            return Number.isNaN(d.getTime()) ? fb : d.toISOString().split('T')[0];
+          }
+        }
+        return fb;
+      };
+
       // Strictly exclude test/dummy sample competitions so students will never see test dummy records
       const realComps = dbComps.filter((c) => {
-        const validId = c.competitionId || (c as any).id;
-        const code = (c.code || '').toUpperCase();
-        const title = (c.title || '').toLowerCase();
+        const validId = safeCompStr(c.competitionId || (c as any).id);
+        const code = safeCompStr(c.code).toUpperCase();
+        const title = safeCompStr(c.title).toLowerCase();
         if (
           knownDemoIds.has(validId) ||
           knownDemoCodes.has(code) ||
@@ -1053,24 +1092,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       const mapped: Competition[] = realComps.map((c) => {
-        const validId = c.competitionId || (c as any).id;
+        const validId = safeCompStr(c.competitionId || (c as any).id, `comp_${Math.random().toString(36).slice(2, 8)}`);
         const resolvedHasTimeLimit =
           c.hasTimeLimit !== undefined ? c.hasTimeLimit : c.duration === 0 ? false : true;
         return {
           id: validId,
           competitionId: validId,
-          title: c.title || 'Untitled Exam / Competition',
-          code: c.code || `HNC-${(validId || 'EXAM').slice(-4).toUpperCase()}`,
-          category: c.category as any,
-          description: c.description || '',
-          competitionType: (c.competitionType as any) || 'Quiz',
-          grade: c.grade || 'Open',
-          language: (c.language as any) || 'English',
-          duration: !resolvedHasTimeLimit ? 0 : (c.duration ?? 60),
+          title: safeCompStr(c.title, 'Untitled Exam / Competition'),
+          code: safeCompStr(c.code) || `HNC-${(validId || 'EXAM').slice(-4).toUpperCase()}`,
+          category: safeCompStr(c.category, 'General Knowledge') as any,
+          description: safeCompStr(c.description),
+          competitionType: (safeCompStr(c.competitionType, 'Quiz') as any),
+          grade: safeCompStr(c.grade, 'Open'),
+          language: (safeCompStr(c.language, 'English') as any),
+          duration: !resolvedHasTimeLimit ? 0 : (Number(c.duration) || 60),
           hasTimeLimit: resolvedHasTimeLimit,
           scheduleMode: c.scheduleMode || 'scheduled',
-          entryType: (c.entryType as any) || 'Free',
-          entryFee: c.entryFee ?? 0,
+          entryType: (safeCompStr(c.entryType, 'Free') as any),
+          entryFee: Number(c.entryFee) || 0,
           prizesEnabled: c.prizesEnabled ?? true,
           prizeDetails: c.prizeDetails || {
             firstPrize: '1st Prize Trophy & Gold Medal',
@@ -1078,20 +1117,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             thirdPrize: '3rd Prize Bronze Medal',
             participationCertificate: 'E-Certificate of Participation',
           },
-          registrationStart: c.registrationStart || c.registrationDeadline || '2026-03-01',
-          registrationEnd: c.registrationEnd || c.registrationDeadline || '2026-04-15',
-          competitionStart: c.competitionStart || c.startDate || '2026-04-20',
-          competitionEnd: c.competitionEnd || c.endDate || '2026-04-22',
-          competitionStartTime: c.competitionStartTime || '09:00',
-          competitionEndTime: c.competitionEndTime || '23:59',
-          status: c.status,
-          questions: c.questions || [],
-          questionsCount: c.questionsCount ?? c.questions?.length ?? 0,
-          totalMarks: c.totalMarks ?? c.questions?.reduce((acc, q) => acc + (q.marks || 0), 0) ?? 0,
-          participants: c.participants || [],
-          registrationDeadline: c.registrationDeadline || c.registrationEnd || '2026-04-15',
-          startDate: c.startDate || c.competitionStart || '2026-04-20',
-          endDate: c.endDate || c.competitionEnd || '2026-04-22',
+          registrationStart: safeCompDate(c.registrationStart || c.registrationDeadline, '2026-03-01'),
+          registrationEnd: safeCompDate(c.registrationEnd || c.registrationDeadline, '2026-04-15'),
+          competitionStart: safeCompDate(c.competitionStart || c.startDate, '2026-04-20'),
+          competitionEnd: safeCompDate(c.competitionEnd || c.endDate, '2026-04-22'),
+          competitionStartTime: safeCompStr(c.competitionStartTime, '09:00'),
+          competitionEndTime: safeCompStr(c.competitionEndTime, '23:59'),
+          status: safeCompStr(c.status, 'Draft') as any,
+          questions: Array.isArray(c.questions) ? c.questions : [],
+          questionsCount: c.questionsCount ?? (Array.isArray(c.questions) ? c.questions.length : 0),
+          totalMarks: c.totalMarks ?? (Array.isArray(c.questions) ? c.questions.reduce((acc, q) => acc + (Number(q?.marks) || 0), 0) : 0),
+          participants: Array.isArray(c.participants) ? c.participants : [],
+          registrationDeadline: safeCompDate(c.registrationDeadline || c.registrationEnd, '2026-04-15'),
+          startDate: safeCompDate(c.startDate || c.competitionStart, '2026-04-20'),
+          endDate: safeCompDate(c.endDate || c.competitionEnd, '2026-04-22'),
           maxParticipants: c.maxParticipants || 500,
           enrolledCount: c.enrolledCount || c.participants?.length || 0,
           leadAdminId: c.leadAdminId,
@@ -1244,22 +1283,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       currentAuthUser.role,
       currentAuthUser.uid,
       (dbResults) => {
-        const mapped: CompetitionResult[] = dbResults.map((r) => ({
-          id: r.resultId,
-          competitionId: r.competitionId,
-          competitionTitle: r.competitionTitle || 'Academic Competition',
-          studentId: r.studentId,
-          studentName: r.studentName || 'Candidate',
-          studentInstitution: r.studentInstitution || 'Participating Institution',
-          score: r.score,
-          maxScore: r.totalMarks,
-          rank: r.rank,
-          percentile: r.percentage,
-          award: (r.award as any) || 'Participation',
-          publishStatus: r.publishStatus || 'published',
-          certificateId: r.certificateId || `CERT-${r.resultId}`,
-          publishedAt: r.submittedAt,
-        }));
+        const sStr = (v: unknown, fb = ''): string => {
+          if (v === null || v === undefined) return fb;
+          if (typeof v === 'string') return v;
+          if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+          return fb;
+        };
+        const sDate = (v: unknown, fb = ''): string => {
+          if (!v) return fb;
+          if (typeof v === 'string') return v.includes('T') ? v.split('T')[0] : v;
+          if (typeof v === 'number') {
+            const d = new Date(v);
+            return Number.isNaN(d.getTime()) ? fb : d.toISOString().split('T')[0];
+          }
+          if (typeof v === 'object') {
+            const obj = v as any;
+            if (typeof obj.toDate === 'function') {
+              const d = obj.toDate();
+              return Number.isNaN(d.getTime()) ? fb : d.toISOString().split('T')[0];
+            }
+            if (typeof obj.seconds === 'number') {
+              const d = new Date(obj.seconds * 1000);
+              return Number.isNaN(d.getTime()) ? fb : d.toISOString().split('T')[0];
+            }
+          }
+          return fb;
+        };
+        const mapped: CompetitionResult[] = dbResults.map((r, idx) => {
+          const rid = sStr(r.resultId, `res_${idx}`);
+          return {
+            id: rid,
+            competitionId: sStr(r.competitionId),
+            competitionTitle: sStr(r.competitionTitle, 'Academic Competition'),
+            studentId: sStr(r.studentId),
+            studentName: sStr(r.studentName, 'Candidate'),
+            studentInstitution: sStr(r.studentInstitution, 'Participating Institution'),
+            score: Number(r.score) || 0,
+            maxScore: Number(r.totalMarks) || 100,
+            rank: Number(r.rank) || 0,
+            percentile: Number(r.percentage) || 0,
+            award: (sStr(r.award, 'Participation') as any),
+            publishStatus: r.publishStatus || 'published',
+            certificateId: sStr(r.certificateId) || `CERT-${rid}`,
+            publishedAt: sDate(r.submittedAt),
+          };
+        });
         setResults(mapped);
 
         // Instant Toast Notification for Newly Graded / Published Results
@@ -1328,39 +1396,85 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     );
 
+    const safeStrField = (v: unknown, fallback = ''): string => {
+      if (v === null || v === undefined) return fallback;
+      if (typeof v === 'string') return v;
+      if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+      return fallback;
+    };
+    const safeIsoDateField = (v: unknown, fallback = '2026-01-01'): string => {
+      if (!v) return fallback;
+      if (typeof v === 'string') return v.includes('T') ? v.split('T')[0] : v;
+      if (typeof v === 'number') {
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? fallback : d.toISOString().split('T')[0];
+      }
+      if (typeof v === 'object') {
+        const obj = v as any;
+        if (typeof obj.toDate === 'function') {
+          const d = obj.toDate();
+          return Number.isNaN(d.getTime()) ? fallback : d.toISOString().split('T')[0];
+        }
+        if (typeof obj.seconds === 'number') {
+          const d = new Date(obj.seconds * 1000);
+          return Number.isNaN(d.getTime()) ? fallback : d.toISOString().split('T')[0];
+        }
+      }
+      return fallback;
+    };
+
     // 3. Students subscription (Admins and Super Admins only)
     let unsubStudents: (() => void) | undefined;
     if (currentAuthUser.role === 'super_admin' || currentAuthUser.role === 'admin') {
       unsubStudents = subscribeToStudents((dbStudents) => {
         const unique = new Map<string, DbStudent>();
         dbStudents.forEach((s) => {
-          if (s.uid) unique.set(s.uid, s);
+          if (s && s.uid) unique.set(String(s.uid), s);
         });
-        const mapped: StudentUser[] = Array.from(unique.values()).map((s, idx) => ({
-          id: s.uid,
-          name: s.fullName,
-          email: s.email,
-          role: 'student',
-          status: s.status,
-          createdAt: s.createdAt ? s.createdAt.split('T')[0] : '2026-01-01',
-          studentId: s.studentId || `HNC-STD-${202600 + idx}`,
-          username: s.username || '',
-          institution: s.school,
-          district: s.district || '',
-          address: s.address || '',
-          dateOfBirth: s.dateOfBirth || '',
-          gradeLevel: s.grade,
-          competitionsEnrolled: 0,
-          awardsCount: 0,
-          phone: s.phone,
-          referralCode: s.referralCode || `HNC-${(s.studentId || s.username || s.uid.slice(0, 5)).toUpperCase().replace(/[^A-Z0-9]/g, '')}`,
-          referredBy: s.referredBy || '',
-          referralPoints: s.referralPoints !== undefined ? s.referralPoints : 0,
-          totalReferrals: s.totalReferrals || 0,
-          sharesCount: s.sharesCount || 0,
-          redeemedPerks: s.redeemedPerks || [],
-          lastSpinDate: s.lastSpinDate || '',
-        }));
+        const mapped: StudentUser[] = Array.from(unique.values()).map((s, idx) => {
+          const uid = safeStrField(s.uid, `std_${idx}`);
+          const rawName = safeStrField(s.fullName) || safeStrField((s as any).name) || 'Student';
+          const rawStudentId = safeStrField(s.studentId) || `HNC-STD-${202600 + idx}`;
+          const rawUsername = safeStrField(s.username);
+          const rawSchool = safeStrField(s.school) || safeStrField((s as any).institution);
+          const rawGrade = safeStrField(s.grade) || safeStrField((s as any).gradeLevel);
+          const rawRefSeed = rawStudentId || rawUsername || uid.slice(0, 5);
+          return {
+            id: uid,
+            name: rawName,
+            fullName: rawName,
+            email: safeStrField(s.email),
+            role: 'student',
+            status: s.status === 'inactive' ? 'inactive' : 'active',
+            createdAt: safeIsoDateField(s.createdAt),
+            studentId: rawStudentId,
+            username: rawUsername,
+            institution: rawSchool,
+            school: rawSchool,
+            district: safeStrField(s.district),
+            address: safeStrField(s.address),
+            dateOfBirth: safeStrField(s.dateOfBirth),
+            guardianName: safeStrField((s as any).guardianName),
+            bio: safeStrField((s as any).bio),
+            gradeLevel: rawGrade,
+            grade: rawGrade,
+            competitionsEnrolled: Number((s as any).competitionsEnrolled) || 0,
+            awardsCount: Number((s as any).awardsCount) || 0,
+            phone: safeStrField(s.phone),
+            referralCode:
+              safeStrField(s.referralCode) ||
+              `HNC-${rawRefSeed.toUpperCase().replace(/[^A-Z0-9]/g, '')}`,
+            referredBy: safeStrField(s.referredBy),
+            referralPoints:
+              typeof s.referralPoints === 'number' && !Number.isNaN(s.referralPoints)
+                ? s.referralPoints
+                : Number(s.referralPoints) || 0,
+            totalReferrals: Number(s.totalReferrals) || 0,
+            sharesCount: Number(s.sharesCount) || 0,
+            redeemedPerks: Array.isArray(s.redeemedPerks) ? s.redeemedPerks : [],
+            lastSpinDate: safeStrField(s.lastSpinDate),
+          };
+        });
         setStudents(mapped);
       });
     }
@@ -1371,26 +1485,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubAdmins = subscribeToAdmins((dbAdmins) => {
         const unique = new Map<string, DbAdmin>();
         dbAdmins.forEach((a) => {
-          if (a.uid) unique.set(a.uid, a);
+          if (a && a.uid) unique.set(String(a.uid), a);
         });
-        const mapped: AdminUser[] = Array.from(unique.values()).map((a) => ({
-          id: a.uid,
-          name: a.fullName,
-          email: a.email,
-          username: a.username || a.staffId || a.email.split('@')[0],
-          initialPassword: a.initialPassword,
-          role: 'admin',
-          status: a.status,
-          createdAt: a.createdAt ? a.createdAt.split('T')[0] : '2026-01-01',
-          department: a.department || 'Academic Affairs',
-          staffId: a.staffId || `ADM-${a.uid.slice(0, 5)}`,
-          adminType: (a.adminType as any) || 'general',
-          assignedSubject: a.assignedSubject || '',
-          assignedSubjects: a.assignedSubjects || (a.assignedSubject ? [a.assignedSubject] : []),
-          assignedGrades: a.assignedGrades || [],
-          assignedCompetitionsCount: 0,
-          phone: a.phone,
-        }));
+        const mapped: AdminUser[] = Array.from(unique.values()).map((a) => {
+          const uid = safeStrField(a.uid);
+          const email = safeStrField(a.email);
+          return {
+            id: uid,
+            name: safeStrField(a.fullName, 'Admin'),
+            email,
+            username: safeStrField(a.username) || safeStrField(a.staffId) || (email ? email.split('@')[0] : uid),
+            initialPassword: a.initialPassword,
+            role: 'admin',
+            status: a.status === 'inactive' ? 'inactive' : 'active',
+            createdAt: safeIsoDateField(a.createdAt),
+            department: safeStrField(a.department, 'Academic Affairs'),
+            staffId: safeStrField(a.staffId) || `ADM-${uid.slice(0, 5)}`,
+            adminType: (a.adminType as any) || 'general',
+            assignedSubject: safeStrField(a.assignedSubject),
+            assignedSubjects: Array.isArray(a.assignedSubjects)
+              ? a.assignedSubjects
+              : a.assignedSubject
+              ? [safeStrField(a.assignedSubject)]
+              : [],
+            assignedGrades: Array.isArray(a.assignedGrades) ? a.assignedGrades : [],
+            assignedCompetitionsCount: 0,
+            phone: safeStrField(a.phone),
+          };
+        });
         setAdmins(mapped);
       });
     }
@@ -1579,7 +1701,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (currentAuthUser?.assignedSubject && c.category?.toLowerCase() === currentAuthUser.assignedSubject.toLowerCase())
     ).length,
     phone: currentAuthUser?.phone || '',
-    createdAt: currentAuthUser?.createdAt ? currentAuthUser.createdAt.split('T')[0] : '2026-01-01',
+    createdAt: typeof currentAuthUser?.createdAt === 'string' ? currentAuthUser.createdAt.split('T')[0] : '2026-01-01',
     status: (currentAuthUser?.status as any) || 'active',
   }), [
     currentAuthUser?.uid,
@@ -1634,7 +1756,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     phone: currentAuthUser?.phone || '',
     guardianName: currentAuthUser?.guardianName || '',
     bio: currentAuthUser?.bio || '',
-    createdAt: currentAuthUser?.createdAt ? currentAuthUser.createdAt.split('T')[0] : '2026-01-01',
+    createdAt: typeof currentAuthUser?.createdAt === 'string' ? currentAuthUser.createdAt.split('T')[0] : '2026-01-01',
     status: (currentAuthUser?.status as any) || 'active',
     referralCode:
       currentAuthUser?.referralCode ||
@@ -2591,29 +2713,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             s.studentId === studentUid ||
             (updatedData.oldStudentId && s.studentId === updatedData.oldStudentId)
           ) {
-            const nextName = updatedData.fullName?.trim() || s.name;
-            const nextSchool = updatedData.school?.trim() || s.institution;
-            const nextGrade = updatedData.grade?.trim() || s.gradeLevel;
+            const nextName = updatedData.fullName ? String(updatedData.fullName).trim() : s.name;
+            const nextSchool = updatedData.school ? String(updatedData.school).trim() : s.institution;
+            const nextGrade = updatedData.grade ? String(updatedData.grade).trim() : s.gradeLevel;
             return {
               ...s,
               name: nextName,
               fullName: nextName,
-              studentId: updatedData.studentId?.trim() || s.studentId,
-              username: updatedData.username !== undefined ? updatedData.username.trim().toLowerCase() : s.username,
-              email: updatedData.email !== undefined ? updatedData.email.trim().toLowerCase() : s.email,
-              phone: updatedData.phone !== undefined ? updatedData.phone.trim() : s.phone,
+              studentId: updatedData.studentId ? String(updatedData.studentId).trim() : s.studentId,
+              username: updatedData.username !== undefined ? String(updatedData.username).trim().toLowerCase() : s.username,
+              email: updatedData.email !== undefined ? String(updatedData.email).trim().toLowerCase() : s.email,
+              phone: updatedData.phone !== undefined ? String(updatedData.phone).trim() : s.phone,
               institution: nextSchool,
               school: nextSchool,
               gradeLevel: nextGrade,
               grade: nextGrade,
-              district: updatedData.district !== undefined ? updatedData.district.trim() : s.district,
-              address: updatedData.address !== undefined ? updatedData.address.trim() : s.address,
-              dateOfBirth: updatedData.dateOfBirth !== undefined ? updatedData.dateOfBirth.trim() : s.dateOfBirth,
-              guardianName: updatedData.guardianName !== undefined ? updatedData.guardianName.trim() : s.guardianName,
+              district: updatedData.district !== undefined ? String(updatedData.district).trim() : s.district,
+              address: updatedData.address !== undefined ? String(updatedData.address).trim() : s.address,
+              dateOfBirth: updatedData.dateOfBirth !== undefined ? String(updatedData.dateOfBirth).trim() : s.dateOfBirth,
+              guardianName: updatedData.guardianName !== undefined ? String(updatedData.guardianName).trim() : s.guardianName,
               status: (updatedData.status as any) || s.status,
               referralPoints: updatedData.referralPoints !== undefined ? updatedData.referralPoints : s.referralPoints,
-              referralCode: updatedData.referralCode !== undefined ? updatedData.referralCode.trim().toUpperCase() : s.referralCode,
-              initialPassword: updatedData.newPassword?.trim() || s.initialPassword,
+              referralCode: updatedData.referralCode !== undefined ? String(updatedData.referralCode).trim().toUpperCase() : s.referralCode,
+              initialPassword: updatedData.newPassword ? String(updatedData.newPassword).trim() : s.initialPassword,
             };
           }
           return s;

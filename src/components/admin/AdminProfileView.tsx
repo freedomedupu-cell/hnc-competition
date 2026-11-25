@@ -60,7 +60,7 @@ export const AdminProfileView: React.FC = () => {
         {/* Left: Summary Identity Card */}
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-2xs space-y-5 text-center flex flex-col items-center">
           <div className="w-20 h-20 rounded-full bg-blue-700 text-white font-extrabold text-2xl flex items-center justify-center shadow-md">
-            {currentAdmin.name.charAt(0)}
+            {(String(currentAdmin?.name || '').trim() || 'A').charAt(0).toUpperCase()}
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-900">{currentAdmin.name}</h2>

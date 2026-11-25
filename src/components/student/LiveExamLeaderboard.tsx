@@ -553,7 +553,7 @@ export const LiveExamLeaderboard: React.FC<LiveExamLeaderboardProps> = ({
                                 : 'bg-slate-800 text-amber-300 border-slate-700'
                             }`}
                           >
-                            {item.studentName.charAt(0)}
+                            {(String(item?.studentName || '').trim() || 'S').charAt(0).toUpperCase()}
                           </div>
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-1.5 flex-wrap">

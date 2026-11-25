@@ -141,9 +141,9 @@ export const StudentCompetitionsView: React.FC = () => {
   const filteredCompetitions = visibleCompetitions.filter((comp) => {
     // 1. Search Term (searches title, code, category, and grade level)
     const matchesSearch =
-      comp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (comp.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (comp.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      comp.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (comp.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (comp.grade && comp.grade.toLowerCase().includes(searchTerm.toLowerCase()));
 
     // 2. Category Filter
@@ -152,7 +152,7 @@ export const StudentCompetitionsView: React.FC = () => {
         ? true
         : categoryFilter === 'enrolled'
         ? isCompetitionInEnrolledSubjects(comp, studentEnrolledSubjects).matches
-        : comp.category.toLowerCase() === categoryFilter.toLowerCase();
+        : (comp.category || '').toLowerCase() === categoryFilter.toLowerCase();
 
     // 3. Type Filter
     const matchesType =

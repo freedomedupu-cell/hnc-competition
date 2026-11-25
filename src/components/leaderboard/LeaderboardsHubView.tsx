@@ -1140,7 +1140,7 @@ export const LeaderboardsHubView: React.FC<LeaderboardsHubViewProps> = ({
                                 : 'bg-slate-100 text-slate-700'
                             }`}
                           >
-                            {item.name.charAt(0)}
+                            {(String(item?.name || '').trim() || 'S').charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">

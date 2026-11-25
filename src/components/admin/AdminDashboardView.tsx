@@ -349,7 +349,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                       }
                       dot
                     >
-                      {comp.status.toUpperCase()}
+                      {(comp.status || 'Draft').toUpperCase()}
                     </Badge>
                   </div>
 

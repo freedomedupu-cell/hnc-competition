@@ -30,12 +30,14 @@ import {
   Copy,
   Check,
   RotateCcw,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   loginWithEmailPassword,
   registerStudentAccount,
   resetUserPasswordByLookup,
   saveActiveUser,
+  signInSuperAdminWithGoogle,
 } from '../../services/firebaseService';
 import { AVAILABLE_GRADES, detectStudentCurriculumPath } from '../../lib/gradeUtils';
 import { ShareModal } from '../common/ShareModal';
@@ -296,6 +298,45 @@ export const AuthView: React.FC = () => {
             : 'No user account found with this identifier.';
       }
       setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSuperAdminGoogleLogin = async () => {
+    setError(null);
+    setSuccessMessage(null);
+    setLoading(true);
+    try {
+      const { userProfile } = await signInSuperAdminWithGoogle();
+      saveActiveUser(userProfile);
+      setCurrentAuthUser(userProfile);
+      setCurrentPortal(userProfile.role);
+      setSuperAdminNav('Dashboard');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('hnc_force_ready'));
+      }
+    } catch (err: any) {
+      console.warn('Super Admin Google Sign-In notice:', err?.message || err);
+      const code = err?.code || '';
+      const rawMsg = err?.message || '';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        setError(
+          language === 'ta'
+            ? 'Google உள்நுழைவு சாளரம் மூடப்பட்டது. Super Admin உள்நுழைய freedomedupu@gmail.com கணக்கைத் தேர்ந்தெடுக்கவும்.'
+            : language === 'si'
+            ? 'Google පිවිසුම් කවුළුව වසා දමන ලදී. කරුණාකර freedomedupu@gmail.com ගිණුම තෝරන්න.'
+            : 'Google Sign-In popup was closed. Please select freedomedupu@gmail.com to continue.'
+        );
+      } else if (code === 'auth/popup-blocked') {
+        setError(
+          language === 'ta'
+            ? 'உலாவி Popup-ஐ தடுத்துள்ளது. அனுமதி வழங்கி மீண்டும் முயற்சிக்கவும்.'
+            : 'Browser blocked the Google sign-in popup. Please allow popups and try again.'
+        );
+      } else {
+        setError(rawMsg || 'Super Admin Google Sign-In failed.');
+      }
     } finally {
       setLoading(false);
     }
@@ -742,6 +783,21 @@ export const AuthView: React.FC = () => {
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
+                </button>
+
+                <button
+                  id="btn-superadmin-google-login"
+                  type="button"
+                  disabled={loading}
+                  onClick={handleSuperAdminGoogleLogin}
+                  className="mt-2.5 w-full flex items-center justify-center gap-2 py-2 px-4 text-xs font-bold rounded-lg text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>
+                    {language === 'ta'
+                      ? 'Super Admin Google உள்நுழைவு (freedomedupu@gmail.com)'
+                      : 'Super Admin Google Sign-In (freedomedupu@gmail.com)'}
+                  </span>
                 </button>
               </div>
 

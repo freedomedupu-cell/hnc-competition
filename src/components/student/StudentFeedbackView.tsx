@@ -445,7 +445,7 @@ export const StudentFeedbackView: React.FC = () => {
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                  {studentName.charAt(0).toUpperCase()}
+                  {(String(studentName || '').trim() || 'S').charAt(0).toUpperCase()}
                 </div>
                 <div className="text-xs">
                   <div className="font-bold text-slate-800 flex items-center gap-2">
