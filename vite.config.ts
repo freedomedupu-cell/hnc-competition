@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import crypto from 'crypto';
 import {defineConfig} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
 
@@ -10,6 +11,33 @@ function apiDevServerPlugin() {
     configureServer(server: any) {
       server.middlewares.use(async (req: any, res: any, next: any) => {
         const url = (req.url || '').split('?')[0];
+        if (url === '/api/auth/verify-superadmin' && req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk: any) => {
+            body += chunk;
+          });
+          req.on('end', () => {
+            try {
+              const { email, password } = JSON.parse(body || '{}');
+              const envPass = process.env.SUPER_ADMIN_PASSCODE || '';
+              if (!envPass.trim()) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ configured: false, verified: false }));
+                return;
+              }
+              const emailOk = String(email || '').trim().toLowerCase() === 'freedomedupu@gmail.com';
+              const a = crypto.createHash('sha256').update(String(password || '')).digest();
+              const b = crypto.createHash('sha256').update(envPass).digest();
+              const passOk = crypto.timingSafeEqual(a, b);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ configured: true, verified: emailOk && passOk }));
+            } catch {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ configured: false, verified: false }));
+            }
+          });
+          return;
+        }
         if (url === '/api/generate-sri-lankan-questions' && req.method === 'POST') {
           let body = '';
           req.on('data', (chunk: any) => {

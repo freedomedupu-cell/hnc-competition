@@ -482,16 +482,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [theme]);
   
-  // Real Firebase Auth user & loading status
-  const [currentAuthUser, setCurrentAuthUserState] = useState<DbUser | null>(() => getSavedActiveUser());
+  const isVerifiedOwnerSession = (candidate: DbUser | null, fbEmail?: string | null): boolean => {
+    if (!candidate || candidate.role !== 'super_admin') return true;
+    const normalizedFb = (fbEmail ?? auth.currentUser?.email ?? '').toLowerCase();
+    if (normalizedFb === 'freedomedupu@gmail.com') return true;
+    try {
+      if (typeof window !== 'undefined') {
+        const marker = window.sessionStorage?.getItem('hnc_verified_owner_session');
+        if (marker && marker === candidate.uid && candidate.email?.toLowerCase() === 'freedomedupu@gmail.com') {
+          return true;
+        }
+      }
+    } catch {}
+    return false;
+  };
+
+  // Real Firebase Auth user & loading status (never blindly hydrate super_admin without verification)
+  const getInitialSafeSavedUser = (): DbUser | null => {
+    const saved = getSavedActiveUser();
+    if (!saved) return null;
+    if (!isVerifiedOwnerSession(saved)) return null;
+    return saved;
+  };
+  const [currentAuthUser, setCurrentAuthUserState] = useState<DbUser | null>(() => getInitialSafeSavedUser());
   const [authLoading, setAuthLoading] = useState<boolean>(false);
   const [isAuthHydrated, setIsAuthHydrated] = useState<boolean>(() => {
-    const saved = getSavedActiveUser();
+    const saved = getInitialSafeSavedUser();
     return Boolean(saved && saved.uid && saved.role && saved.status !== 'inactive');
   });
 
   // Portal role (strictly synchronized with currentAuthUser.role, default 'student' for safety)
-  const [currentPortal, setInternalPortal] = useState<PortalRole>(() => getSavedActiveUser()?.role || 'student');
+  const [currentPortal, setInternalPortal] = useState<PortalRole>(() => getInitialSafeSavedUser()?.role || 'student');
 
   // Navigation tab states
   const [superAdminNav, setSuperAdminNav] = useState<SuperAdminNav>('Dashboard');
@@ -807,9 +828,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
       try {
         const saved = getSavedActiveUser();
+        const isFbVerifiedSuperAdmin = fbUser?.email?.toLowerCase() === 'freedomedupu@gmail.com';
+        const isSuperAdminSessionValid = isVerifiedOwnerSession(saved, fbUser?.email);
 
-        // If a valid saved user exists, immediately hydrate and present the portal UI
-        if (saved && saved.role && saved.status !== 'inactive') {
+        // Never blindly hydrate a super_admin session unless Firebase Auth or verified tab session matches
+        if (saved && saved.role && saved.status !== 'inactive' && isSuperAdminSessionValid) {
           setIsAuthHydrated(true);
           setAuthLoading(false);
         }
@@ -891,7 +914,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           // 6. Process resolvedUser or maintain saved session
           if (resolvedUser) {
             const isInactive = resolvedUser.status === 'inactive';
-            if (isInactive) {
+            const unauthorizedSuperAdmin =
+              resolvedUser.role === 'super_admin' && !isFbVerifiedSuperAdmin;
+            if (isInactive || unauthorizedSuperAdmin) {
               await logoutUserSession();
               setCurrentAuthUser(null);
             } else {
@@ -973,34 +998,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           } else {
             // Neither Firestore nor query resolved this fbUser.
             const freshSaved = getSavedActiveUser() || saved;
-            if (freshSaved && freshSaved.role && freshSaved.status !== 'inactive') {
+            if (
+              freshSaved &&
+              freshSaved.role &&
+              freshSaved.status !== 'inactive' &&
+              isVerifiedOwnerSession(freshSaved, fbUser?.email)
+            ) {
               saveActiveUser(freshSaved);
               setCurrentAuthUser(freshSaved);
               setInternalPortal(freshSaved.role);
             } else {
-              setCurrentAuthUserState((prev) => (prev && prev.status !== 'inactive' ? prev : null));
+              if (freshSaved?.role === 'super_admin') {
+                saveActiveUser(null);
+              }
+              setCurrentAuthUserState((prev) =>
+                prev && prev.status !== 'inactive' && isVerifiedOwnerSession(prev, fbUser?.email)
+                  ? prev
+                  : null
+              );
             }
           }
         } else {
-          // fbUser is null (e.g. user logged in using Student ID, Username, or Staff ID with offline/direct auth)
+          // fbUser is null (e.g. user logged in using Student ID, Username, Staff ID, or verified owner session)
           const freshSaved = getSavedActiveUser();
-          if (freshSaved && freshSaved.role && freshSaved.status !== 'inactive') {
+          if (
+            freshSaved &&
+            freshSaved.role &&
+            freshSaved.status !== 'inactive' &&
+            isVerifiedOwnerSession(freshSaved, null)
+          ) {
             saveActiveUser(freshSaved);
             setCurrentAuthUser(freshSaved);
             setInternalPortal(freshSaved.role);
           } else {
-            setCurrentAuthUserState((prev) => (prev && prev.status !== 'inactive' ? prev : null));
+            if (freshSaved?.role === 'super_admin') {
+              saveActiveUser(null);
+            }
+            setCurrentAuthUserState((prev) =>
+              prev && prev.status !== 'inactive' && isVerifiedOwnerSession(prev, null) ? prev : null
+            );
           }
         }
       } catch (err) {
         console.warn('Auth restoration resilience fallback note:', err);
         const freshSaved = getSavedActiveUser();
-        if (freshSaved && freshSaved.role && freshSaved.status !== 'inactive') {
+        if (
+          freshSaved &&
+          freshSaved.role &&
+          freshSaved.status !== 'inactive' &&
+          isVerifiedOwnerSession(freshSaved, null)
+        ) {
           saveActiveUser(freshSaved);
           setCurrentAuthUser(freshSaved);
           setInternalPortal(freshSaved.role);
         } else {
-          setCurrentAuthUserState((prev) => (prev && prev.status !== 'inactive' ? prev : null));
+          setCurrentAuthUserState((prev) =>
+            prev && prev.status !== 'inactive' && isVerifiedOwnerSession(prev, null) ? prev : null
+          );
         }
       } finally {
         setIsAuthHydrated(true);

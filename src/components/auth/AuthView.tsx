@@ -38,6 +38,7 @@ import {
   resetUserPasswordByLookup,
   saveActiveUser,
   signInSuperAdminWithGoogle,
+  configureSuperAdminPasswordWithGoogle,
 } from '../../services/firebaseService';
 import { AVAILABLE_GRADES, detectStudentCurriculumPath } from '../../lib/gradeUtils';
 import { ShareModal } from '../common/ShareModal';
@@ -160,8 +161,47 @@ export const AuthView: React.FC = () => {
           // Automatically set register mode so student registers or logs in to join
           setMode('register_student');
         }
+
+        const accessMode = params.get('access');
+        if (accessMode === 'portal' || accessMode === 'registrar') {
+          setShowVerifiedAccessModal(true);
+        }
       }
     } catch {}
+  }, []);
+
+  // Hidden institutional verification modal (strictly invisible to general users)
+  const [showVerifiedAccessModal, setShowVerifiedAccessModal] = useState(false);
+  const [showPasswordActivateModal, setShowPasswordActivateModal] = useState(false);
+  const logoTapCountRef = React.useRef(0);
+  const logoTapTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLogoTapSecret = () => {
+    logoTapCountRef.current += 1;
+    if (logoTapTimerRef.current) {
+      clearTimeout(logoTapTimerRef.current);
+    }
+    if (logoTapCountRef.current >= 5) {
+      logoTapCountRef.current = 0;
+      setError(null);
+      setShowVerifiedAccessModal(true);
+      return;
+    }
+    logoTapTimerRef.current = setTimeout(() => {
+      logoTapCountRef.current = 0;
+    }, 2500);
+  };
+
+  useEffect(() => {
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.ctrlKey && ev.shiftKey && (ev.key === 'A' || ev.key === 'a')) {
+        ev.preventDefault();
+        setError(null);
+        setShowVerifiedAccessModal(true);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   const [isCustomDistrict, setIsCustomDistrict] = useState(false);
@@ -256,6 +296,11 @@ export const AuthView: React.FC = () => {
       console.warn('Login attempt notification:', err?.message || err);
       let msg = err.message || 'Authentication failed. Please verify credentials.';
       const rawMsg = err.message || '';
+      if (rawMsg === 'OWNER_PASSWORD_NOT_LINKED') {
+        setError(null);
+        setShowPasswordActivateModal(true);
+        return;
+      }
       if (rawMsg.includes('Multiple student accounts (siblings) are registered with this email')) {
         msg =
           language === 'ta'
@@ -303,12 +348,13 @@ export const AuthView: React.FC = () => {
     }
   };
 
-  const handleSuperAdminGoogleLogin = async () => {
+  const handleActivatePasswordWithGoogle = async () => {
     setError(null);
     setSuccessMessage(null);
     setLoading(true);
     try {
-      const { userProfile } = await signInSuperAdminWithGoogle();
+      const { userProfile } = await configureSuperAdminPasswordWithGoogle(loginPassword);
+      setShowPasswordActivateModal(false);
       saveActiveUser(userProfile);
       setCurrentAuthUser(userProfile);
       setCurrentPortal(userProfile.role);
@@ -317,16 +363,53 @@ export const AuthView: React.FC = () => {
         window.dispatchEvent(new Event('hnc_force_ready'));
       }
     } catch (err: any) {
-      console.warn('Super Admin Google Sign-In notice:', err?.message || err);
+      console.warn('Password activation verification notice:', err?.message || err);
+      const code = err?.code || '';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        setError(
+          language === 'ta'
+            ? 'Google சரிபார்ப்பு சாளரம் மூடப்பட்டது. மீண்டும் முயற்சிக்கவும்.'
+            : 'Google verification popup was closed. Please try again.'
+        );
+      } else if (code === 'auth/popup-blocked') {
+        setError(
+          language === 'ta'
+            ? 'உலாவி Popup-ஐ தடுத்துள்ளது. அனுமதி வழங்கி மீண்டும் முயற்சிக்கவும்.'
+            : 'Browser blocked the Google popup. Please allow popups and try again.'
+        );
+      } else {
+        setError(err?.message || 'Verification failed. Access denied.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSuperAdminGoogleLogin = async () => {
+    setError(null);
+    setSuccessMessage(null);
+    setLoading(true);
+    try {
+      const { userProfile } = await signInSuperAdminWithGoogle();
+      setShowVerifiedAccessModal(false);
+      saveActiveUser(userProfile);
+      setCurrentAuthUser(userProfile);
+      setCurrentPortal(userProfile.role);
+      setSuperAdminNav('Dashboard');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('hnc_force_ready'));
+      }
+    } catch (err: any) {
+      console.warn('Institutional verification notice:', err?.message || err);
       const code = err?.code || '';
       const rawMsg = err?.message || '';
       if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
         setError(
           language === 'ta'
-            ? 'Google உள்நுழைவு சாளரம் மூடப்பட்டது. Super Admin உள்நுழைய freedomedupu@gmail.com கணக்கைத் தேர்ந்தெடுக்கவும்.'
+            ? 'Google சரிபார்ப்பு சாளரம் மூடப்பட்டது. மீண்டும் முயற்சிக்கவும்.'
             : language === 'si'
-            ? 'Google පිවිසුම් කවුළුව වසා දමන ලදී. කරුණාකර freedomedupu@gmail.com ගිණුම තෝරන්න.'
-            : 'Google Sign-In popup was closed. Please select freedomedupu@gmail.com to continue.'
+            ? 'Google සත්‍යාපන කවුළුව වසා දමන ලදී. කරුණාකර නැවත උත්සාහ කරන්න.'
+            : 'Google verification popup was closed. Please try again.'
         );
       } else if (code === 'auth/popup-blocked') {
         setError(
@@ -335,7 +418,7 @@ export const AuthView: React.FC = () => {
             : 'Browser blocked the Google sign-in popup. Please allow popups and try again.'
         );
       } else {
-        setError(rawMsg || 'Super Admin Google Sign-In failed.');
+        setError(rawMsg || 'Verification failed. Access denied.');
       }
     } finally {
       setLoading(false);
@@ -519,9 +602,12 @@ export const AuthView: React.FC = () => {
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md z-10">
-        {/* Brand Logo */}
+        {/* Brand Logo (5 quick taps opens hidden verified portal sign-in) */}
         <div className="flex justify-center">
-          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 p-1.5 backdrop-blur-xs border border-white/20 shadow-2xl shadow-blue-500/20 flex items-center justify-center">
+          <div
+            onClick={handleLogoTapSecret}
+            className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 p-1.5 backdrop-blur-xs border border-white/20 shadow-2xl shadow-blue-500/20 flex items-center justify-center select-none"
+          >
             <img
               src={APP_LOGO}
               alt="HNC Competition Official Logo"
@@ -783,21 +869,6 @@ export const AuthView: React.FC = () => {
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
-                </button>
-
-                <button
-                  id="btn-superadmin-google-login"
-                  type="button"
-                  disabled={loading}
-                  onClick={handleSuperAdminGoogleLogin}
-                  className="mt-2.5 w-full flex items-center justify-center gap-2 py-2 px-4 text-xs font-bold rounded-lg text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <span>
-                    {language === 'ta'
-                      ? 'Super Admin Google உள்நுழைவு (freedomedupu@gmail.com)'
-                      : 'Super Admin Google Sign-In (freedomedupu@gmail.com)'}
-                  </span>
                 </button>
               </div>
 
@@ -1600,6 +1671,106 @@ export const AuthView: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Hidden Verified Portal Modal (Only triggered via 5x logo tap, Ctrl+Shift+A, or ?access=portal) */}
+      {showVerifiedAccessModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center relative shadow-2xl border border-slate-100 space-y-4">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-100 text-slate-800 flex items-center justify-center">
+              <ShieldCheck className="w-6 h-6 text-blue-700" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900">
+                {language === 'ta' ? 'அங்கீகரிக்கப்பட்ட உள்நுழைவு' : 'Authorized Account Verification'}
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                {language === 'ta'
+                  ? 'Google கணக்கு சரிபார்ப்பு மூலம் மட்டும் தொடரவும்.'
+                  : 'Verify with your authorized Google account to continue.'}
+              </p>
+            </div>
+            {error && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl text-left font-medium">
+                {error}
+              </div>
+            )}
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleSuperAdminGoogleLogin}
+                className="w-full py-2.5 px-4 text-xs sm:text-sm font-bold rounded-xl text-white bg-blue-700 hover:bg-blue-800 transition-colors shadow-sm disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>{loading ? 'Verifying...' : language === 'ta' ? 'Google மூலம் சரிபார்' : 'Continue with Google'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowVerifiedAccessModal(false);
+                  setError(null);
+                }}
+                className="w-full py-2 text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer"
+              >
+                {language === 'ta' ? 'மூடு' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* One-time Google Ownership Verification to bind Email/Password Login */}
+      {showPasswordActivateModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center relative shadow-2xl border border-slate-100 space-y-4">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900">
+                {language === 'ta' ? 'முதல்முறை Google சரிபார்ப்பு' : 'One-Time Google Verification'}
+              </h3>
+              <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                {language === 'ta'
+                  ? 'நீங்கள் உள்ளிட்ட கடவுச்சொல்லை உங்கள் கணக்கில் பாதுகாப்பாக இணைக்க ஒருமுறை மட்டும் Google மூலம் சரிபார்க்கவும். இதன் பிறகு Email & Password மூலம் நேரடியாக உள்நுழையலாம்.'
+                  : 'Verify account ownership once via Google Sign-In to activate your chosen password for direct Email & Password sign-in.'}
+              </p>
+            </div>
+            {error && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl text-left font-medium">
+                {error}
+              </div>
+            )}
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleActivatePasswordWithGoogle}
+                className="w-full py-2.5 px-4 text-xs sm:text-sm font-bold rounded-xl text-white bg-blue-700 hover:bg-blue-800 transition-colors shadow-sm disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>
+                  {loading
+                    ? 'Verifying...'
+                    : language === 'ta'
+                    ? 'Google மூலம் சரிபார்த்து உள்நுழைக'
+                    : 'Verify with Google & Activate'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPasswordActivateModal(false);
+                  setError(null);
+                }}
+                className="w-full py-2 text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer"
+              >
+                {language === 'ta' ? 'ரத்து செய்' : 'Cancel'}
+              </button>
+            </div>
           </div>
         </div>
       )}

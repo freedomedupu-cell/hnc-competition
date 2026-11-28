@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import zlib from 'zlib';
+import crypto from 'crypto';
 
 import { GoogleGenAI, Modality } from '@google/genai';
 import { WebSocketServer } from 'ws';
@@ -59,6 +60,35 @@ const server = http.createServer((req, res) => {
   ) {
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('OK');
+    return;
+  }
+
+  // Server-side institutional passcode verification (if SUPER_ADMIN_PASSCODE env var is configured)
+  if (urlPath === '/api/auth/verify-superadmin' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      try {
+        const { email, password } = JSON.parse(body || '{}');
+        const envPass = process.env.SUPER_ADMIN_PASSCODE || '';
+        if (!envPass.trim()) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ configured: false, verified: false }));
+          return;
+        }
+        const emailOk = String(email || '').trim().toLowerCase() === 'freedomedupu@gmail.com';
+        const a = crypto.createHash('sha256').update(String(password || '')).digest();
+        const b = crypto.createHash('sha256').update(envPass).digest();
+        const passOk = crypto.timingSafeEqual(a, b);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ configured: true, verified: emailOk && passOk }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ configured: false, verified: false }));
+      }
+    });
     return;
   }
 

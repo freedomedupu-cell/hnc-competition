@@ -21,6 +21,9 @@ import {
   sendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithPopup,
+  EmailAuthProvider,
+  linkWithCredential,
+  updatePassword,
   User as FirebaseUser,
 } from 'firebase/auth';
 import { initializeApp, deleteApp } from 'firebase/app';
@@ -93,12 +96,14 @@ export function saveActiveUser(user: DbUser | null): void {
   try {
     if (typeof window !== 'undefined') {
       if (user) {
-        const serialized = JSON.stringify(user);
+        const { passwordHash: _ph, initialPassword: _ip, ...safeUser } = user;
+        const serialized = JSON.stringify(safeUser);
         window.localStorage?.setItem('hnc_eduhub_active_user', serialized);
         window.sessionStorage?.setItem('hnc_eduhub_active_user', serialized);
       } else {
         window.localStorage?.removeItem('hnc_eduhub_active_user');
         window.sessionStorage?.removeItem('hnc_eduhub_active_user');
+        window.sessionStorage?.removeItem('hnc_verified_owner_session');
       }
     }
   } catch {}
@@ -132,13 +137,20 @@ export async function signInSuperAdminWithGoogle(options?: {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({
     prompt: 'select_account',
-    login_hint: 'freedomedupu@gmail.com',
   });
 
   // Keep signInWithPopup as the very first await to preserve browser user-gesture activation
   const result = await signInWithPopup(auth, provider);
   const fbUser = result.user;
   const email = (fbUser.email || '').trim().toLowerCase();
+
+  const isDesignatedSuperAdmin = email === 'freedomedupu@gmail.com';
+  if (!isDesignatedSuperAdmin) {
+    try {
+      await fbSignOut(auth);
+    } catch {}
+    throw new Error('This Google account is not authorized for institutional portal access.');
+  }
 
   let userProfile: DbUser | null = null;
   const targetRef = doc(db, 'users', fbUser.uid);
@@ -159,17 +171,11 @@ export async function signInSuperAdminWithGoogle(options?: {
     console.warn('Super Admin Google profile lookup notice:', err);
   }
 
-  const isDesignatedSuperAdmin = email === 'freedomedupu@gmail.com';
-  const isStoredSuperAdmin =
-    userProfile?.role === 'super_admin' && userProfile?.status !== 'inactive';
-
-  if (!isDesignatedSuperAdmin && !isStoredSuperAdmin) {
+  if (userProfile?.status === 'inactive') {
     try {
       await fbSignOut(auth);
     } catch {}
-    throw new Error(
-      `Account (${email || 'unknown'}) is not authorized as Super Admin. Please select freedomedupu@gmail.com.`
-    );
+    throw new Error('This account is currently inactive.');
   }
 
   const existingSaved = options?.preserveExistingSessionUid ? getSavedActiveUser() : null;
@@ -199,8 +205,117 @@ export async function signInSuperAdminWithGoogle(options?: {
       ? { ...existingSaved, email: firestoreProfile.email }
       : firestoreProfile;
 
+  try {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage?.setItem('hnc_verified_owner_session', activeProfile.uid);
+    }
+  } catch {}
   saveActiveUser(activeProfile);
   return { firebaseUser: fbUser, userProfile: activeProfile };
+}
+
+/**
+ * Verify Google ownership (freedomedupu@gmail.com) and bind/update the Super Admin's
+ * personal login password in Firebase Auth & salted Firestore credential storage.
+ */
+export async function configureSuperAdminPasswordWithGoogle(
+  newPassword: string,
+  options?: { skipPopupIfSignedIn?: boolean }
+): Promise<{ firebaseUser: FirebaseUser | null; userProfile: DbUser }> {
+  const cleanPass = newPassword.trim();
+  if (cleanPass.length < 6) {
+    throw new Error('Password must be at least 6 characters long.');
+  }
+
+  let fbUser: FirebaseUser | null = null;
+  let userProfile: DbUser | null = null;
+
+  if (
+    options?.skipPopupIfSignedIn &&
+    auth.currentUser &&
+    auth.currentUser.email?.toLowerCase() === 'freedomedupu@gmail.com'
+  ) {
+    fbUser = auth.currentUser;
+    const snap = await getDoc(doc(db, 'users', fbUser.uid));
+    if (snap.exists()) {
+      userProfile = snap.data() as DbUser;
+    }
+  } else {
+    const authRes = await signInSuperAdminWithGoogle();
+    fbUser = authRes.firebaseUser;
+    userProfile = authRes.userProfile;
+  }
+
+  if (!fbUser || fbUser.email?.toLowerCase() !== 'freedomedupu@gmail.com') {
+    throw new Error('Google account verification is required.');
+  }
+
+  // Bind or update Firebase Auth email/password credential when provider is enabled
+  try {
+    const emailCred = EmailAuthProvider.credential('freedomedupu@gmail.com', cleanPass);
+    await linkWithCredential(fbUser, emailCred);
+  } catch (linkErr: any) {
+    if (
+      linkErr?.code === 'auth/provider-already-linked' ||
+      linkErr?.code === 'auth/credential-already-in-use' ||
+      linkErr?.code === 'auth/email-already-in-use'
+    ) {
+      try {
+        await updatePassword(fbUser, cleanPass);
+      } catch (updErr: any) {
+        console.warn('Firebase Auth updatePassword notice:', updErr?.code || updErr?.message);
+      }
+    } else {
+      console.warn('Firebase Auth linkWithCredential notice:', linkErr?.code || linkErr?.message);
+    }
+  }
+
+  const computedHash = await hashCredential(cleanPass);
+  const nowIso = new Date().toISOString();
+
+  const updatedProfile: DbUser = {
+    ...(userProfile || {}),
+    uid: fbUser.uid,
+    fullName: userProfile?.fullName || fbUser.displayName || 'Chief Academic Registrar (Super Admin)',
+    email: 'freedomedupu@gmail.com',
+    phone: userProfile?.phone || '+94 77 123 4567',
+    role: 'super_admin',
+    status: 'active',
+    createdAt: userProfile?.createdAt || nowIso,
+    passwordHash: computedHash,
+    customPasswordConfigured: true,
+    passwordUpdatedAt: nowIso,
+  };
+
+  await setDoc(doc(db, 'users', fbUser.uid), updatedProfile, { merge: true });
+
+  // Sync updated hash across any legacy email-matched doc (clears any old seed hash)
+  try {
+    const emailSnap = await getDocs(
+      query(collection(db, 'users'), where('email', '==', 'freedomedupu@gmail.com'))
+    );
+    await Promise.all(
+      emailSnap.docs.map((d) =>
+        setDoc(
+          d.ref,
+          {
+            passwordHash: computedHash,
+            customPasswordConfigured: true,
+            passwordUpdatedAt: nowIso,
+          },
+          { merge: true }
+        )
+      )
+    );
+  } catch {}
+
+  try {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage?.setItem('hnc_verified_owner_session', updatedProfile.uid);
+    }
+  } catch {}
+  saveActiveUser(updatedProfile);
+  return { firebaseUser: fbUser, userProfile: updatedProfile };
 }
 
 /**
@@ -215,96 +330,121 @@ export async function loginWithEmailPassword(
   const normalizedIdentifier = rawIdentifier.toLowerCase();
   let firebaseUser: FirebaseUser | null = null;
 
-  // 1. Designated Institutional Super Admin flow (freedomedupu@gmail.com)
+  // Never allow guessed shortcut username 'superadmin'
+  if (normalizedIdentifier === 'superadmin') {
+    throw new Error('No user account found with this Student ID or Username. Please verify and try again.');
+  }
+
+  // 1. Strict Verified Owner Email/Password Login (freedomedupu@gmail.com)
+  // Requires genuine Firebase Auth password, configured server secret, OR owner-activated salted hash.
   if (normalizedIdentifier === 'freedomedupu@gmail.com') {
-    let authUnavailable = false;
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, normalizedIdentifier, trimmedPass);
-      firebaseUser = userCredential.user;
-    } catch (authErr: any) {
-      if (isAuthUnavailableError(authErr)) {
-        authUnavailable = true;
-      } else if (
-        authErr.code === 'auth/user-not-found' ||
-        authErr.code === 'auth/invalid-credential'
-      ) {
-        // If not yet provisioned in Firebase Auth, attempt to register designated Super Admin
-        try {
-          const newCred = await createUserWithEmailAndPassword(auth, normalizedIdentifier, trimmedPass);
-          firebaseUser = newCred.user;
-        } catch (createErr: any) {
-          if (isAuthUnavailableError(createErr)) {
-            authUnavailable = true;
-          } else if (createErr.code === 'auth/email-already-in-use') {
-            throw new Error('Invalid password. Please check your credentials.');
-          } else {
-            authUnavailable = true;
-          }
-        }
-      } else {
-        // Any other network or provider issue defaults to resilient Firestore authentication
-        authUnavailable = true;
-      }
+    if (!trimmedPass) {
+      throw new Error('Invalid password. Please check your credentials.');
     }
 
-    const saUid = firebaseUser ? firebaseUser.uid : 'sa_freedomedupu';
-    const computedHash = await hashCredential(trimmedPass);
-    let targetDocRef = doc(db, 'users', saUid);
-    let userProfile: DbUser;
-
+    let firebaseVerified = false;
     try {
-      const userSnap = await getDoc(targetDocRef);
-      if (userSnap.exists()) {
-        userProfile = userSnap.data() as DbUser;
-      } else {
-        // Search if super admin user document was stored under a different ID
-        const saSnap = await getDocs(query(collection(db, 'users'), where('email', '==', normalizedIdentifier)));
-        if (!saSnap.empty) {
-          userProfile = saSnap.docs[0].data() as DbUser;
-          targetDocRef = saSnap.docs[0].ref;
-        } else {
-          userProfile = {
-            uid: saUid,
-            fullName: 'Chief Academic Registrar (Super Admin)',
-            email: normalizedIdentifier,
-            phone: '+94 77 123 4567',
-            role: 'super_admin',
-            status: 'active',
-            passwordHash: computedHash,
-            createdAt: new Date().toISOString(),
-          };
-          await setDoc(targetDocRef, userProfile);
-        }
-      }
+      const cred = await signInWithEmailAndPassword(auth, 'freedomedupu@gmail.com', trimmedPass);
+      firebaseUser = cred.user;
+      firebaseVerified = true;
+    } catch {
+      firebaseVerified = false;
+    }
 
-      // If logging in via Firestore fallback, check password hash
-      if (authUnavailable && userProfile.passwordHash) {
-        if (userProfile.passwordHash !== computedHash) {
-          throw new Error('Invalid password. Please check your credentials.');
+    // Check optional server-side SUPER_ADMIN_PASSCODE secret if configured
+    let serverConfigured = false;
+    let serverVerified = false;
+    try {
+      const controller = new AbortController();
+      const tId = setTimeout(() => controller.abort(), 3000);
+      const resp = await fetch('/api/auth/verify-superadmin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedIdentifier, password: trimmedPass }),
+        signal: controller.signal,
+      });
+      clearTimeout(tId);
+      if (resp.ok) {
+        const data = await resp.json();
+        serverConfigured = Boolean(data?.configured);
+        serverVerified = Boolean(data?.verified);
+      }
+    } catch {}
+
+    if (serverConfigured && !serverVerified && !firebaseVerified) {
+      throw new Error('Invalid password. Please check your credentials.');
+    }
+
+    // Fetch existing Firestore Super Admin profile(s)
+    let matchedProfile: DbUser | null = null;
+    const ownerDocs: DbUser[] = [];
+    try {
+      if (firebaseUser) {
+        const uidSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
+        if (uidSnap.exists()) {
+          ownerDocs.push(uidSnap.data() as DbUser);
         }
-      } else if (!userProfile.passwordHash) {
-        try {
-          await setDoc(targetDocRef, { passwordHash: computedHash }, { merge: true });
-        } catch {}
       }
-    } catch (firestoreErr: any) {
-      if (firestoreErr?.message === 'Invalid password. Please check your credentials.') {
-        throw firestoreErr;
-      }
-      console.warn('Super Admin Firestore profile fetch fallback:', firestoreErr);
-      userProfile = {
-        uid: saUid,
-        fullName: 'Chief Academic Registrar (Super Admin)',
-        email: normalizedIdentifier,
+      const emailSnap = await getDocs(
+        query(collection(db, 'users'), where('email', '==', 'freedomedupu@gmail.com'))
+      );
+      emailSnap.forEach((d) => {
+        const data = d.data() as DbUser;
+        if (!ownerDocs.some((x) => x.uid === data.uid)) {
+          ownerDocs.push(data);
+        }
+      });
+    } catch (err) {
+      console.warn('Owner profile lookup notice:', err);
+    }
+
+    if (firebaseVerified || serverVerified) {
+      matchedProfile = ownerDocs[0] || {
+        uid: firebaseUser?.uid || 'sa_freedomedupu',
+        fullName: firebaseUser?.displayName || 'Chief Academic Registrar (Super Admin)',
+        email: 'freedomedupu@gmail.com',
         phone: '+94 77 123 4567',
         role: 'super_admin',
         status: 'active',
-        passwordHash: computedHash,
         createdAt: new Date().toISOString(),
       };
+    } else {
+      // Strictly ONLY accept passwords explicitly configured by the verified owner (never legacy seeds)
+      const configuredDocs = ownerDocs.filter(
+        (d) => d.customPasswordConfigured === true && Boolean(d.passwordHash)
+      );
+      if (configuredDocs.length > 0) {
+        const computedHash = await hashCredential(trimmedPass);
+        const exactMatch = configuredDocs.find((d) => d.passwordHash === computedHash);
+        if (!exactMatch) {
+          throw new Error('Invalid password. Please check your credentials.');
+        }
+        matchedProfile = exactMatch;
+      } else {
+        // Owner has not yet linked an email/password after Google registration
+        throw new Error('OWNER_PASSWORD_NOT_LINKED');
+      }
     }
-    saveActiveUser(userProfile);
-    return { firebaseUser, userProfile };
+
+    if (matchedProfile.status === 'inactive') {
+      throw new Error('Your account is currently inactive or suspended. Please contact the administrator.');
+    }
+
+    const finalProfile: DbUser = {
+      ...matchedProfile,
+      uid: firebaseUser?.uid || matchedProfile.uid || 'sa_freedomedupu',
+      email: 'freedomedupu@gmail.com',
+      role: 'super_admin',
+      status: 'active',
+    };
+
+    try {
+      if (typeof window !== 'undefined') {
+        window.sessionStorage?.setItem('hnc_verified_owner_session', finalProfile.uid);
+      }
+    } catch {}
+    saveActiveUser(finalProfile);
+    return { firebaseUser, userProfile: finalProfile };
   }
 
   // 2. Candidate & Staff Look-up: Locate user account by Username, Student ID, Staff ID, or Email (Parallelized)
@@ -412,7 +552,7 @@ export async function loginWithEmailPassword(
     }
   }
 
-  if (!targetUserDoc) {
+  if (!targetUserDoc || targetUserDoc.role === 'super_admin') {
     throw new Error('No user account found with this Student ID or Username. Please verify and try again.');
   }
 
@@ -473,17 +613,10 @@ export async function loginWithEmailPassword(
     return { firebaseUser, userProfile: targetUserDoc };
   }
 
-  // 4. Resilient Fallback: Verify password hash directly from Firestore
+  // 4. Resilient Fallback: Verify password hash strictly against Firestore
   const computedHash = await hashCredential(trimmedPass);
-  if (targetUserDoc.passwordHash) {
-    if (computedHash !== targetUserDoc.passwordHash) {
-      throw new Error('Invalid password. Please check your credentials.');
-    }
-  } else {
-    // Record password hash on initial successful check
-    try {
-      await updateDoc(doc(db, 'users', targetUserDoc.uid), { passwordHash: computedHash });
-    } catch {}
+  if (!targetUserDoc.passwordHash || computedHash !== targetUserDoc.passwordHash) {
+    throw new Error('Invalid password. Please check your credentials.');
   }
 
   if (targetUserDoc.role === 'student') {
@@ -872,56 +1005,6 @@ export async function deleteAdminInFirestore(adminUid: string): Promise<void> {
   } catch (e) {
     console.warn('Delete admin from users collection notice:', e);
   }
-}
-
-/**
- * Bootstrap or register Super Admin on first project run if not yet existing
- */
-export async function setupSuperAdminInitialAccount(
-  fullName: string,
-  email: string,
-  pass: string
-): Promise<{ firebaseUser: FirebaseUser | null; userProfile: DbUser }> {
-  const normalizedEmail = email.trim().toLowerCase();
-  const computedHash = await hashCredential(pass);
-  const now = new Date().toISOString();
-  let firebaseUser: FirebaseUser | null = null;
-  let targetUid = 'sa_freedomedupu';
-
-  try {
-    const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, pass);
-    firebaseUser = cred.user;
-    targetUid = cred.user.uid;
-  } catch (err: any) {
-    if (isAuthUnavailableError(err)) {
-      console.warn('Firebase Auth email/password provider is not enabled in Firebase Console. Using persistent Firestore authentication layer.');
-    } else if (err.code === 'auth/email-already-in-use') {
-      try {
-        const cred = await signInWithEmailAndPassword(auth, normalizedEmail, pass);
-        firebaseUser = cred.user;
-        targetUid = cred.user.uid;
-      } catch {
-        // Continue with Firestore setup
-      }
-    } else {
-      throw err;
-    }
-  }
-
-  const superAdminProfile: DbUser = {
-    uid: targetUid,
-    fullName: fullName.trim() || 'Chief Academic Registrar',
-    email: normalizedEmail,
-    phone: '+94 77 123 4567',
-    role: 'super_admin',
-    status: 'active',
-    createdAt: now,
-    passwordHash: computedHash,
-  };
-
-  await setDoc(doc(db, 'users', targetUid), superAdminProfile);
-  saveActiveUser(superAdminProfile);
-  return { firebaseUser, userProfile: superAdminProfile };
 }
 
 /**
@@ -1521,27 +1604,6 @@ export async function closeLiveProctorSession(
  */
 export async function seedInitialDataIfEmpty(): Promise<void> {
   try {
-    const now = new Date().toISOString();
-    const adminPassHash = await hashCredential('Admin@123456');
-
-    // 1. Super Admin: freedomedupu@gmail.com
-    const saDocRef = doc(db, 'users', 'sa_freedomedupu');
-    const saSnap = await getDoc(saDocRef);
-    if (!saSnap.exists() || !saSnap.data()?.passwordHash) {
-      const saRecord: DbUser = {
-        uid: 'sa_freedomedupu',
-        fullName: 'Chief Academic Registrar (Super Admin)',
-        email: 'freedomedupu@gmail.com',
-        username: 'superadmin',
-        phone: '+94 77 123 4567',
-        role: 'super_admin',
-        status: 'active',
-        createdAt: now,
-        passwordHash: adminPassHash,
-      };
-      await setDoc(saDocRef, saRecord, { merge: true });
-    }
-
     // Purge legacy and sample demo data from Firestore (including demo ads)
     await purgeLegacyDemoFirestoreData();
     if (typeof window !== 'undefined') {
@@ -3094,6 +3156,15 @@ export async function resetUserPasswordByLookup(
   const userDoc = userSnap.docs[0];
   const userData = userDoc.data();
   const uid = userDoc.id || userData.uid;
+
+  // Strictly block password reset recovery on Super Admin & Admin staff accounts
+  if (
+    userData.role === 'super_admin' ||
+    userData.role === 'admin' ||
+    String(userData.email || '').toLowerCase() === 'freedomedupu@gmail.com'
+  ) {
+    throw new Error('No account found matching this Student ID, Username, or Email.');
+  }
 
   // Generate or use new password
   const assignedPassword =

@@ -14,6 +14,8 @@ export interface DbUser {
   status: 'active' | 'inactive';
   createdAt: string;
   passwordHash?: string;
+  customPasswordConfigured?: boolean;
+  passwordUpdatedAt?: string;
   initialPassword?: string;
   grade?: string;
   school?: string;

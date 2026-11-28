@@ -34,6 +34,7 @@ import { useApp } from '../../context/AppContext';
 import { BankAccountDetails, PaymentGatewayConfig, MembershipSettings } from '../../types';
 import { simulateSessionTimeoutWarning } from '../../lib/sessionUtils';
 import { NotificationsConfigPanel } from '../common/NotificationsConfigPanel';
+import { configureSuperAdminPasswordWithGoogle } from '../../services/firebaseService';
 
 export const SettingsView: React.FC = () => {
   const {
@@ -54,6 +55,10 @@ export const SettingsView: React.FC = () => {
   const [memSaveSuccess, setMemSaveSuccess] = useState(false);
   const [reviewLoading, setReviewLoading] = useState<string | null>(null);
   const [viewingSlipUrl, setViewingSlipUrl] = useState<string | null>(null);
+  const [newOwnerPass, setNewOwnerPass] = useState('');
+  const [confirmOwnerPass, setConfirmOwnerPass] = useState('');
+  const [ownerPassBusy, setOwnerPassBusy] = useState(false);
+  const [ownerPassMsg, setOwnerPassMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   React.useEffect(() => {
     setFormData({ ...settings });
@@ -1337,6 +1342,75 @@ export const SettingsView: React.FC = () => {
                   Transaction references and slip images are stored with immutable audit log entries.
                 </span>
               </div>
+            </div>
+
+            {/* Super Admin Login Password Configuration */}
+            <div className="pt-4 border-t border-slate-200 space-y-3">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-blue-700" />
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Super Admin Login Password Setup
+                </h3>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Set or update the direct Email &amp; Password login credential for your Super Admin account. Requires Google verification if not already verified in this browser session.
+              </p>
+              {ownerPassMsg && (
+                <div
+                  className={`p-2.5 rounded-lg text-xs font-medium border ${
+                    ownerPassMsg.type === 'ok'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                      : 'bg-rose-50 border-rose-200 text-rose-800'
+                  }`}
+                >
+                  {ownerPassMsg.text}
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="password"
+                  value={newOwnerPass}
+                  onChange={(e) => setNewOwnerPass(e.target.value)}
+                  placeholder="New Password (min 6 chars)"
+                  className="px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+                <input
+                  type="password"
+                  value={confirmOwnerPass}
+                  onChange={(e) => setConfirmOwnerPass(e.target.value)}
+                  placeholder="Confirm New Password"
+                  className="px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={ownerPassBusy}
+                onClick={async () => {
+                  setOwnerPassMsg(null);
+                  if (newOwnerPass.trim().length < 6) {
+                    setOwnerPassMsg({ type: 'err', text: 'Password must be at least 6 characters.' });
+                    return;
+                  }
+                  if (newOwnerPass !== confirmOwnerPass) {
+                    setOwnerPassMsg({ type: 'err', text: 'Passwords do not match.' });
+                    return;
+                  }
+                  setOwnerPassBusy(true);
+                  try {
+                    await configureSuperAdminPasswordWithGoogle(newOwnerPass, { skipPopupIfSignedIn: true });
+                    setNewOwnerPass('');
+                    setConfirmOwnerPass('');
+                    setOwnerPassMsg({ type: 'ok', text: 'Super Admin password updated securely.' });
+                  } catch (e: any) {
+                    setOwnerPassMsg({ type: 'err', text: e?.message || 'Failed to update password.' });
+                  } finally {
+                    setOwnerPassBusy(false);
+                  }
+                }}
+                className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold rounded-lg shadow-2xs transition disabled:opacity-50 cursor-pointer"
+              >
+                {ownerPassBusy ? 'Updating...' : 'Save Super Admin Password'}
+              </button>
             </div>
           </div>
 
